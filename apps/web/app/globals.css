@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 30 20% 98%;
+  --foreground: 220 25% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 25% 15%;
+  --primary: 238 82% 59%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 30 15% 92%;
+  --secondary-foreground: 220 20% 20%;
+  --muted: 30 10% 94%;
+  --muted-foreground: 220 10% 46%;
+  --accent: 238 82% 95%;
+  --accent-foreground: 238 82% 45%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 30 15% 88%;
+  --input: 30 15% 88%;
+  --ring: 238 82% 59%;
+}
+
+.dark {
+  --background: 224 25% 9%;
+  --foreground: 210 20% 98%;
+  --card: 224 25% 12%;
+  --card-foreground: 210 20% 98%;
+  --primary: 238 82% 65%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 224 20% 16%;
+  --secondary-foreground: 210 20% 90%;
+  --muted: 224 20% 16%;
+  --muted-foreground: 217 10% 65%;
+  --accent: 238 82% 20%;
+  --accent-foreground: 238 82% 80%;
+  --destructive: 0 62% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 224 20% 18%;
+  --input: 224 20% 18%;
+  --ring: 238 82% 65%;
+}
+
+body {
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}

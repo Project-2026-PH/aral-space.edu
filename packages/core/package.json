@@ -1,0 +1,14 @@
+{
+  "name": "@quiz-creator/core",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@quiz-creator/types": "workspace:*",
+    "@google/genai": "^2.17.1",
+    "@supabase/supabase-js": "^2.112.1"
+  }
+}

@@ -1,0 +1,82 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import QuizRunner from '@/components/quiz/QuizRunner';
+import { Quiz, QuizQuestion, QuizSession, QuestionProgress, QuizMode } from '@quiz-creator/types';
+
+export default function PracticePage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const quizId = params?.quizId as string;
+
+  const mode = (searchParams.get('mode') as QuizMode) || 'multiple_choice';
+  const shuffleQuestions = searchParams.get('shuffleQuestions') === 'true';
+  const shuffleOptions = searchParams.get('shuffleOptions') !== 'false';
+
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [session, setSession] = useState<QuizSession | null>(null);
+  const [progress, setProgress] = useState<QuestionProgress[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function initSession() {
+      if (!quizId) return;
+      try {
+        // 1. Fetch quiz metadata
+        const quizRes = await fetch(`/api/quizzes/${quizId}`);
+        if (!quizRes.ok) throw new Error('Quiz not found');
+        const quizData = await quizRes.json();
+        setQuiz(quizData);
+
+        // 2. Start session
+        const sessRes = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'start', quizId })
+        });
+        if (!sessRes.ok) throw new Error('Failed to start session');
+        const sessData = await sessRes.json();
+
+        setQuestions(sessData.questions || []);
+        setSession(sessData.session || null);
+        setProgress(sessData.progress || []);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    initSession();
+  }, [quizId]);
+
+  if (loading) {
+    return (
+      <div className="max-w-xl mx-auto py-12 text-center text-xs text-muted-foreground animate-pulse">
+        Initializing practice session...
+      </div>
+    );
+  }
+
+  if (error || !quiz || !session) {
+    return (
+      <div className="max-w-md mx-auto py-12 text-center space-y-3">
+        <p className="text-sm font-bold text-destructive">{error || 'Session initialization failed'}</p>
+      </div>
+    );
+  }
+
+  return (
+    <QuizRunner
+      quiz={quiz}
+      initialQuestions={questions}
+      initialSession={session}
+      initialProgress={progress}
+      mode={mode}
+      shuffleQuestions={shuffleQuestions}
+      shuffleOptions={shuffleOptions}
+    />
+  );
+}

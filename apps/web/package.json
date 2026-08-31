@@ -1,0 +1,34 @@
+{
+  "name": "@quiz-creator/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@quiz-creator/types": "workspace:*",
+    "@quiz-creator/core": "workspace:*",
+    "@quiz-creator/controllers": "workspace:*",
+    "@google/genai": "^2.17.1",
+    "@supabase/supabase-js": "^2.112.1",
+    "@supabase/ssr": "^0.12.4",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.511.0",
+    "next": "^15.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@quiz-creator/controllers",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@quiz-creator/types": "workspace:*",
+    "@quiz-creator/core": "workspace:*"
+  }
+}

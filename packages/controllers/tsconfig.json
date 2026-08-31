@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@quiz-creator/controllers": [
+        "./src/index.ts"
+      ],
+      "@quiz-creator/core": [
+        "../core/src/index.ts"
+      ],
+      "@quiz-creator/types": [
+        "../types/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ]
+}

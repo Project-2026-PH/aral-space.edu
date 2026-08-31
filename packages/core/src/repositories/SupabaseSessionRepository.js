@@ -1,0 +1,146 @@
+export class SupabaseSessionRepository {
+    supabase;
+    constructor(supabase) {
+        this.supabase = supabase;
+    }
+    async getActiveSession(quizId, userId) {
+        let query = this.supabase
+            .from('quiz_sessions')
+            .select('*')
+            .eq('quiz_id', quizId)
+            .eq('status', 'in_progress')
+            .order('created_at', { ascending: false })
+            .limit(1);
+        if (userId)
+            query = query.eq('user_id', userId);
+        const { data, error } = await query.maybeSingle();
+        if (error)
+            throw error;
+        return data;
+    }
+    async getScheduledSession(quizId, userId) {
+        let query = this.supabase
+            .from('quiz_sessions')
+            .select('*')
+            .eq('quiz_id', quizId)
+            .eq('status', 'scheduled')
+            .order('available_at', { ascending: true })
+            .limit(1);
+        if (userId)
+            query = query.eq('user_id', userId);
+        const { data, error } = await query.maybeSingle();
+        if (error)
+            throw error;
+        return data;
+    }
+    async getLatestCompletedSession(quizId, userId) {
+        let query = this.supabase
+            .from('quiz_sessions')
+            .select('*')
+            .eq('quiz_id', quizId)
+            .eq('status', 'completed')
+            .order('completed_at', { ascending: false })
+            .limit(1);
+        if (userId)
+            query = query.eq('user_id', userId);
+        const { data, error } = await query.maybeSingle();
+        if (error)
+            throw error;
+        return data;
+    }
+    async listSessions(quizId, userId) {
+        let query = this.supabase
+            .from('quiz_sessions')
+            .select('*')
+            .eq('quiz_id', quizId)
+            .order('created_at', { ascending: false });
+        if (userId)
+            query = query.eq('user_id', userId);
+        const { data, error } = await query;
+        if (error)
+            throw error;
+        return data || [];
+    }
+    async createSession(quizId, sessionType, availableAt, userId) {
+        const { data, error } = await this.supabase
+            .from('quiz_sessions')
+            .insert({
+            quiz_id: quizId,
+            user_id: userId,
+            session_type: sessionType,
+            status: 'in_progress',
+            available_at: availableAt || new Date().toISOString(),
+            started_at: new Date().toISOString()
+        })
+            .select('*')
+            .single();
+        if (error)
+            throw error;
+        return data;
+    }
+    async updateSessionStatus(sessionId, status, completedAt) {
+        const { data, error } = await this.supabase
+            .from('quiz_sessions')
+            .update({
+            status,
+            ...(completedAt ? { completed_at: completedAt } : {})
+        })
+            .eq('id', sessionId)
+            .select('*')
+            .single();
+        if (error)
+            throw error;
+        return data;
+    }
+    async getProgressForSession(sessionId) {
+        const { data, error } = await this.supabase
+            .from('quiz_question_progress')
+            .select('*')
+            .eq('session_id', sessionId);
+        if (error)
+            throw error;
+        return data || [];
+    }
+    async saveQuestionProgress(p) {
+        if (p.id) {
+            const { data, error } = await this.supabase
+                .from('quiz_question_progress')
+                .update({
+                streak_count: p.streak_count,
+                has_missed: p.has_missed,
+                locked: p.locked,
+                locked_at: p.locked_at
+            })
+                .eq('id', p.id)
+                .select('*')
+                .single();
+            if (error)
+                throw error;
+            return data;
+        }
+        else {
+            const { data, error } = await this.supabase
+                .from('quiz_question_progress')
+                .upsert({
+                session_id: p.session_id,
+                question_id: p.question_id,
+                streak_count: p.streak_count,
+                has_missed: p.has_missed,
+                locked: p.locked,
+                locked_at: p.locked_at
+            }, { onConflict: 'session_id,question_id' })
+                .select('*')
+                .single();
+            if (error)
+                throw error;
+            return data;
+        }
+    }
+    async batchSaveQuestionProgress(progressList) {
+        const results = [];
+        for (const p of progressList) {
+            results.push(await this.saveQuestionProgress(p));
+        }
+        return results;
+    }
+}

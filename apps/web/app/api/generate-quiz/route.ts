@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { RepositoryFactory } from '@quiz-creator/core';
 import { QuizGenerationController } from '@quiz-creator/controllers';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getAnonymousUserId } from '@/lib/anonymous';
 
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
@@ -13,6 +14,8 @@ export async function POST(req: NextRequest) {
     await writer.write(encoder.encode(payload));
   };
 
+  const userId = await getAnonymousUserId(req);
+
   (async () => {
     try {
       const body = await req.json();
@@ -22,7 +25,7 @@ export async function POST(req: NextRequest) {
 
       await controller.handleStreamingGeneration(body, (progressData) => {
         sendProgress(progressData);
-      });
+      }, userId);
     } catch (err: any) {
       console.error('[API generate-quiz error]:', err);
       await sendProgress({

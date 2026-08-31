@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RepositoryFactory } from '@quiz-creator/core';
 import { MasterySessionController } from '@quiz-creator/controllers';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getAnonymousUserId } from '@/lib/anonymous';
 
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getAnonymousUserId(req);
     const body = await req.json();
     const { action, quizId, sessionId, questionId, isCorrect, sessionType } = body;
     const supabase = await createServerSupabaseClient();
@@ -13,7 +15,7 @@ export async function POST(req: NextRequest) {
     const controller = new MasterySessionController(sessionRepo, quizRepo);
 
     if (action === 'start') {
-      const data = await controller.getOrStartSession(quizId, sessionType);
+      const data = await controller.getOrStartSession(quizId, sessionType, userId);
       return NextResponse.json(data);
     }
 
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'complete') {
-      const result = await controller.completeSession(sessionId, quizId);
+      const result = await controller.completeSession(sessionId, quizId, userId);
       return NextResponse.json(result);
     }
 

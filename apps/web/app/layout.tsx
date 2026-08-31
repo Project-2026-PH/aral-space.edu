@@ -3,6 +3,7 @@ import './globals.css';
 import Link from 'next/link';
 import { Sparkles, BookOpen, Layers } from 'lucide-react';
 import PwaRegister from '@/components/PwaRegister';
+import AnonymousSessionBadge from '@/components/AnonymousSessionBadge';
 
 export const viewport: Viewport = {
   themeColor: '#4f46e5',
@@ -43,15 +44,9 @@ export default function RootLayout({
               </div>
             </Link>
 
-            <nav className="flex items-center gap-2">
-              <Link
-                href="/new"
-                className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-md shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Create Quiz</span>
-              </Link>
-            </nav>
+            <div className="flex items-center gap-3">
+              <AnonymousSessionBadge />
+            </div>
           </div>
         </header>
 

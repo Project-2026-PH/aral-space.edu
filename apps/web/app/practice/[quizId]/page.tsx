@@ -28,13 +28,13 @@ export default function PracticePage({
     async function initSession() {
       if (!quizId) return;
       try {
-        // 1. Fetch quiz metadata
+        // Fetch quiz metadata
         const quizRes = await fetch(`/api/quizzes/${quizId}`);
         if (!quizRes.ok) throw new Error('Quiz not found');
         const quizData = await quizRes.json();
         setQuiz(quizData);
 
-        // 2. Start session
+        // Start session
         const sessRes = await fetch('/api/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -65,6 +65,33 @@ export default function QuizRunner({
   const [restingCompletedBatch, setRestingCompletedBatch] = useState<number>(0);
   const [restingNextBatch, setRestingNextBatch] = useState<number>(1);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const correctAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const audio = new Audio('/correct_sound.mp3');
+      audio.preload = 'auto';
+      correctAudioRef.current = audio;
+    }
+  }, []);
+
+  const playCorrectSound = () => {
+    try {
+      if (correctAudioRef.current) {
+        correctAudioRef.current.currentTime = 0;
+        correctAudioRef.current.play().catch((err) => {
+          console.warn('Audio playback error:', err);
+        });
+      } else {
+        const audio = new Audio('/correct_sound.mp3');
+        audio.play().catch((err) => {
+          console.warn('Audio playback error:', err);
+        });
+      }
+    } catch (err) {
+      console.warn('Audio error:', err);
+    }
+  };
 
   // Active batch questions
   const batchQuestions = questions.filter(
@@ -113,6 +140,9 @@ export default function QuizRunner({
     setSelectedOptionId(option.optionId);
 
     const isCorrect = option.isCorrect;
+    if (isCorrect) {
+      playCorrectSound();
+    }
     const nextProgData = MasteryEngineService.calculateNextProgress(
       currentProg,
       isCorrect,

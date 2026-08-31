@@ -1,3 +1,4 @@
+// @ts-ignore
 import { GoogleGenAI, Type } from '@google/genai';
 import { RawAiQuestion, GeneratedQuizResult, HandoutPage } from '@quiz-creator/types';
 

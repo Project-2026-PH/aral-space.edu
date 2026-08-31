@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS quizzes (
   source_model TEXT NOT NULL DEFAULT 'manual',
   subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL,
   user_id UUID,
+  share_token TEXT UNIQUE,
+  is_public BOOLEAN NOT NULL DEFAULT TRUE,
+  allow_cloning BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

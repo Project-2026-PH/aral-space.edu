@@ -6,8 +6,9 @@ import QuizBatchesSection from './QuizBatchesSection';
 import QuizQuestionList from './QuizQuestionList';
 import QuizQuestionFormModal from './QuizQuestionFormModal';
 import QuizStartConfigModal from './QuizStartConfigModal';
+import ShareQuizModal from './ShareQuizModal';
 import ConfirmModal from '../ui/ConfirmModal';
-import { Play, Plus, Edit, Trash2, ArrowLeft } from 'lucide-react';
+import { Play, Plus, Edit, Trash2, ArrowLeft, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -30,6 +31,7 @@ export default function QuizOverviewClient({
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
   const [showStartModal, setShowStartModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteQuizModal, setShowDeleteQuizModal] = useState(false);
 
   async function refreshQuestions() {
@@ -90,8 +92,16 @@ export default function QuizOverviewClient({
           <button
             onClick={() => setShowDeleteQuizModal(true)}
             className="p-2 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            title="Delete Quiz"
           >
             <Trash2 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            <span>Share</span>
           </button>
           <button
             onClick={() => setShowStartModal(true)}
@@ -203,6 +213,13 @@ export default function QuizOverviewClient({
         onOpenChange={setShowStartModal}
         quizId={quiz.id}
         title={quiz.title}
+      />
+
+      <ShareQuizModal
+        open={showShareModal}
+        onOpenChange={setShowShareModal}
+        quizId={quiz.id}
+        quizTitle={quiz.title}
       />
 
       <ConfirmModal

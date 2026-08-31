@@ -35,3 +35,34 @@ export interface UpdateQuestionDto {
   explanation?: string | null;
   source_pages?: number[] | null;
 }
+
+export interface UpdateShareConfigDto {
+  is_public?: boolean;
+  allow_cloning?: boolean;
+  reset_token?: boolean;
+}
+
+export interface PublicQuizDto {
+  id: string;
+  title: string;
+  question_count: number;
+  generated_at: string;
+  source_model: string;
+  share_token: string;
+  is_public: boolean;
+  allow_cloning: boolean;
+  created_at?: string;
+  subject?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
+  questions: Array<{
+    id: string;
+    question_text: string;
+    options: string[];
+    correct_answer: number;
+    explanation?: string | null;
+    order_index: number;
+  }>;
+}

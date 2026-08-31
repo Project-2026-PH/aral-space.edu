@@ -1,5 +1,5 @@
 import { IQuizRepository } from '@quiz-creator/core';
-import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto } from '@quiz-creator/types';
+import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto } from '@quiz-creator/types';
 
 export class QuizCrudController {
   constructor(private quizRepo: IQuizRepository) {}
@@ -49,5 +49,21 @@ export class QuizCrudController {
 
   async reorderQuestions(quizId: string, questionIds: string[]) {
     return await this.quizRepo.reorderQuestions(quizId, questionIds);
+  }
+
+  async getShareConfig(quizId: string, userId?: string) {
+    return await this.quizRepo.getShareConfig(quizId, userId);
+  }
+
+  async updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string) {
+    return await this.quizRepo.updateShareConfig(quizId, dto, userId);
+  }
+
+  async getQuizByShareToken(shareToken: string) {
+    return await this.quizRepo.getQuizByShareToken(shareToken);
+  }
+
+  async cloneQuizByShareToken(shareToken: string, userId?: string) {
+    return await this.quizRepo.cloneQuizByShareToken(shareToken, userId);
   }
 }

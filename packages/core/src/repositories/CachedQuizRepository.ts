@@ -1,5 +1,5 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
 import { LRUCache } from '../cache/LRUCache';
 
 export class CachedQuizRepository implements IQuizRepository {
@@ -125,6 +125,26 @@ export class CachedQuizRepository implements IQuizRepository {
     const result = await this.underlying.reorderQuestions(quizId, questionIds);
     this.cache.delete(this.questionsKey(quizId));
     return result;
+  }
+
+  async getShareConfig(quizId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
+    return this.underlying.getShareConfig(quizId, userId);
+  }
+
+  async updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
+    const res = await this.underlying.updateShareConfig(quizId, dto, userId);
+    this.cache.delete(this.quizKey(quizId, userId));
+    return res;
+  }
+
+  async getQuizByShareToken(shareToken: string): Promise<PublicQuizDto | null> {
+    return this.underlying.getQuizByShareToken(shareToken);
+  }
+
+  async cloneQuizByShareToken(shareToken: string, userId?: string): Promise<Quiz> {
+    const res = await this.underlying.cloneQuizByShareToken(shareToken, userId);
+    this.cache.delete(this.quizzesKey(userId));
+    return res;
   }
 
   /**

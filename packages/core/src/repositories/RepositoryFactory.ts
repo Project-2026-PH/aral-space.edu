@@ -40,12 +40,12 @@ export class RepositoryFactory {
       if (opts.databaseUrl) {
         repo = new NeonQuizRepository(opts.databaseUrl);
       } else if (opts.supabase) {
-        repo = new SupabaseQuizRepository(opts.supabase);
+        repo = new SupabaseQuizRepository(opts.supabase, sharedMemoryQuizRepo);
       } else {
         repo = sharedMemoryQuizRepo;
       }
     } else if (source) {
-      repo = new SupabaseQuizRepository(source as SupabaseClient);
+      repo = new SupabaseQuizRepository(source as SupabaseClient, sharedMemoryQuizRepo);
     } else {
       repo = sharedMemoryQuizRepo;
     }

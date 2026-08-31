@@ -1,5 +1,14 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
+
+function generateShareSlug(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let slug = '';
+  for (let i = 0; i < 10; i++) {
+    slug += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return slug;
+}
 
 export class MemoryQuizRepository implements IQuizRepository {
   private subjects: Map<string, Subject> = new Map();
@@ -27,6 +36,9 @@ export class MemoryQuizRepository implements IQuizRepository {
       handout_name: 'Introduction Handout',
       source_model: 'manual',
       subject_id: defaultSubject.id,
+      share_token: 'demo-welcome',
+      is_public: true,
+      allow_cloning: true,
       created_at: new Date().toISOString(),
       subject: defaultSubject
     };
@@ -143,6 +155,9 @@ export class MemoryQuizRepository implements IQuizRepository {
       source_model: dto.source_model || 'manual',
       subject_id: dto.subject_id || null,
       user_id: userId || null,
+      share_token: generateShareSlug(),
+      is_public: true,
+      allow_cloning: true,
       created_at: new Date().toISOString()
     };
     this.quizzes.set(quizId, newQuiz);
@@ -249,5 +264,101 @@ export class MemoryQuizRepository implements IQuizRepository {
       }
     });
     return true;
+  }
+
+  async getShareConfig(quizId: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
+    const quiz = this.quizzes.get(quizId);
+    if (!quiz) throw new Error(`Quiz ${quizId} not found`);
+
+    if (!quiz.share_token) {
+      quiz.share_token = generateShareSlug();
+      if (quiz.is_public === undefined) quiz.is_public = true;
+      if (quiz.allow_cloning === undefined) quiz.allow_cloning = true;
+      this.quizzes.set(quizId, quiz);
+    }
+
+    return {
+      share_token: quiz.share_token,
+      is_public: quiz.is_public ?? true,
+      allow_cloning: quiz.allow_cloning ?? true
+    };
+  }
+
+  async updateShareConfig(quizId: string, dto: UpdateShareConfigDto): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
+    const quiz = this.quizzes.get(quizId);
+    if (!quiz) throw new Error(`Quiz ${quizId} not found`);
+
+    if (dto.reset_token || !quiz.share_token) {
+      quiz.share_token = generateShareSlug();
+    }
+    if (dto.is_public !== undefined) {
+      quiz.is_public = dto.is_public;
+    }
+    if (dto.allow_cloning !== undefined) {
+      quiz.allow_cloning = dto.allow_cloning;
+    }
+
+    this.quizzes.set(quizId, quiz);
+
+    return {
+      share_token: quiz.share_token,
+      is_public: quiz.is_public ?? true,
+      allow_cloning: quiz.allow_cloning ?? true
+    };
+  }
+
+  async getQuizByShareToken(shareToken: string): Promise<PublicQuizDto | null> {
+    let matchedQuiz: Quiz | null = null;
+    for (const q of this.quizzes.values()) {
+      if (q.share_token === shareToken) {
+        matchedQuiz = q;
+        break;
+      }
+    }
+
+    if (!matchedQuiz) return null;
+    if (matchedQuiz.is_public === false) return null;
+
+    const questions = await this.getQuestionsByQuizId(matchedQuiz.id);
+    const subject = matchedQuiz.subject_id ? this.subjects.get(matchedQuiz.subject_id) : null;
+
+    return {
+      id: matchedQuiz.id,
+      title: matchedQuiz.title,
+      question_count: matchedQuiz.question_count || questions.length,
+      generated_at: matchedQuiz.generated_at,
+      source_model: matchedQuiz.source_model,
+      share_token: matchedQuiz.share_token || shareToken,
+      is_public: matchedQuiz.is_public ?? true,
+      allow_cloning: matchedQuiz.allow_cloning ?? true,
+      created_at: matchedQuiz.created_at,
+      subject: subject ? { id: subject.id, name: subject.name, color: subject.color } : null,
+      questions: questions.map(q => ({
+        id: q.id,
+        question_text: q.question_text,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation || null,
+        order_index: q.order_index
+      }))
+    };
+  }
+
+  async cloneQuizByShareToken(shareToken: string, userId?: string): Promise<Quiz> {
+    const publicQuiz = await this.getQuizByShareToken(shareToken);
+    if (!publicQuiz) throw new Error('Shared set not found or access is restricted.');
+    if (!publicQuiz.allow_cloning) throw new Error('Creator has disabled cloning for this study set.');
+
+    return await this.createQuiz({
+      title: `${publicQuiz.title} (Copy)`,
+      subject_id: publicQuiz.subject?.id || null,
+      source_model: 'cloned',
+      questions: publicQuiz.questions.map(q => ({
+        question_text: q.question_text,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation || null
+      }))
+    }, userId);
   }
 }

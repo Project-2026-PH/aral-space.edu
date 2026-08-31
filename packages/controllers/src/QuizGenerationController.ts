@@ -15,7 +15,8 @@ export class QuizGenerationController {
     sendProgress({
       progress: 5,
       message: 'Initializing',
-      detail: 'Validating source material...'
+      detail: 'Validating source material...',
+      stage: 'extracting'
     });
 
     let pages = dto.pdfPages || [];
@@ -27,21 +28,17 @@ export class QuizGenerationController {
       sendProgress({
         progress: 0,
         message: 'Error',
-        detail: 'No text or PDF pages provided for quiz generation.'
+        detail: 'No text or PDF pages provided for quiz generation.',
+        stage: 'error'
       });
       throw new Error('No content provided');
     }
 
     sendProgress({
-      progress: 30,
+      progress: 25,
       message: 'Processing Material',
-      detail: `Extracted ${pages.length} pages of source text`
-    });
-
-    sendProgress({
-      progress: 50,
-      message: 'Generating Questions',
-      detail: 'Connecting to AI model...'
+      detail: `Extracted ${pages.length} pages of source text`,
+      stage: 'extracting'
     });
 
     let liveTokens = 0;
@@ -49,21 +46,40 @@ export class QuizGenerationController {
       handoutPages: pages,
       pageStart: dto.pageStart,
       pageEnd: dto.pageEnd,
+      pipelineMode: dto.pipelineMode,
+      apiKey: dto.apiKey,
+      groqApiKey: dto.groqApiKey,
+      onStageChange: (stage, detail, model) => {
+        const progressMap = {
+          extracting: 40,
+          reviewing: 75,
+          fallback: 60,
+          complete: 95
+        };
+        sendProgress({
+          progress: progressMap[stage] || 50,
+          message: stage === 'reviewing' ? 'Stage 2/2: Reviewing Pedagogy' : 'Stage 1/2: Extracting Concepts',
+          detail,
+          stage,
+          modelUsed: model
+        });
+      },
       onChunk: (chunk) => {
         liveTokens += Math.ceil(chunk.length / 4);
         sendProgress({
-          progress: Math.min(85, 50 + Math.floor(liveTokens / 20)),
-          message: 'Drafting questions',
-          detail: `Streamed ${liveTokens} tokens...`,
+          progress: Math.min(90, 45 + Math.floor(liveTokens / 30)),
+          message: 'Drafting & Polishing questions',
+          detail: `Streaming output (${liveTokens} tokens)...`,
           tokensCount: liveTokens
         });
       }
     });
 
     sendProgress({
-      progress: 90,
+      progress: 95,
       message: 'Saving Quiz',
-      detail: `Saving ${generated.questions.length} questions to library...`
+      detail: `Saving ${generated.questions.length} questions (${generated.sourceModel}) to library...`,
+      stage: 'complete'
     });
 
     const title = dto.title || dto.handoutName || 'Generated Handout Quiz';
@@ -85,8 +101,10 @@ export class QuizGenerationController {
     sendProgress({
       progress: 100,
       message: 'Complete',
-      detail: 'Quiz ready for practice!',
-      quizId: createdQuiz.id
+      detail: `Quiz ready! (Powered by ${generated.sourceModel})`,
+      quizId: createdQuiz.id,
+      stage: 'complete',
+      modelUsed: generated.sourceModel
     });
 
     return { quizId: createdQuiz.id };

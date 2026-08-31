@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RepositoryFactory } from '@quiz-creator/core';
 import { MasterySessionController } from '@quiz-creator/controllers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getAnonymousUserId } from '@/lib/anonymous';
+import { getQuizRepository, getSessionRepository } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
     const userId = await getAnonymousUserId(req);
     const body = await req.json();
     const { action, quizId, sessionId, questionId, isCorrect, sessionType } = body;
-    const supabase = await createServerSupabaseClient();
-    const sessionRepo = RepositoryFactory.createSessionRepository(supabase);
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    
+    const [sessionRepo, quizRepo] = await Promise.all([
+      getSessionRepository(),
+      getQuizRepository()
+    ]);
     const controller = new MasterySessionController(sessionRepo, quizRepo);
 
     if (action === 'start') {

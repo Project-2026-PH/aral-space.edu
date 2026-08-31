@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RepositoryFactory } from '@quiz-creator/core';
 import { QuizCrudController } from '@quiz-creator/controllers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getAnonymousUserId } from '@/lib/anonymous';
+import { getQuizRepository } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   try {
     const userId = await getAnonymousUserId(req);
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const quizzes = await controller.listQuizzes(userId);
     const subjects = await controller.listSubjects(userId);
@@ -22,8 +20,7 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await getAnonymousUserId(req);
     const body = await req.json();
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const created = await controller.createQuiz(body, userId);
     return NextResponse.json(created, { status: 201 });

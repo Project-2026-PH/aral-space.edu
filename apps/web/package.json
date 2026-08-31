@@ -13,6 +13,7 @@
     "@quiz-creator/core": "workspace:*",
     "@quiz-creator/controllers": "workspace:*",
     "@google/genai": "^2.17.1",
+    "@neondatabase/serverless": "^0.10.4",
     "@supabase/supabase-js": "^2.112.1",
     "@supabase/ssr": "^0.12.4",
     "clsx": "^2.1.1",

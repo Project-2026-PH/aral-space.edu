@@ -1,6 +1,15 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+
+function generateShareSlug(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let slug = '';
+  for (let i = 0; i < 10; i++) {
+    slug += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return slug;
+}
 
 export class NeonQuizRepository implements IQuizRepository {
   private sql: NeonQueryFunction<false, false>;
@@ -325,5 +334,123 @@ export class NeonQuizRepository implements IQuizRepository {
       `;
     }
     return true;
+  }
+
+  async getShareConfig(quizId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
+    const rows = userId
+      ? await this.sql`SELECT share_token, is_public, allow_cloning FROM quizzes WHERE id = ${quizId} AND user_id = ${userId} LIMIT 1`
+      : await this.sql`SELECT share_token, is_public, allow_cloning FROM quizzes WHERE id = ${quizId} LIMIT 1`;
+
+    if (!rows || rows.length === 0) throw new Error(`Quiz ${quizId} not found`);
+    const quiz = rows[0] as any;
+
+    if (quiz.share_token) {
+      return {
+        share_token: quiz.share_token,
+        is_public: quiz.is_public ?? true,
+        allow_cloning: quiz.allow_cloning ?? true
+      };
+    }
+
+    const share_token = generateShareSlug();
+    await this.sql`
+      UPDATE quizzes
+      SET share_token = ${share_token}, is_public = true, allow_cloning = true
+      WHERE id = ${quizId}
+    `;
+
+    return {
+      share_token,
+      is_public: true,
+      allow_cloning: true
+    };
+  }
+
+  async updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
+    const current = await this.getShareConfig(quizId, userId);
+    const newShareToken = dto.reset_token ? generateShareSlug() : current.share_token;
+    const isPublic = dto.is_public !== undefined ? dto.is_public : current.is_public;
+    const allowCloning = dto.allow_cloning !== undefined ? dto.allow_cloning : current.allow_cloning;
+
+    const rows = userId
+      ? await this.sql`
+          UPDATE quizzes
+          SET share_token = ${newShareToken}, is_public = ${isPublic}, allow_cloning = ${allowCloning}
+          WHERE id = ${quizId} AND user_id = ${userId}
+          RETURNING share_token, is_public, allow_cloning
+        `
+      : await this.sql`
+          UPDATE quizzes
+          SET share_token = ${newShareToken}, is_public = ${isPublic}, allow_cloning = ${allowCloning}
+          WHERE id = ${quizId}
+          RETURNING share_token, is_public, allow_cloning
+        `;
+
+    if (!rows || rows.length === 0) throw new Error('Quiz not found or update failed');
+    return {
+      share_token: rows[0].share_token,
+      is_public: rows[0].is_public ?? true,
+      allow_cloning: rows[0].allow_cloning ?? true
+    };
+  }
+
+  async getQuizByShareToken(shareToken: string): Promise<PublicQuizDto | null> {
+    const rows = await this.sql`
+      SELECT 
+        q.*,
+        CASE 
+          WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color)
+          ELSE NULL 
+        END AS subject
+      FROM quizzes q
+      LEFT JOIN subjects s ON q.subject_id = s.id
+      WHERE q.share_token = ${shareToken}
+      LIMIT 1
+    `;
+
+    if (!rows || rows.length === 0) return null;
+    const quiz = rows[0] as any;
+    if (quiz.is_public === false) return null;
+
+    const questions = await this.getQuestionsByQuizId(quiz.id);
+
+    return {
+      id: quiz.id,
+      title: quiz.title,
+      question_count: quiz.question_count || questions.length,
+      generated_at: quiz.generated_at,
+      source_model: quiz.source_model,
+      share_token: quiz.share_token || shareToken,
+      is_public: quiz.is_public ?? true,
+      allow_cloning: quiz.allow_cloning ?? true,
+      created_at: quiz.created_at,
+      subject: quiz.subject ? { id: quiz.subject.id, name: quiz.subject.name, color: quiz.subject.color } : null,
+      questions: questions.map(q => ({
+        id: q.id,
+        question_text: q.question_text,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation || null,
+        order_index: q.order_index
+      }))
+    };
+  }
+
+  async cloneQuizByShareToken(shareToken: string, userId?: string): Promise<Quiz> {
+    const publicQuiz = await this.getQuizByShareToken(shareToken);
+    if (!publicQuiz) throw new Error('Shared set not found or access is restricted.');
+    if (!publicQuiz.allow_cloning) throw new Error('Creator has disabled cloning for this study set.');
+
+    return await this.createQuiz({
+      title: `${publicQuiz.title} (Copy)`,
+      subject_id: publicQuiz.subject?.id || null,
+      source_model: 'cloned',
+      questions: publicQuiz.questions.map(q => ({
+        question_text: q.question_text,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation || null
+      }))
+    }, userId);
   }
 }

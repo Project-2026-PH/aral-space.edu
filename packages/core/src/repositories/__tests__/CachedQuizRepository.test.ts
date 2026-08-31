@@ -43,7 +43,11 @@ describe('CachedQuizRepository', () => {
       addQuestion: vi.fn().mockResolvedValue(sampleQuestion),
       updateQuestion: vi.fn().mockResolvedValue(sampleQuestion),
       deleteQuestion: vi.fn().mockResolvedValue(true),
-      reorderQuestions: vi.fn().mockResolvedValue(true)
+      reorderQuestions: vi.fn().mockResolvedValue(true),
+      getShareConfig: vi.fn().mockResolvedValue({ share_token: 'tok-1', is_public: true, allow_cloning: true }),
+      updateShareConfig: vi.fn().mockResolvedValue({ share_token: 'tok-1', is_public: true, allow_cloning: true }),
+      getQuizByShareToken: vi.fn().mockResolvedValue(null),
+      cloneQuizByShareToken: vi.fn().mockResolvedValue(sampleQuiz)
     };
 
     cachedRepo = new CachedQuizRepository(mockRepo);

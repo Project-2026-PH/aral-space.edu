@@ -138,7 +138,7 @@ importers:
         version: 0.15.0
     devDependencies:
       '@types/node':
-        specifier: ^20.17.19
+        specifier: ^20.19.43
         version: 20.19.43
 
   packages/types: {}

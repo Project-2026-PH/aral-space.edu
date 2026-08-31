@@ -1,3 +1,4 @@
+// @ts-ignore
 import { GoogleGenAI, Type } from '@google/genai';
 export class QuizGenerationService {
     static sanitizeJsonString(str) {

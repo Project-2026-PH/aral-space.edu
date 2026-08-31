@@ -12,7 +12,7 @@ let sharedLocalFirstSessionRepo = null;
 export class RepositoryFactory {
     static createQuizRepository(supabase) {
         if (supabase) {
-            return new SupabaseQuizRepository(supabase);
+            return new SupabaseQuizRepository(supabase, sharedMemoryQuizRepo);
         }
         return sharedMemoryQuizRepo;
     }

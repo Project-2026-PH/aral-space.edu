@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
-import { Loader2, Sparkles, AlertCircle, FileText, CheckCircle2 } from 'lucide-react';
+import { Loader2, Sparkles, AlertCircle, FileText, CheckCircle2, Plus, Tag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import NewSubjectModal from '../subject/NewSubjectModal';
 
 interface GenerateQuizModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  subjects?: Array<{ id: string; name: string }>;
+  subjects?: Array<{ id: string; name: string; color?: string }>;
   onGenerated?: (quizId: string) => void;
 }
 
@@ -20,7 +21,16 @@ export default function GenerateQuizModal({
 }: GenerateQuizModalProps) {
   const router = useRouter();
   const [title, setTitle] = useState('');
+  const [subjectList, setSubjectList] = useState<Array<{ id: string; name: string; color?: string }>>(subjects);
   const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || '');
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+
+  useEffect(() => {
+    setSubjectList(subjects);
+    if (!selectedSubject && subjects.length > 0) {
+      setSelectedSubject(subjects[0].id);
+    }
+  }, [subjects]);
   const [text, setText] = useState('');
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -128,26 +138,43 @@ export default function GenerateQuizModal({
           />
         </div>
 
-        {subjects.length > 0 && (
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Subject Category
             </label>
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              disabled={generating}
-              className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
+            <button
+              type="button"
+              onClick={() => setShowSubjectModal(true)}
+              className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 transition-all"
             >
-              <option value="">No subject</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              <Plus className="h-3 w-3" />
+              <span>New Subject</span>
+            </button>
           </div>
-        )}
+          <select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value)}
+            disabled={generating}
+            className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
+          >
+            <option value="">General (No subject)</option>
+            {subjectList.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <NewSubjectModal
+          open={showSubjectModal}
+          onOpenChange={setShowSubjectModal}
+          onCreated={(created) => {
+            setSubjectList((prev) => [...prev, created]);
+            setSelectedSubject(created.id);
+          }}
+        />
 
         <div>
           <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">

@@ -3,6 +3,33 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import { QuizQuestion } from '@quiz-creator/types';
+import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered } from 'lucide-react';
+
+export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
+
+const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'multiple_choice', label: 'Multiple Choice', icon: CircleDot },
+  { id: 'identification', label: 'Identification', icon: PenLine },
+  { id: 'true_false', label: 'True or False', icon: ToggleLeft },
+  { id: 'enumeration', label: 'Enumeration', icon: ListOrdered },
+];
+
+function detectQuestionType(options: string[]): QuestionType {
+  if (
+    options.length === 2 &&
+    options[0]?.toLowerCase() === 'true' &&
+    options[1]?.toLowerCase() === 'false'
+  ) {
+    return 'true_false';
+  }
+  if (options.length === 1) {
+    return 'identification';
+  }
+  if (options.length > 4) {
+    return 'enumeration';
+  }
+  return 'multiple_choice';
+}
 
 interface QuizQuestionFormModalProps {
   open: boolean;
@@ -20,6 +47,7 @@ export default function QuizQuestionFormModal({
   onSaved
 }: QuizQuestionFormModalProps) {
   const isEditing = Boolean(question);
+  const [type, setType] = useState<QuestionType>('multiple_choice');
   const [questionText, setQuestionText] = useState('');
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState<number>(0);
@@ -29,11 +57,20 @@ export default function QuizQuestionFormModal({
 
   useEffect(() => {
     if (question) {
+      const detected = detectQuestionType(question.options);
+      setType(detected);
       setQuestionText(question.question_text);
-      setOptions(question.options.length === 4 ? question.options : [...question.options, '', '', '', ''].slice(0, 4));
+      setOptions(
+        detected === 'multiple_choice'
+          ? question.options.length === 4
+            ? question.options
+            : [...question.options, '', '', '', ''].slice(0, 4)
+          : question.options
+      );
       setCorrectAnswer(question.correct_answer);
       setExplanation(question.explanation || '');
     } else {
+      setType('multiple_choice');
       setQuestionText('');
       setOptions(['', '', '', '']);
       setCorrectAnswer(0);
@@ -42,14 +79,65 @@ export default function QuizQuestionFormModal({
     setError(null);
   }, [question, open]);
 
+  function handleTypeChange(newType: QuestionType) {
+    let newOptions = options;
+    let newCorrect = correctAnswer;
+
+    if (newType === 'multiple_choice') {
+      if (newOptions.length < 4) {
+        newOptions = [...newOptions, '', '', '', ''].slice(0, 4);
+      } else if (newOptions.length > 4) {
+        newOptions = newOptions.slice(0, 4);
+      }
+      newCorrect = Math.min(newCorrect, 3);
+    } else if (newType === 'true_false') {
+      newOptions = ['True', 'False'];
+      newCorrect = newCorrect === 1 ? 1 : 0;
+    } else if (newType === 'identification') {
+      newOptions = [newOptions[0] || ''];
+      newCorrect = 0;
+    } else if (newType === 'enumeration') {
+      const valid = newOptions.filter((o) => o.trim());
+      newOptions = valid.length > 0 ? valid : ['', ''];
+      newCorrect = 0;
+    }
+
+    setType(newType);
+    setOptions(newOptions);
+    setCorrectAnswer(newCorrect);
+  }
+
   async function handleSave() {
     if (!questionText.trim()) {
       setError('Please provide a question prompt.');
       return;
     }
-    if (options.some((o) => !o.trim())) {
-      setError('All 4 options must be filled out.');
-      return;
+
+    let cleanedOptions = options.map((o) => o.trim());
+    let cleanedCorrect = correctAnswer;
+
+    if (type === 'multiple_choice') {
+      if (cleanedOptions.some((o) => !o)) {
+        setError('All 4 options must be filled out.');
+        return;
+      }
+    } else if (type === 'true_false') {
+      cleanedOptions = ['True', 'False'];
+    } else if (type === 'identification') {
+      if (!cleanedOptions[0]) {
+        setError('Please enter the identification answer.');
+        return;
+      }
+      cleanedOptions = [cleanedOptions[0]];
+      cleanedCorrect = 0;
+    } else if (type === 'enumeration') {
+      const filled = cleanedOptions.filter(Boolean);
+      if (filled.length === 0) {
+        setError('Please add at least one enumeration item.');
+        return;
+      }
+      cleanedOptions = filled;
+      cleanedCorrect = 0;
     }
 
     setSaving(true);
@@ -62,8 +150,8 @@ export default function QuizQuestionFormModal({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             question_text: questionText.trim(),
-            options: options.map((o) => o.trim()),
-            correct_answer: correctAnswer,
+            options: cleanedOptions,
+            correct_answer: cleanedCorrect,
             explanation: explanation.trim() || null
           })
         });
@@ -74,8 +162,8 @@ export default function QuizQuestionFormModal({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             question_text: questionText.trim(),
-            options: options.map((o) => o.trim()),
-            correct_answer: correctAnswer,
+            options: cleanedOptions,
+            correct_answer: cleanedCorrect,
             explanation: explanation.trim() || null
           })
         });
@@ -96,7 +184,7 @@ export default function QuizQuestionFormModal({
       open={open}
       onOpenChange={onOpenChange}
       title={isEditing ? 'Edit Question' : 'Add Question'}
-      description="Define question prompt, 4 choices, and correct answer."
+      description="Configure question prompt, category mode, and correct answers."
     >
       <div className="space-y-4">
         {error && (
@@ -104,6 +192,34 @@ export default function QuizQuestionFormModal({
             {error}
           </div>
         )}
+
+        {/* Category Badges */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Category / Mode
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {QUESTION_TYPES.map((t) => {
+              const isActive = type === t.id;
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => handleTypeChange(t.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-primary text-white shadow-sm shadow-primary/30 ring-2 ring-primary/20 scale-100'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div>
           <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
@@ -118,47 +234,149 @@ export default function QuizQuestionFormModal({
           />
         </div>
 
-        <div className="space-y-2">
-          <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Options & Correct Answer
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {options.map((opt, idx) => {
-              const isSelected = correctAnswer === idx;
-              return (
-                <div
-                  key={idx}
-                  onClick={() => setCorrectAnswer(idx)}
-                  className={`flex items-center gap-2 rounded-2xl border p-2.5 cursor-pointer transition-all ${
-                    isSelected
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                      : 'border-border bg-background hover:bg-muted/40'
-                  }`}
-                >
+        {/* Dynamic Type Inputs */}
+        {type === 'multiple_choice' && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <span>Options & Correct Answer</span>
+              <span className="text-[11px] font-normal lowercase italic text-muted-foreground">click radio to mark correct</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {options.map((opt, idx) => {
+                const isSelected = correctAnswer === idx;
+                return (
                   <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                      isSelected ? 'border-primary bg-primary text-white' : 'border-muted-foreground'
+                    key={idx}
+                    onClick={() => setCorrectAnswer(idx)}
+                    className={`flex items-center gap-2 rounded-2xl border p-2.5 cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'border-border bg-background hover:bg-muted/40'
                     }`}
                   >
-                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                        isSelected ? 'border-primary bg-primary text-white' : 'border-muted-foreground'
+                      }`}
+                    >
+                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={`Option ${String.fromCharCode(65 + idx)}`}
+                      value={opt}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        const next = [...options];
+                        next[idx] = e.target.value;
+                        setOptions(next);
+                      }}
+                      className="w-full bg-transparent text-xs text-foreground focus:outline-none"
+                    />
                   </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {type === 'true_false' && (
+          <div className="space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Correct Answer
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'True', val: 0, color: 'text-emerald-500', activeBg: 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500' },
+                { label: 'False', val: 1, color: 'text-rose-500', activeBg: 'border-rose-500 bg-rose-500/10 ring-1 ring-rose-500' }
+              ].map((tf) => {
+                const isSelected = correctAnswer === tf.val;
+                return (
+                  <div
+                    key={tf.val}
+                    onClick={() => setCorrectAnswer(tf.val)}
+                    className={`flex items-center justify-center gap-2 rounded-2xl border py-3.5 px-4 cursor-pointer font-bold text-xs transition-all ${
+                      isSelected
+                        ? tf.activeBg
+                        : 'border-border bg-background hover:bg-muted/40 text-muted-foreground'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                        isSelected ? 'border-current bg-current text-card' : 'border-muted-foreground'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className={isSelected ? tf.color : ''}>{tf.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {type === 'identification' && (
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Target Identification Answer
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Photosynthesis"
+              value={options[0] || ''}
+              onChange={(e) => setOptions([e.target.value])}
+              className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
+            />
+          </div>
+        )}
+
+        {type === 'enumeration' && (
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Enumeration Items
+              </label>
+              <button
+                type="button"
+                onClick={() => setOptions([...options, ''])}
+                className="flex items-center gap-1 text-primary hover:underline text-xs font-bold"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Item</span>
+              </button>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {options.map((opt, optIdx) => (
+                <div key={optIdx} className="flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-muted text-muted-foreground text-[11px] font-bold shrink-0">
+                    {optIdx + 1}
+                  </span>
                   <input
                     type="text"
-                    placeholder={`Option ${String.fromCharCode(65 + idx)}`}
+                    placeholder={`Item #${optIdx + 1}`}
                     value={opt}
                     onChange={(e) => {
-                      e.stopPropagation();
                       const next = [...options];
-                      next[idx] = e.target.value;
+                      next[optIdx] = e.target.value;
                       setOptions(next);
                     }}
-                    className="w-full bg-transparent text-xs text-foreground focus:outline-none"
+                    className="flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
                   />
+                  {options.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setOptions(options.filter((_, i) => i !== optIdx))}
+                      className="text-muted-foreground hover:text-destructive p-1 rounded-lg hover:bg-destructive/10 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div>
           <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">

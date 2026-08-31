@@ -1,40 +1,63 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Trash2, CheckCircle2, Save, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, GripVertical, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import NewSubjectModal, { SUBJECT_PALETTE } from '../subject/NewSubjectModal';
+
+export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
 
 interface QuestionDraft {
+  type: QuestionType;
   question_text: string;
   options: string[];
   correct_answer: number;
-  explanation: string;
+  explanation?: string;
 }
 
-export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<{ id: string; name: string }> }) {
+const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'multiple_choice', label: 'Multiple Choice', icon: CircleDot },
+  { id: 'identification', label: 'Identification', icon: PenLine },
+  { id: 'true_false', label: 'True or False', icon: ToggleLeft },
+  { id: 'enumeration', label: 'Enumeration', icon: ListOrdered },
+];
+
+export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<{ id: string; name: string; color?: string }> }) {
   const router = useRouter();
   const [title, setTitle] = useState('');
+  const [subjectList, setSubjectList] = useState<Array<{ id: string; name: string; color?: string }>>(subjects);
   const [subjectId, setSubjectId] = useState(subjects[0]?.id || '');
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [questions, setQuestions] = useState<QuestionDraft[]>([
     {
+      type: 'multiple_choice',
       question_text: '',
       options: ['', '', '', ''],
-      correct_answer: 0,
-      explanation: ''
+      correct_answer: 0
     }
   ]);
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function moveQuestion(fromIndex: number, toIndex: number) {
+    if (toIndex < 0 || toIndex >= questions.length || fromIndex === toIndex) return;
+    const next = [...questions];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    setQuestions(next);
+  }
 
   function addQuestion() {
     setQuestions([
       ...questions,
       {
+        type: 'multiple_choice',
         question_text: '',
         options: ['', '', '', ''],
-        correct_answer: 0,
-        explanation: ''
+        correct_answer: 0
       }
     ]);
   }
@@ -42,6 +65,40 @@ export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<
   function removeQuestion(index: number) {
     if (questions.length <= 1) return;
     setQuestions(questions.filter((_, i) => i !== index));
+  }
+
+  function setQuestionType(index: number, type: QuestionType) {
+    const next = [...questions];
+    const current = next[index];
+    let newOptions = current.options;
+    let newCorrect = current.correct_answer;
+
+    if (type === 'multiple_choice') {
+      if (newOptions.length < 4) {
+        newOptions = [...newOptions, '', '', '', ''].slice(0, 4);
+      } else if (newOptions.length > 4) {
+        newOptions = newOptions.slice(0, 4);
+      }
+      newCorrect = Math.min(newCorrect, 3);
+    } else if (type === 'true_false') {
+      newOptions = ['True', 'False'];
+      newCorrect = newCorrect === 1 ? 1 : 0;
+    } else if (type === 'identification') {
+      newOptions = [newOptions[0] || ''];
+      newCorrect = 0;
+    } else if (type === 'enumeration') {
+      const valid = newOptions.filter((o) => o.trim());
+      newOptions = valid.length > 0 ? valid : ['', ''];
+      newCorrect = 0;
+    }
+
+    next[index] = {
+      ...current,
+      type,
+      options: newOptions,
+      correct_answer: newCorrect
+    };
+    setQuestions(next);
   }
 
   function updateQuestionText(index: number, text: string) {
@@ -56,15 +113,22 @@ export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<
     setQuestions(next);
   }
 
-  function setCorrectOption(qIdx: number, optIdx: number) {
+  function addEnumerationItem(qIdx: number) {
     const next = [...questions];
-    next[qIdx].correct_answer = optIdx;
+    next[qIdx].options.push('');
     setQuestions(next);
   }
 
-  function updateExplanation(qIdx: number, val: string) {
+  function removeEnumerationItem(qIdx: number, optIdx: number) {
     const next = [...questions];
-    next[qIdx].explanation = val;
+    if (next[qIdx].options.length <= 1) return;
+    next[qIdx].options = next[qIdx].options.filter((_, i) => i !== optIdx);
+    setQuestions(next);
+  }
+
+  function setCorrectOption(qIdx: number, optIdx: number) {
+    const next = [...questions];
+    next[qIdx].correct_answer = optIdx;
     setQuestions(next);
   }
 
@@ -80,9 +144,22 @@ export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<
         setError(`Question #${i + 1} is missing question text.`);
         return;
       }
-      if (q.options.some((o) => !o.trim())) {
-        setError(`Question #${i + 1} must have all 4 options filled.`);
-        return;
+      if (q.type === 'multiple_choice') {
+        if (q.options.some((o) => !o.trim())) {
+          setError(`Question #${i + 1} must have all 4 options filled.`);
+          return;
+        }
+      } else if (q.type === 'identification') {
+        if (!q.options[0]?.trim()) {
+          setError(`Question #${i + 1} is missing the identification answer.`);
+          return;
+        }
+      } else if (q.type === 'enumeration') {
+        const filled = q.options.filter((o) => o.trim());
+        if (filled.length === 0) {
+          setError(`Question #${i + 1} must have at least one enumeration item.`);
+          return;
+        }
       }
     }
 
@@ -97,13 +174,28 @@ export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<
           title: title.trim(),
           subject_id: subjectId || null,
           source_model: 'manual',
-          questions: questions.map((q, idx) => ({
-            question_text: q.question_text.trim(),
-            options: q.options.map((o) => o.trim()),
-            correct_answer: q.correct_answer,
-            explanation: q.explanation.trim() || null,
-            source_pages: [1]
-          }))
+          questions: questions.map((q) => {
+            let opts = q.options.map((o) => o.trim());
+            let correct = q.correct_answer;
+
+            if (q.type === 'true_false') {
+              opts = ['True', 'False'];
+            } else if (q.type === 'identification') {
+              opts = [q.options[0]?.trim() || ''];
+              correct = 0;
+            } else if (q.type === 'enumeration') {
+              opts = q.options.map((o) => o.trim()).filter(Boolean);
+              correct = 0;
+            }
+
+            return {
+              question_text: q.question_text.trim(),
+              options: opts,
+              correct_answer: correct,
+              explanation: q.explanation?.trim() || null,
+              source_pages: [1]
+            };
+          })
         })
       });
 
@@ -160,24 +252,66 @@ export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<
             />
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
-              Subject Category
-            </label>
-            <select
-              value={subjectId}
-              onChange={(e) => setSubjectId(e.target.value)}
-              className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
-            >
-              <option value="">General</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Subject Category
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowSubjectModal(true)}
+                className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 transition-all"
+              >
+                <Plus className="h-3 w-3" />
+                <span>New Subject</span>
+              </button>
+            </div>
+            <div className="relative flex items-center">
+              <select
+                value={subjectId}
+                onChange={(e) => setSubjectId(e.target.value)}
+                className="w-full rounded-2xl border border-border bg-background pl-4 pr-8 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none cursor-pointer"
+              >
+                <option value="">General (No Subject)</option>
+                {subjectList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* Active subject color tag */}
+            {subjectId && (
+              <div className="mt-2 flex items-center gap-1.5">
+                {(() => {
+                  const currentSub = subjectList.find((s) => s.id === subjectId);
+                  if (!currentSub) return null;
+                  return (
+                    <span
+                      style={{
+                        backgroundColor: currentSub.color || '#86EFAC',
+                        color: '#1e293b'
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow-2xs"
+                    >
+                      <Tag className="h-2.5 w-2.5" />
+                      {currentSub.name}
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      <NewSubjectModal
+        open={showSubjectModal}
+        onOpenChange={setShowSubjectModal}
+        onCreated={(created) => {
+          setSubjectList((prev) => [...prev, created]);
+          setSubjectId(created.id);
+        }}
+      />
 
       {/* Questions list */}
       <div className="space-y-4">
@@ -185,86 +319,255 @@ export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<
           <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
             Questions ({questions.length})
           </h3>
-          <button
-            onClick={addQuestion}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-all"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Question</span>
-          </button>
         </div>
 
-        {questions.map((q, qIdx) => (
-          <div key={qIdx} className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <span className="flex items-center justify-center w-7 h-7 rounded-xl bg-primary/10 text-primary text-xs font-extrabold shrink-0">
-                #{qIdx + 1}
-              </span>
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Enter your question prompt..."
-                  value={q.question_text}
-                  onChange={(e) => updateQuestionText(qIdx, e.target.value)}
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
-                />
-              </div>
-              {questions.length > 1 && (
-                <button
-                  onClick={() => removeQuestion(qIdx)}
-                  className="text-muted-foreground hover:text-destructive p-1 rounded-lg"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+        {questions.map((q, qIdx) => {
+          const isDragging = draggedIdx === qIdx;
+          const isOver = dragOverIdx === qIdx && draggedIdx !== qIdx;
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              {q.options.map((opt, optIdx) => {
-                const isSelected = q.correct_answer === optIdx;
-                return (
+          return (
+            <div
+              key={qIdx}
+              draggable
+              onDragStart={(e) => {
+                const target = e.target as HTMLElement;
+                // If user started dragging inside an input, button, or textarea, don't drag card
+                if (target.closest('input, textarea, select, button')) {
+                  e.preventDefault();
+                  return;
+                }
+                e.dataTransfer.effectAllowed = 'move';
+                setDraggedIdx(qIdx);
+              }}
+              onDragEnd={() => {
+                setDraggedIdx(null);
+                setDragOverIdx(null);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOverIdx(qIdx);
+              }}
+              onDragLeave={() => {
+                if (dragOverIdx === qIdx) setDragOverIdx(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedIdx !== null && draggedIdx !== qIdx) {
+                  moveQuestion(draggedIdx, qIdx);
+                }
+                setDraggedIdx(null);
+                setDragOverIdx(null);
+              }}
+              className={`rounded-3xl border bg-card p-6 shadow-sm space-y-4 transition-all cursor-default ${
+                isDragging
+                  ? 'opacity-30 border-dashed border-primary scale-[0.98] shadow-none'
+                  : isOver
+                  ? 'border-primary ring-2 ring-primary/30 bg-primary/[0.03] translate-y-1 shadow-md'
+                  : 'border-border/80 hover:border-border'
+              }`}
+            >
+              {/* Header: Drag handle, Number, Category Badges & Delete */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  {/* Drag Handle */}
                   <div
-                    key={optIdx}
-                    onClick={() => setCorrectOption(qIdx, optIdx)}
-                    className={`flex items-center gap-3 rounded-2xl border p-3 cursor-pointer transition-all ${
-                      isSelected
-                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                        : 'border-border bg-background/50 hover:bg-muted/40'
-                    }`}
+                    className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-primary p-1 rounded-lg hover:bg-muted transition-colors"
+                    title="Drag anywhere on card to reorder"
                   >
-                    <div
-                      className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                        isSelected ? 'border-primary bg-primary text-white' : 'border-muted-foreground'
-                      }`}
-                    >
-                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                    </div>
-                    <input
-                      type="text"
-                      placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
-                      value={opt}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        updateOptionText(qIdx, optIdx, e.target.value);
-                      }}
-                      className="w-full bg-transparent text-xs text-foreground focus:outline-none font-medium"
-                    />
+                    <GripVertical className="h-4 w-4" />
                   </div>
-                );
-              })}
-            </div>
 
+                  {/* Question Number Badge */}
+                  <span className="flex items-center justify-center w-7 h-7 rounded-xl bg-primary/10 text-primary text-xs font-extrabold shrink-0 select-none">
+                    #{qIdx + 1}
+                  </span>
+
+                  <span className="text-xs font-bold text-muted-foreground">Category:</span>
+                </div>
+
+                {/* Question Type Badges */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {QUESTION_TYPES.map((t) => {
+                    const isActive = q.type === t.id;
+                    const Icon = t.icon;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setQuestionType(qIdx, t.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          isActive
+                            ? 'bg-primary text-white shadow-sm shadow-primary/30 ring-2 ring-primary/20 scale-100'
+                            : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40'
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        <span>{t.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {questions.length > 1 && (
+                  <button
+                    onClick={() => removeQuestion(qIdx)}
+                    className="text-muted-foreground hover:text-destructive p-1.5 rounded-xl hover:bg-destructive/10 transition-colors ml-auto sm:ml-0"
+                    title="Delete Question"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+            {/* Question prompt input */}
             <div>
               <input
                 type="text"
-                placeholder="Explanation (why the selected option is correct)"
-                value={q.explanation}
-                onChange={(e) => updateExplanation(qIdx, e.target.value)}
-                className="w-full rounded-xl border border-dashed border-border bg-background/30 px-3 py-1.5 text-xs text-muted-foreground focus:border-primary focus:outline-none"
+                placeholder="Enter your question prompt..."
+                value={q.question_text}
+                onChange={(e) => updateQuestionText(qIdx, e.target.value)}
+                className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
               />
             </div>
+
+            {/* Dynamic Type Body */}
+            {q.type === 'multiple_choice' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+                  <span>Choice Options</span>
+                  <span className="italic">Select the radio icon of the correct choice</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {q.options.map((opt, optIdx) => {
+                    const isSelected = q.correct_answer === optIdx;
+                    return (
+                      <div
+                        key={optIdx}
+                        onClick={() => setCorrectOption(qIdx, optIdx)}
+                        className={`flex items-center gap-3 rounded-2xl border p-3 cursor-pointer transition-all ${
+                          isSelected
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-border bg-background/50 hover:bg-muted/40'
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                            isSelected ? 'border-primary bg-primary text-white' : 'border-muted-foreground'
+                          }`}
+                        >
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                        <input
+                          type="text"
+                          placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
+                          value={opt}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            updateOptionText(qIdx, optIdx, e.target.value);
+                          }}
+                          className="w-full bg-transparent text-xs text-foreground focus:outline-none font-medium"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {q.type === 'true_false' && (
+              <div className="space-y-2">
+                <div className="text-[11px] font-semibold text-muted-foreground">
+                  Select the correct answer:
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'True', val: 0, color: 'text-emerald-500', activeBg: 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500' },
+                    { label: 'False', val: 1, color: 'text-rose-500', activeBg: 'border-rose-500 bg-rose-500/10 ring-1 ring-rose-500' }
+                  ].map((tf) => {
+                    const isSelected = q.correct_answer === tf.val;
+                    return (
+                      <div
+                        key={tf.val}
+                        onClick={() => setCorrectOption(qIdx, tf.val)}
+                        className={`flex items-center justify-center gap-2.5 rounded-2xl border py-4 px-4 cursor-pointer font-bold text-xs transition-all ${
+                          isSelected
+                            ? tf.activeBg
+                            : 'border-border bg-background/50 hover:bg-muted/40 text-muted-foreground'
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                            isSelected ? 'border-current bg-current text-card' : 'border-muted-foreground'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <span className={`text-sm ${isSelected ? tf.color : ''}`}>{tf.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {q.type === 'identification' && (
+              <div className="space-y-2">
+                <label className="block text-[11px] font-semibold text-muted-foreground">
+                  Correct Answer (Target identification term/phrase)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Photosynthesis"
+                  value={q.options[0] || ''}
+                  onChange={(e) => updateOptionText(qIdx, 0, e.target.value)}
+                  className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
+                />
+              </div>
+            )}
+
+            {q.type === 'enumeration' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+                  <span>Enumeration Items / Answers</span>
+                  <button
+                    type="button"
+                    onClick={() => addEnumerationItem(qIdx)}
+                    className="flex items-center gap-1 text-primary hover:underline text-xs font-bold"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Add Item</span>
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {q.options.map((opt, optIdx) => (
+                    <div key={optIdx} className="flex items-center gap-2">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-muted text-muted-foreground text-[11px] font-bold shrink-0">
+                        {optIdx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        placeholder={`Item #${optIdx + 1}`}
+                        value={opt}
+                        onChange={(e) => updateOptionText(qIdx, optIdx, e.target.value)}
+                        className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
+                      />
+                      {q.options.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeEnumerationItem(qIdx, optIdx)}
+                          className="text-muted-foreground hover:text-destructive p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
 
         <button
           onClick={addQuestion}

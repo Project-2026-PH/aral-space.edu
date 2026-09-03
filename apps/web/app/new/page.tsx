@@ -30,11 +30,10 @@ function NewQuizContent() {
           <button
             type="button"
             onClick={() => setMode('ai')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              mode === 'ai'
-                ? 'bg-primary text-white shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${mode === 'ai'
+              ? 'bg-primary text-white shadow-xs'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             <Sparkles className="h-3.5 w-3.5" />
             <span>AI Studio</span>
@@ -42,11 +41,10 @@ function NewQuizContent() {
           <button
             type="button"
             onClick={() => setMode('manual')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              mode === 'manual'
-                ? 'bg-primary text-white shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${mode === 'manual'
+              ? 'bg-primary text-white shadow-xs'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             <PenLine className="h-3.5 w-3.5" />
             <span>Manual Builder</span>
@@ -59,7 +57,7 @@ function NewQuizContent() {
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary mb-1">
               <Sparkles className="h-3.5 w-3.5" />
-              <span>AI Quiz Generation Studio</span>
+              <span>Quiz Generation Studio</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
               Generate Reviewer with AI

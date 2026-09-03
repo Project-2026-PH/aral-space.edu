@@ -367,15 +367,11 @@ export default function AiQuizGenerator({
             <Brain className="h-4 w-4" />
           </div>
           <div>
-            <div>Adaptive Exam Reviewer Engine</div>
+            <div>Reviewer Generator</div>
             <div className="text-[11px] font-normal text-muted-foreground">
               Auto-routes material size, cross-chapter distribution & distractor rigor
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl self-start sm:self-auto">
-          <CheckCircle2 className="h-3 w-3" />
-          <span>Auto-Optimized</span>
         </div>
       </div>
 
@@ -445,8 +441,8 @@ export default function AiQuizGenerator({
               onClick={() => setInputMode('upload')}
               disabled={generating}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${inputMode === 'upload'
-                  ? 'bg-card text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
               <FolderUp className="h-3 w-3" />
@@ -457,8 +453,8 @@ export default function AiQuizGenerator({
               onClick={() => setInputMode('text')}
               disabled={generating}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${inputMode === 'text'
-                  ? 'bg-card text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
               <FileCode className="h-3 w-3" />
@@ -499,8 +495,8 @@ export default function AiQuizGenerator({
               }}
               onDrop={handleDrop}
               className={`relative rounded-3xl border-2 border-dashed p-6 text-center transition-all duration-200 ${isDragging
-                  ? 'border-primary bg-primary/10 scale-[1.005] shadow-md shadow-primary/10'
-                  : 'border-border/90 bg-muted/20 hover:border-primary/50 hover:bg-muted/40'
+                ? 'border-primary bg-primary/10 scale-[1.005] shadow-md shadow-primary/10'
+                : 'border-border/90 bg-muted/20 hover:border-primary/50 hover:bg-muted/40'
                 } ${generating ? 'opacity-60 pointer-events-none' : ''}`}
             >
               <div className="flex flex-col items-center justify-center space-y-3">

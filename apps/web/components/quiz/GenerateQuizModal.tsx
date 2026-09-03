@@ -24,8 +24,8 @@ export default function GenerateQuizModal({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="AI Quiz Generation Studio"
-      description="Paste lecture notes, study guides, or topic summaries to auto-generate questions."
+      title="Generate your Quiz with Us!"
+      description="Paste lecture notes, study guides, or topic summaries to generate questions."
     >
       <AiQuizGenerator
         isModal={true}

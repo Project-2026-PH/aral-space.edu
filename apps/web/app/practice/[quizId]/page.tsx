@@ -5,10 +5,13 @@ import { useParams, useSearchParams } from 'next/navigation';
 import QuizRunner from '@/components/quiz/QuizRunner';
 import { Quiz, QuizQuestion, QuizSession, QuestionProgress, QuizMode } from '@quiz-creator/types';
 
-export default function PracticePage() {
-  const params = useParams();
+export default function PracticePage({
+  params,
+}: {
+  params: Promise<{ quizId: string }>;
+}) {
+  const { quizId } = React.use(params);
   const searchParams = useSearchParams();
-  const quizId = params?.quizId as string;
 
   const mode = (searchParams.get('mode') as QuizMode) || 'multiple_choice';
   const shuffleQuestions = searchParams.get('shuffleQuestions') === 'true';
@@ -25,13 +28,13 @@ export default function PracticePage() {
     async function initSession() {
       if (!quizId) return;
       try {
-        // 1. Fetch quiz metadata
+        // Fetch quiz metadata
         const quizRes = await fetch(`/api/quizzes/${quizId}`);
         if (!quizRes.ok) throw new Error('Quiz not found');
         const quizData = await quizRes.json();
         setQuiz(quizData);
 
-        // 2. Start session
+        // Start session
         const sessRes = await fetch('/api/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

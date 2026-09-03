@@ -113,8 +113,9 @@ export class MemoryQuizRepository implements IQuizRepository {
     });
   }
 
-  async listSubjects(): Promise<Subject[]> {
-    return Array.from(this.subjects.values());
+  async listSubjects(userId?: string): Promise<Subject[]> {
+    const list = Array.from(this.subjects.values());
+    return userId ? list.filter(s => !s.user_id || s.user_id === userId) : list;
   }
 
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {
@@ -124,17 +125,19 @@ export class MemoryQuizRepository implements IQuizRepository {
     return subject;
   }
 
-  async listQuizzes(): Promise<Quiz[]> {
+  async listQuizzes(userId?: string): Promise<Quiz[]> {
     const all = Array.from(this.quizzes.values());
-    return all.map(q => ({
+    const filtered = userId ? all.filter(q => !q.user_id || q.user_id === userId) : all;
+    return filtered.map(q => ({
       ...q,
       subject: q.subject_id ? this.subjects.get(q.subject_id) || null : null
     }));
   }
 
-  async getQuizById(id: string): Promise<Quiz | null> {
+  async getQuizById(id: string, userId?: string): Promise<Quiz | null> {
     const quiz = this.quizzes.get(id);
     if (!quiz) return null;
+    if (userId && quiz.user_id && quiz.user_id !== userId) return null;
     return {
       ...quiz,
       subject: quiz.subject_id ? this.subjects.get(quiz.subject_id) || null : null
@@ -177,8 +180,8 @@ export class MemoryQuizRepository implements IQuizRepository {
     return newQuiz;
   }
 
-  async updateQuiz(id: string, dto: UpdateQuizDto): Promise<Quiz> {
-    const quiz = this.quizzes.get(id);
+  async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
+    const quiz = await this.getQuizById(id, userId);
     if (!quiz) throw new Error(`Quiz ${id} not found`);
     if (dto.title !== undefined) quiz.title = dto.title;
     if (dto.subject_id !== undefined) quiz.subject_id = dto.subject_id;
@@ -186,7 +189,9 @@ export class MemoryQuizRepository implements IQuizRepository {
     return quiz;
   }
 
-  async deleteQuiz(id: string): Promise<boolean> {
+  async deleteQuiz(id: string, userId?: string): Promise<boolean> {
+    const quiz = await this.getQuizById(id, userId);
+    if (!quiz) return false;
     const deleted = this.quizzes.delete(id);
     for (const [qId, q] of this.questions.entries()) {
       if (q.quiz_id === id) this.questions.delete(qId);

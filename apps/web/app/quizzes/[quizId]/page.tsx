@@ -5,10 +5,13 @@ import { useParams, useRouter } from 'next/navigation';
 import QuizOverviewClient from '@/components/quiz/QuizOverviewClient';
 import { Quiz, QuizQuestion, QuizSession } from '@quiz-creator/types';
 
-export default function QuizDetailPage() {
-  const params = useParams();
+export default function QuizDetailPage({
+  params,
+}: {
+  params: Promise<{ quizId: string }>;
+}) {
   const router = useRouter();
-  const quizId = params?.quizId as string;
+  const { quizId } = React.use(params);
 
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);

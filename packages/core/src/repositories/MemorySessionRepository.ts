@@ -5,39 +5,49 @@ export class MemorySessionRepository implements ISessionRepository {
   private sessions: Map<string, QuizSession> = new Map();
   private progress: Map<string, QuestionProgress> = new Map();
 
-  async getActiveSession(quizId: string): Promise<QuizSession | null> {
+  async getActiveSession(quizId: string, userId?: string): Promise<QuizSession | null> {
     for (const session of this.sessions.values()) {
       if (session.quiz_id === quizId && session.status === 'in_progress') {
-        return session;
+        if (!userId || session.user_id === userId) {
+          return session;
+        }
       }
     }
     return null;
   }
 
-  async getScheduledSession(quizId: string): Promise<QuizSession | null> {
+  async getScheduledSession(quizId: string, userId?: string): Promise<QuizSession | null> {
     for (const session of this.sessions.values()) {
       if (session.quiz_id === quizId && session.status === 'scheduled') {
-        return session;
+        if (!userId || session.user_id === userId) {
+          return session;
+        }
       }
     }
     return null;
   }
 
-  async getLatestCompletedSession(quizId: string): Promise<QuizSession | null> {
+  async getLatestCompletedSession(quizId: string, userId?: string): Promise<QuizSession | null> {
     const completed: QuizSession[] = [];
     for (const session of this.sessions.values()) {
       if (session.quiz_id === quizId && session.status === 'completed') {
-        completed.push(session);
+        if (!userId || session.user_id === userId) {
+          completed.push(session);
+        }
       }
     }
     if (completed.length === 0) return null;
     return completed.sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime())[0];
   }
 
-  async listSessions(quizId: string): Promise<QuizSession[]> {
+  async listSessions(quizId: string, userId?: string): Promise<QuizSession[]> {
     const list: QuizSession[] = [];
     for (const session of this.sessions.values()) {
-      if (session.quiz_id === quizId) list.push(session);
+      if (session.quiz_id === quizId) {
+        if (!userId || session.user_id === userId) {
+          list.push(session);
+        }
+      }
     }
     return list.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   }

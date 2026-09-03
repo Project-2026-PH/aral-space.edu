@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Trash2, Save, ArrowLeft, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, GripVertical, Tag } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, GripVertical, Tag, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import NewSubjectModal, { SUBJECT_PALETTE } from '../subject/NewSubjectModal';
 
 export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
 
@@ -23,12 +22,14 @@ const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentTy
   { id: 'enumeration', label: 'Enumeration', icon: ListOrdered },
 ];
 
-export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<{ id: string; name: string; color?: string }> }) {
+export default function ManualQuizCreator({
+  onSwitchToAi
+}: {
+  subjects?: Array<{ id: string; name: string; color?: string }>;
+  onSwitchToAi?: () => void;
+}) {
   const router = useRouter();
   const [title, setTitle] = useState('');
-  const [subjectList, setSubjectList] = useState<Array<{ id: string; name: string; color?: string }>>(subjects);
-  const [subjectId, setSubjectId] = useState(subjects[0]?.id || '');
-  const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [questions, setQuestions] = useState<QuestionDraft[]>([
     {
       type: 'multiple_choice',
@@ -172,7 +173,7 @@ export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim(),
-          subject_id: subjectId || null,
+          subject_id: null,
           source_model: 'manual',
           questions: questions.map((q) => {
             let opts = q.options.map((o) => o.trim());
@@ -219,14 +220,26 @@ export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<
           <ArrowLeft className="h-4 w-4" />
           Back to Hub
         </Link>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 rounded-2xl bg-primary px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
-        >
-          <Save className="h-4 w-4" />
-          <span>{saving ? 'Saving...' : 'Save & Publish Quiz'}</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          {onSwitchToAi && (
+            <button
+              type="button"
+              onClick={onSwitchToAi}
+              className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              <span>Generate with AI</span>
+            </button>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-2xl bg-primary px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            <span>{saving ? 'Saving...' : 'Save & Publish Quiz'}</span>
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -238,80 +251,19 @@ export default function ManualQuizCreator({ subjects = [] }: { subjects?: Array<
       {/* Quiz metadata */}
       <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm space-y-4">
         <h2 className="text-base font-bold text-foreground">Quiz Details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
-              Quiz Title
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Molecular Biology Core Concepts"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Subject Category
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowSubjectModal(true)}
-                className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 transition-all"
-              >
-                <Plus className="h-3 w-3" />
-                <span>New Subject</span>
-              </button>
-            </div>
-            <div className="relative flex items-center">
-              <select
-                value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-background pl-4 pr-8 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none cursor-pointer"
-              >
-                <option value="">General (No Subject)</option>
-                {subjectList.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {/* Active subject color tag */}
-            {subjectId && (
-              <div className="mt-2 flex items-center gap-1.5">
-                {(() => {
-                  const currentSub = subjectList.find((s) => s.id === subjectId);
-                  if (!currentSub) return null;
-                  return (
-                    <span
-                      style={{
-                        backgroundColor: currentSub.color || '#86EFAC',
-                        color: '#1e293b'
-                      }}
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow-2xs"
-                    >
-                      <Tag className="h-2.5 w-2.5" />
-                      {currentSub.name}
-                    </span>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
+            Quiz Title
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Molecular Biology Core Concepts"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
+          />
         </div>
       </div>
-
-      <NewSubjectModal
-        open={showSubjectModal}
-        onOpenChange={setShowSubjectModal}
-        onCreated={(created) => {
-          setSubjectList((prev) => [...prev, created]);
-          setSubjectId(created.id);
-        }}
-      />
 
       {/* Questions list */}
       <div className="space-y-4">

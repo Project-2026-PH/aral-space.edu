@@ -1,11 +1,12 @@
 import Groq from 'groq-sdk';
-import { RawAiQuestion, HandoutPage } from '@quiz-creator/types';
+import { RawAiQuestion, HandoutPage, UserAuthoringProfile } from '@quiz-creator/types';
 
 export interface GroqReviewOptions {
   apiKey: string;
   candidateQuestions: RawAiQuestion[];
   subjectName?: string;
   modelName?: string;
+  authoringProfile?: UserAuthoringProfile;
   onChunk?: (text: string) => void;
 }
 
@@ -15,6 +16,7 @@ export interface GroqDirectOptions {
   subjectName?: string;
   targetCount?: number;
   modelName?: string;
+  authoringProfile?: UserAuthoringProfile;
   onChunk?: (text: string) => void;
 }
 
@@ -54,6 +56,7 @@ AUDIT RULES:
 4. Index Integrity: Ensure correct_answer is strictly 0, 1, 2, or 3, precisely matching the intended option index.
 5. Explanation: Keep explanations razor-sharp and instructional.
 6. Preserve Citations: Retain source_pages arrays.
+7. Preserve Chapter Metadata: Retain chapter tags and distribute focus evenly across chapters.${options.authoringProfile?.styleSummary ? `\n8. User Style Alignment: ${options.authoringProfile.styleSummary}` : ''}
 
 Output ONLY valid JSON containing an array of question objects matching the input format.`;
 
@@ -102,11 +105,32 @@ Return the polished JSON array:`;
   async generateDirect(options: GroqDirectOptions): Promise<{ questions: RawAiQuestion[]; tokensUsed: number; model: string }> {
     const model = options.modelName || GroqReviewer.DEFAULT_MODEL;
     const groq = new Groq({ apiKey: options.apiKey });
-    const targetCount = options.targetCount || 15;
+    const targetCount = options.targetCount || options.authoringProfile?.targetCount || 15;
+    const uniqueChapters = Array.from(
+      new Set(options.handoutPages.map((p) => p.chapterTitle).filter((c): c is string => Boolean(c && c.trim())))
+    );
 
     const formattedContent = options.handoutPages
-      .map((p) => `--- PAGE ${p.pageNumber} ---\n${p.text}\n`)
+      .map((p) => {
+        const chapterHeader = p.chapterTitle ? ` [Chapter / File: ${p.chapterTitle}]` : '';
+        return `--- PAGE ${p.pageNumber}${chapterHeader} ---\n${p.text}\n`;
+      })
       .join('\n');
+
+    let multiChapterInstruction = '';
+    if (uniqueChapters.length > 1) {
+      multiChapterInstruction = `\n6. Multi-Chapter Balance: Material spans ${uniqueChapters.length} chapters (${uniqueChapters.join(', ')}). Distribute questions proportionally across ALL chapters. Include "chapter" field with the corresponding chapter name.`;
+    }
+
+    let styleInstruction = '';
+    if (options.authoringProfile?.styleSummary) {
+      styleInstruction += `\n7. User Style Adaptation: ${options.authoringProfile.styleSummary}`;
+    }
+    if (options.authoringProfile?.sampleQuestions && options.authoringProfile.sampleQuestions.length > 0) {
+      styleInstruction += `\n8. Match the formatting and phrasing of user's previous questions:\n${options.authoringProfile.sampleQuestions
+        .map((s, idx) => `   [Example ${idx + 1}] "${s.question}" | Options: [${s.options.join(', ')}]`)
+        .join('\n')}`;
+    }
 
     const prompt = `You are an expert exam author${options.subjectName ? ` for ${options.subjectName}` : ''}.
 Generate a comprehensive multiple-choice quiz based on the text below.
@@ -119,7 +143,7 @@ Requirements:
 2. 4 plausible options per question.
 3. correct_answer is the 0-indexed integer (0, 1, 2, or 3).
 4. explanation cites why it is correct.
-5. source_pages is an array of page numbers.
+5. source_pages is an array of page numbers.${multiChapterInstruction}${styleInstruction}
 
 Return a JSON object with key "questions" containing the array of questions.`;
 

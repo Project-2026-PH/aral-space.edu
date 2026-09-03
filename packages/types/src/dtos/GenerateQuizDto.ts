@@ -8,9 +8,37 @@ export interface ExtractedPageText {
 export interface HandoutPage {
   pageNumber: number;
   text: string;
+  chapterTitle?: string;
 }
 
-export type AiPipelineMode = 'two_stage' | 'groq_direct' | 'gemini_direct';
+export interface IngestedFileInfo {
+  fileName: string;
+  pageCount: number;
+  fileSize?: number;
+}
+
+export interface UserAuthoringProfile {
+  targetCount: number;
+  sourceType: 'manual' | 'ai_adjusted' | 'default';
+  sampleQuestions?: Array<{
+    question: string;
+    options: string[];
+    explanation?: string;
+  }>;
+  styleSummary?: string;
+  avgQuestionLength?: number;
+  avgOptionCount?: number;
+  totalReviewersAnalyzed?: number;
+}
+
+export type AiPipelineMode = 'auto' | 'two_stage' | 'groq_direct' | 'gemini_direct' | 'verbatim_exact';
+
+export interface VerbatimTermPair {
+  term: string;
+  verbatim_definition: string;
+  source_page: number;
+  chapter?: string;
+}
 
 export interface GenerateQuizRequestDto {
   subjectId?: string;
@@ -19,11 +47,13 @@ export interface GenerateQuizRequestDto {
   handoutPath?: string;
   text?: string;
   pdfPages?: HandoutPage[];
+  filesSummary?: IngestedFileInfo[];
   pageStart?: number;
   pageEnd?: number;
   pipelineMode?: AiPipelineMode;
   apiKey?: string;
   groqApiKey?: string;
+  authoringProfile?: UserAuthoringProfile;
 }
 
 export interface QuizGenerationProgressDto {
@@ -36,6 +66,8 @@ export interface QuizGenerationProgressDto {
   stageNumber?: number;
   totalStages?: number;
   modelUsed?: string;
+  pipelineMode?: AiPipelineMode;
+  authoringProfile?: UserAuthoringProfile;
 }
 
 export interface RawAiQuestion {
@@ -44,6 +76,7 @@ export interface RawAiQuestion {
   correct_answer: number;
   explanation: string;
   source_pages?: number[];
+  chapter?: string;
 }
 
 export interface GeneratedQuizResult {

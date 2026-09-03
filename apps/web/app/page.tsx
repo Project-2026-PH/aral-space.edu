@@ -1,17 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Quiz, Subject } from '@quiz-creator/types';
+import { Quiz } from '@quiz-creator/types';
 import GenerateQuizModal from '@/components/quiz/GenerateQuizModal';
 import { Sparkles, Plus, BookOpen, Layers, Play, Clock, Search, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HomePage() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('all');
   const [showAiModal, setShowAiModal] = useState(false);
 
   useEffect(() => {
@@ -21,7 +19,6 @@ export default function HomePage() {
         if (res.ok) {
           const data = await res.json();
           setQuizzes(data.quizzes || []);
-          setSubjects(data.subjects || []);
         }
       } catch (err) {
         console.error('Failed to load quizzes:', err);
@@ -33,9 +30,7 @@ export default function HomePage() {
   }, []);
 
   const filtered = quizzes.filter((q) => {
-    const matchesSearch = q.title.toLowerCase().includes(search.toLowerCase());
-    const matchesSubject = selectedSubjectId === 'all' || q.subject_id === selectedSubjectId;
-    return matchesSearch && matchesSubject;
+    return q.title.toLowerCase().includes(search.toLowerCase());
   });
 
   return (
@@ -73,46 +68,16 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search quiz library..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-2xl border border-border bg-card pl-10 pr-4 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none shadow-2xs"
-          />
-        </div>
-
-        {subjects.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
-            <button
-              onClick={() => setSelectedSubjectId('all')}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
-                selectedSubjectId === 'all'
-                  ? 'bg-primary text-white'
-                  : 'bg-card border border-border text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              All
-            </button>
-            {subjects.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSelectedSubjectId(s.id)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-colors ${
-                  selectedSubjectId === s.id
-                    ? 'bg-primary text-white'
-                    : 'bg-card border border-border text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-        )}
+      {/* Search Bar */}
+      <div className="relative w-full sm:w-96">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Search reviewer library..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-2xl border border-border bg-card pl-10 pr-4 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none shadow-2xs"
+        />
       </div>
 
       {/* Quizzes Grid */}
@@ -139,17 +104,7 @@ export default function HomePage() {
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  {quiz.subject ? (
-                    <span className="flex items-center gap-1.5 font-bold text-foreground">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: quiz.subject.color }}
-                      />
-                      {quiz.subject.name}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground text-[11px]">General</span>
-                  )}
+                  <span className="text-muted-foreground text-[11px] font-medium">Reviewer</span>
                   <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground">
                     {quiz.question_count} Qs
                   </span>
@@ -191,7 +146,6 @@ export default function HomePage() {
       <GenerateQuizModal
         open={showAiModal}
         onOpenChange={setShowAiModal}
-        subjects={subjects}
       />
     </div>
   );

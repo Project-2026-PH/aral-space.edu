@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import { RawAiQuestion, HandoutPage } from '@quiz-creator/types';
+import { RawAiQuestion, HandoutPage, UserAuthoringProfile } from '@quiz-creator/types';
 
 export interface GeminiExtractionOptions {
   apiKey: string;
@@ -7,14 +7,44 @@ export interface GeminiExtractionOptions {
   subjectName?: string;
   targetCount?: number;
   modelName?: string;
+  authoringProfile?: UserAuthoringProfile;
   onChunk?: (text: string) => void;
 }
 
 export class GeminiExtractor {
-  static buildExtractionPrompt(pages: HandoutPage[], subjectName?: string, targetCount: number = 15): string {
+  static buildExtractionPrompt(
+    pages: HandoutPage[],
+    subjectName?: string,
+    targetCount: number = 15,
+    authoringProfile?: UserAuthoringProfile
+  ): string {
+    const uniqueChapters = Array.from(
+      new Set(pages.map((p) => p.chapterTitle).filter((c): c is string => Boolean(c && c.trim())))
+    );
+
     const formattedContent = pages
-      .map((p) => `--- PAGE ${p.pageNumber} ---\n${p.text}\n`)
+      .map((p) => {
+        const chapterHeader = p.chapterTitle ? ` [Chapter / File: ${p.chapterTitle}]` : '';
+        return `--- PAGE ${p.pageNumber}${chapterHeader} ---\n${p.text}\n`;
+      })
       .join('\n');
+
+    let multiChapterInstruction = '';
+    if (uniqueChapters.length > 1) {
+      multiChapterInstruction = `\n6. Multi-Chapter Balanced Distribution: The source material covers ${uniqueChapters.length} distinct chapters/files (${uniqueChapters.join(', ')}). You MUST distribute questions proportionally and evenly across ALL chapters so every chapter is thoroughly tested. In the "chapter" field, record the specific chapter name for each question.`;
+    } else if (uniqueChapters.length === 1) {
+      multiChapterInstruction = `\n6. Source Chapter: The handout is from chapter "${uniqueChapters[0]}". Tag questions with this chapter in the "chapter" field.`;
+    }
+
+    let styleInstruction = '';
+    if (authoringProfile?.styleSummary) {
+      styleInstruction += `\n7. User Style Adaptation: ${authoringProfile.styleSummary}`;
+    }
+    if (authoringProfile?.sampleQuestions && authoringProfile.sampleQuestions.length > 0) {
+      styleInstruction += `\n8. Match the formatting, difficulty, and tone of the user's previously authored questions:\n${authoringProfile.sampleQuestions
+        .map((s, idx) => `   [Exemplar ${idx + 1}] Question: "${s.question}" | Options: [${s.options.join(', ')}]${s.explanation ? ` | Explanation: ${s.explanation}` : ''}`)
+        .join('\n')}`;
+    }
 
     return `You are an expert curriculum designer and exam question author${subjectName ? ` specializing in ${subjectName}` : ''}.
 Thoroughly analyze the source handout provided below and extract high-yield conceptual multiple-choice questions.
@@ -27,7 +57,7 @@ Requirements:
 2. Each question MUST have exactly 4 plausible, distinct options.
 3. correct_answer MUST be the 0-indexed integer (0, 1, 2, or 3) of the correct choice.
 4. explanation MUST cite why the answer is correct according to the text.
-5. source_pages MUST be an array of page numbers where the concept appears.
+5. source_pages MUST be an array of page numbers where the concept appears.${multiChapterInstruction}${styleInstruction}
 `;
   }
 
@@ -47,7 +77,8 @@ Requirements:
           source_pages: {
             type: Type.ARRAY,
             items: { type: Type.INTEGER }
-          }
+          },
+          chapter: { type: Type.STRING }
         },
         required: ["question", "options", "correct_answer", "explanation"]
       }
@@ -57,7 +88,8 @@ Requirements:
   async extract(options: GeminiExtractionOptions): Promise<{ questions: RawAiQuestion[]; tokensUsed: number; model: string }> {
     const model = options.modelName || 'gemini-2.5-flash';
     const ai = new GoogleGenAI({ apiKey: options.apiKey });
-    const prompt = GeminiExtractor.buildExtractionPrompt(options.handoutPages, options.subjectName, options.targetCount);
+    const targetCount = options.targetCount || options.authoringProfile?.targetCount || 15;
+    const prompt = GeminiExtractor.buildExtractionPrompt(options.handoutPages, options.subjectName, targetCount, options.authoringProfile);
 
     const responseStream = await ai.models.generateContentStream({
       model,

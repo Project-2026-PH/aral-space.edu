@@ -1,12 +1,16 @@
-import { RawAiQuestion, GeneratedQuizResult, HandoutPage, AiPipelineMode } from '@quiz-creator/types';
+import { RawAiQuestion, GeneratedQuizResult, HandoutPage, AiPipelineMode, UserAuthoringProfile } from '@quiz-creator/types';
 import { GeminiExtractor } from './ai/GeminiExtractor';
 import { GroqReviewer } from './ai/GroqReviewer';
+import { VerbatimExtractor } from './ai/VerbatimExtractor';
+import { VerbatimQuizBuilder } from './ai/VerbatimQuizBuilder';
 
 export interface GenerateOptions {
   handoutPages: HandoutPage[];
   subjectName?: string;
   pageStart?: number;
   pageEnd?: number;
+  targetCount?: number;
+  authoringProfile?: UserAuthoringProfile;
   pipelineMode?: AiPipelineMode;
   apiKey?: string;       // Gemini API key
   groqApiKey?: string;   // Groq API key
@@ -17,13 +21,16 @@ export interface GenerateOptions {
 export class QuizGenerationService {
   private geminiExtractor: GeminiExtractor;
   private groqReviewer: GroqReviewer;
+  private verbatimExtractor: VerbatimExtractor;
 
   constructor(
     geminiExtractor: GeminiExtractor = new GeminiExtractor(),
-    groqReviewer: GroqReviewer = new GroqReviewer()
+    groqReviewer: GroqReviewer = new GroqReviewer(),
+    verbatimExtractor: VerbatimExtractor = new VerbatimExtractor()
   ) {
     this.geminiExtractor = geminiExtractor;
     this.groqReviewer = groqReviewer;
+    this.verbatimExtractor = verbatimExtractor;
   }
 
   static validateQuestions(questions: any[]): questions is RawAiQuestion[] {
@@ -80,10 +87,65 @@ export class QuizGenerationService {
     ];
   }
 
+  /**
+   * Intelligently selects the optimal pipeline mode based on material size,
+   * chapter distribution, and available AI provider keys.
+   */
+  static resolveAutoPipelineMode(
+    options: GenerateOptions,
+    geminiKey?: string,
+    groqKey?: string
+  ): { resolvedMode: 'two_stage' | 'groq_direct' | 'gemini_direct'; reason: string } {
+    const totalChars = options.handoutPages.reduce((acc, p) => acc + (p.text?.length || 0), 0);
+    const estimatedTokens = Math.ceil(totalChars / 4);
+    const uniqueChapters = new Set(
+      options.handoutPages.map((p) => p.chapterTitle).filter((c): c is string => Boolean(c && c.trim()))
+    );
+    const isMultiChapter = uniqueChapters.size > 1;
+
+    // Single provider available
+    if (geminiKey && !groqKey) {
+      return {
+        resolvedMode: 'gemini_direct',
+        reason: 'Gemini provider active.'
+      };
+    }
+    if (!geminiKey && groqKey) {
+      return {
+        resolvedMode: 'groq_direct',
+        reason: 'Groq provider active.'
+      };
+    }
+
+    // Both providers available
+    // Massive document (>15k tokens) routes to Gemini 1M context
+    if (estimatedTokens > 15000 && geminiKey) {
+      return {
+        resolvedMode: 'gemini_direct',
+        reason: `Large document (~${estimatedTokens} tokens, ${options.handoutPages.length} pages); routed to Gemini 1M context.`
+      };
+    }
+
+    // Default Gold Standard: Two-Stage Pipeline (Gemini extraction + Groq distractor hardening)
+    return {
+      resolvedMode: 'two_stage',
+      reason: isMultiChapter
+        ? `Multi-chapter reviewer (${uniqueChapters.size} chapters); routed to Dual-Stage for cross-chapter balance.`
+        : 'Standard document; routed to Dual-Stage (Gemini extraction + Groq distractor hardening).'
+    };
+  }
+
   async generateQuiz(options: GenerateOptions): Promise<GeneratedQuizResult> {
     const geminiKey = options.apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
     const groqKey = options.groqApiKey || process.env.GROQ_API_KEY;
-    const mode = options.pipelineMode || 'two_stage';
+    let mode = options.pipelineMode || 'auto';
+    let autoReason: string | undefined;
+
+    if (mode === 'auto') {
+      const autoRouting = QuizGenerationService.resolveAutoPipelineMode(options, geminiKey, groqKey);
+      mode = autoRouting.resolvedMode;
+      autoReason = autoRouting.reason;
+    }
 
     // Mock fallback when no keys are provided
     if (!geminiKey && !groqKey) {
@@ -96,6 +158,46 @@ export class QuizGenerationService {
       };
     }
 
+    const targetCount = options.targetCount || options.authoringProfile?.targetCount || 10;
+
+    // 0. Verbatim Exact Mode (Zero-variance extraction + programmatic distractor assembly)
+    if (mode === 'verbatim_exact') {
+      options.onStageChange?.(
+        'extracting',
+        'Stage 1/2: Extracting verbatim definitions at temperature 0.0...',
+        geminiKey ? 'gemini-2.5-flash' : 'llama-3.3-70b-versatile'
+      );
+
+      const extractResult = await this.verbatimExtractor.extract({
+        apiKey: geminiKey,
+        groqApiKey: groqKey,
+        handoutPages: options.handoutPages,
+        subjectName: options.subjectName,
+        targetCount,
+        onChunk: options.onChunk
+      });
+
+      options.onStageChange?.(
+        'reviewing',
+        'Stage 2/2: Validating verbatim quotes & assembling distractors...',
+        'verbatim-assembler'
+      );
+
+      const fullSourceText = options.handoutPages.map((p) => p.text).join('\n');
+      const questions = VerbatimQuizBuilder.assembleVerbatimQuiz(
+        extractResult.pairs,
+        fullSourceText,
+        targetCount
+      );
+
+      return {
+        questions,
+        sourceModel: `verbatim/${extractResult.model}`,
+        tokensUsed: extractResult.tokensUsed,
+        pipelineMode: 'verbatim_exact'
+      };
+    }
+
     // 1. Direct Groq Mode
     if (mode === 'groq_direct' && groqKey) {
       options.onStageChange?.('extracting', 'Generating questions with Groq Llama-3.3-70b...', 'llama-3.3-70b-versatile');
@@ -103,6 +205,8 @@ export class QuizGenerationService {
         apiKey: groqKey,
         handoutPages: options.handoutPages,
         subjectName: options.subjectName,
+        targetCount,
+        authoringProfile: options.authoringProfile,
         onChunk: options.onChunk
       });
       return {
@@ -120,6 +224,8 @@ export class QuizGenerationService {
         apiKey: geminiKey,
         handoutPages: options.handoutPages,
         subjectName: options.subjectName,
+        targetCount,
+        authoringProfile: options.authoringProfile,
         onChunk: options.onChunk
       });
       return {
@@ -141,6 +247,8 @@ export class QuizGenerationService {
           apiKey: geminiKey,
           handoutPages: options.handoutPages,
           subjectName: options.subjectName,
+          targetCount,
+          authoringProfile: options.authoringProfile,
           onChunk: options.onChunk
         });
       } catch (geminiErr: any) {
@@ -151,6 +259,8 @@ export class QuizGenerationService {
             apiKey: groqKey,
             handoutPages: options.handoutPages,
             subjectName: options.subjectName,
+            targetCount,
+            authoringProfile: options.authoringProfile,
             onChunk: options.onChunk
           });
           return {
@@ -171,6 +281,7 @@ export class QuizGenerationService {
             apiKey: groqKey,
             candidateQuestions: stage1Result.questions,
             subjectName: options.subjectName,
+            authoringProfile: options.authoringProfile,
             onChunk: options.onChunk
           });
 

@@ -1,6 +1,7 @@
-export interface CacheOptions {
+export interface CacheOptions<K = string, V = unknown> {
   maxSize?: number;
   ttlMs?: number;
+  onEvict?: (key: K, value: V) => void;
 }
 
 interface CacheEntry<T> {
@@ -8,14 +9,29 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
-export class LRUCache<K = string, V = any> {
+/**
+ * In-memory LRU cache using Map insertion order.
+ *
+ * Expiration model:
+ * Lazy (passive) expiration. Entries expire only when accessed via `get()`,
+ * `has()`, or `peek()`, or when evicted due to `maxSize`. No background timers run.
+ */
+export class LRUCache<K = string, V = unknown> {
   private maxSize: number;
   private ttlMs: number;
+  private onEvict?: (key: K, value: V) => void;
   private cache: Map<K, CacheEntry<V>>;
 
-  constructor(options?: CacheOptions) {
+  constructor(options?: CacheOptions<K, V>) {
+    if (options?.ttlMs !== undefined && options.ttlMs < 0) {
+      throw new RangeError('ttlMs must be non-negative');
+    }
+    if (options?.maxSize !== undefined && options.maxSize < 0) {
+      throw new RangeError('maxSize must be non-negative');
+    }
     this.maxSize = options?.maxSize ?? 500;
     this.ttlMs = options?.ttlMs ?? 60_000; // Default 60 seconds
+    this.onEvict = options?.onEvict;
     this.cache = new Map();
   }
 
@@ -25,6 +41,7 @@ export class LRUCache<K = string, V = any> {
 
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
+      this.onEvict?.(key, entry.value);
       return undefined;
     }
 
@@ -34,18 +51,57 @@ export class LRUCache<K = string, V = any> {
     return entry.value;
   }
 
+  peek(key: K): V | undefined {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      this.onEvict?.(key, entry.value);
+      return undefined;
+    }
+
+    return entry.value;
+  }
+
+  has(key: K): boolean {
+    const entry = this.cache.get(key);
+    if (!entry) return false;
+
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      this.onEvict?.(key, entry.value);
+      return false;
+    }
+
+    return true;
+  }
+
   set(key: K, value: V, ttlMs?: number): void {
+    if (ttlMs !== undefined && ttlMs < 0) {
+      throw new RangeError('ttlMs must be non-negative');
+    }
+
+    if (this.maxSize <= 0) {
+      return;
+    }
+
     if (this.cache.has(key)) {
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxSize) {
       // Evict oldest item (first key in map)
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey !== undefined) {
+        const evictedEntry = this.cache.get(oldestKey);
         this.cache.delete(oldestKey);
+        if (evictedEntry) {
+          this.onEvict?.(oldestKey, evictedEntry.value);
+        }
       }
     }
 
-    const expiresAt = Date.now() + (ttlMs ?? this.ttlMs);
+    const effectiveTtl = ttlMs ?? this.ttlMs;
+    const expiresAt = Date.now() + effectiveTtl;
     this.cache.set(key, { value, expiresAt });
   }
 
@@ -53,9 +109,9 @@ export class LRUCache<K = string, V = any> {
     return this.cache.delete(key);
   }
 
-  deleteByPrefix(prefix: string): void {
+  deleteByPrefix(this: LRUCache<string, V>, prefix: string): void {
     for (const key of this.cache.keys()) {
-      if (typeof key === 'string' && key.startsWith(prefix)) {
+      if (key.startsWith(prefix)) {
         this.cache.delete(key);
       }
     }
@@ -65,7 +121,10 @@ export class LRUCache<K = string, V = any> {
     this.cache.clear();
   }
 
-  size(): number {
+  get size(): number {
     return this.cache.size;
   }
 }
+
+export class StringLRUCache<V = unknown> extends LRUCache<string, V> {}
+

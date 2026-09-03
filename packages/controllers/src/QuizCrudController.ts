@@ -1,5 +1,5 @@
 import { IQuizRepository } from '@quiz-creator/core';
-import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto } from '@quiz-creator/types';
+import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto, UpdateSubjectShareConfigDto } from '@quiz-creator/types';
 
 export class QuizCrudController {
   constructor(private quizRepo: IQuizRepository) {}
@@ -14,6 +14,18 @@ export class QuizCrudController {
 
   async createSubject(name: string, color: string, userId?: string) {
     return await this.quizRepo.createSubject(name, color, userId);
+  }
+
+  async getSubjectShareConfig(subjectId: string, userId?: string) {
+    return await this.quizRepo.getSubjectShareConfig(subjectId, userId);
+  }
+
+  async updateSubjectShareConfig(subjectId: string, dto: UpdateSubjectShareConfigDto, userId?: string) {
+    return await this.quizRepo.updateSubjectShareConfig(subjectId, dto, userId);
+  }
+
+  async getSubjectByShareToken(shareToken: string) {
+    return await this.quizRepo.getSubjectByShareToken(shareToken);
   }
 
   async getQuiz(id: string, userId?: string) {

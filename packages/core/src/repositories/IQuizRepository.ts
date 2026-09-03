@@ -1,8 +1,11 @@
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto, UpdateSubjectShareConfigDto, SubjectShareConfig, PublicSubjectDto } from '@quiz-creator/types';
 
 export interface IQuizRepository {
   listSubjects(userId?: string): Promise<Subject[]>;
   createSubject(name: string, color: string, userId?: string): Promise<Subject>;
+  getSubjectShareConfig(subjectId: string, userId?: string): Promise<SubjectShareConfig>;
+  updateSubjectShareConfig(subjectId: string, dto: UpdateSubjectShareConfigDto, userId?: string): Promise<SubjectShareConfig>;
+  getSubjectByShareToken(shareToken: string): Promise<PublicSubjectDto | null>;
   listQuizzes(userId?: string): Promise<Quiz[]>;
   getQuizById(id: string, userId?: string): Promise<Quiz | null>;
   createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz>;

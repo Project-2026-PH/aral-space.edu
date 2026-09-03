@@ -17,7 +17,9 @@
     "lint": "pnpm -r lint",
     "test": "vitest run",
     "test:infisical": "infisical run -- pnpm test",
-    "typecheck": "pnpm -r exec tsc --noEmit"
+    "typecheck": "pnpm -r exec tsc --noEmit",
+    "migrate": "node scripts/migrate.mjs",
+    "migrate:infisical": "infisical run -- node scripts/migrate.mjs"
   },
   "devDependencies": {
     "typescript": "7.1.0-dev.20260902.1",

@@ -1,25 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { RepositoryFactory } from '@quiz-creator/core';
+import { NextResponse } from 'next/server';
 import { QuizCrudController } from '@quiz-creator/controllers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getQuizRepository } from '@/lib/db';
+import { createApiRoute } from '@/lib/api-handler';
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ shareToken: string }> }
-) {
-  try {
-    const { shareToken } = await params;
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
-    const controller = new QuizCrudController(quizRepo);
-    const publicQuiz = await controller.getQuizByShareToken(shareToken);
+export const GET = createApiRoute<{ shareToken: string }>(async ({ params }) => {
+  const quizRepo = await getQuizRepository(true);
+  const controller = new QuizCrudController(quizRepo);
+  const publicQuiz = await controller.getQuizByShareToken(params.shareToken);
 
-    if (!publicQuiz) {
-      return NextResponse.json({ error: 'Study set not found or access is restricted' }, { status: 404 });
-    }
-
-    return NextResponse.json(publicQuiz);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  if (!publicQuiz) {
+    return NextResponse.json({ error: 'Study set not found or access is restricted' }, { status: 404 });
   }
-}
+
+  return publicQuiz;
+}, { cache: 'public', skipAuth: true });

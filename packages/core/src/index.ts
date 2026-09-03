@@ -14,6 +14,7 @@ export * from './repositories/RepositoryFactory';
 export * from './cache/LRUCache';
 
 export * from './services/QuizGenerationService';
+export * from './services/ai/AiModelConfig';
 export * from './services/ai/GeminiExtractor';
 export * from './services/ai/GroqReviewer';
 export * from './services/ai/VerbatimExtractor';

@@ -3,6 +3,7 @@ import { GeminiExtractor } from './ai/GeminiExtractor';
 import { GroqReviewer } from './ai/GroqReviewer';
 import { VerbatimExtractor } from './ai/VerbatimExtractor';
 import { VerbatimQuizBuilder } from './ai/VerbatimQuizBuilder';
+import { AiModelConfig } from './ai/AiModelConfig';
 
 export interface GenerateOptions {
   handoutPages: HandoutPage[];
@@ -107,35 +108,27 @@ export class QuizGenerationService {
     if (geminiKey && !groqKey) {
       return {
         resolvedMode: 'gemini_direct',
-        reason: 'Gemini provider active.'
+        reason: 'Gemini provider active (1M context high-yield single pass).'
       };
     }
     if (!geminiKey && groqKey) {
       return {
         resolvedMode: 'groq_direct',
-        reason: 'Groq provider active.'
+        reason: 'Groq provider active (high-speed LPU).'
       };
     }
 
-    // Both providers available
-    // Massive document (>15k tokens) routes to Gemini 1M context
-    if (estimatedTokens > 15000 && geminiKey) {
-      return {
-        resolvedMode: 'gemini_direct',
-        reason: `Large document (~${estimatedTokens} tokens, ${options.handoutPages.length} pages); routed to Gemini 1M context.`
-      };
-    }
-
-    // Default Gold Standard: Two-Stage Pipeline (Gemini extraction + Groq distractor hardening)
+    // Both providers available: Gemini Flash is primary free workhorse (1M context + resilient single-pass)
     return {
-      resolvedMode: 'two_stage',
+      resolvedMode: 'gemini_direct',
       reason: isMultiChapter
-        ? `Multi-chapter reviewer (${uniqueChapters.size} chapters); routed to Dual-Stage for cross-chapter balance.`
-        : 'Standard document; routed to Dual-Stage (Gemini extraction + Groq distractor hardening).'
+        ? `Multi-chapter reviewer (${uniqueChapters.size} chapters); routed to Gemini Flash for unified cross-chapter grounding.`
+        : 'Gemini Flash active as primary high-yield engine with Groq fallback.'
     };
   }
 
   async generateQuiz(options: GenerateOptions): Promise<GeneratedQuizResult> {
+    const pipelineStartTime = Date.now();
     const geminiKey = options.apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
     const groqKey = options.groqApiKey || process.env.GROQ_API_KEY;
     let mode = options.pipelineMode || 'auto';
@@ -147,8 +140,17 @@ export class QuizGenerationService {
       autoReason = autoRouting.reason;
     }
 
+    const totalChars = options.handoutPages.reduce((acc, p) => acc + (p.text?.length || 0), 0);
+    const estimatedTokens = Math.ceil(totalChars / 4);
+
+    console.log(`\n[QuizGenerationService] === GENERATION PIPELINE START ===`);
+    console.log(`[QuizGenerationService] Mode: "${mode}" (${autoReason || 'explicit selection'})`);
+    console.log(`[QuizGenerationService] Provider Keys: [Gemini: ${Boolean(geminiKey)}, Groq: ${Boolean(groqKey)}]`);
+    console.log(`[QuizGenerationService] Material: ${options.handoutPages.length} pages | ${totalChars} chars | ~${estimatedTokens} tokens`);
+
     // Mock fallback when no keys are provided
     if (!geminiKey && !groqKey) {
+      console.warn(`[QuizGenerationService] No API keys configured. Falling back to mock demo.`);
       options.onStageChange?.('fallback', 'No API keys detected; generating demo quiz data...', 'mock');
       return {
         sourceModel: 'mock-demo-generator',
@@ -162,10 +164,15 @@ export class QuizGenerationService {
 
     // 0. Verbatim Exact Mode (Zero-variance extraction + programmatic distractor assembly)
     if (mode === 'verbatim_exact') {
+      const verbatimModel = geminiKey
+        ? AiModelConfig.getGeminiModel()
+        : AiModelConfig.getGroqModel();
+
+      console.log(`[QuizGenerationService] Executing verbatim_exact with model "${verbatimModel}"...`);
       options.onStageChange?.(
         'extracting',
         'Stage 1/2: Extracting verbatim definitions at temperature 0.0...',
-        geminiKey ? 'gemini-2.5-flash' : 'llama-3.3-70b-versatile'
+        verbatimModel
       );
 
       const extractResult = await this.verbatimExtractor.extract({
@@ -190,6 +197,7 @@ export class QuizGenerationService {
         targetCount
       );
 
+      console.log(`[QuizGenerationService] verbatim_exact finished in ${Date.now() - pipelineStartTime}ms with ${questions.length} questions.`);
       return {
         questions,
         sourceModel: `verbatim/${extractResult.model}`,
@@ -200,15 +208,19 @@ export class QuizGenerationService {
 
     // 1. Direct Groq Mode
     if (mode === 'groq_direct' && groqKey) {
-      options.onStageChange?.('extracting', 'Generating questions with Groq Llama-3.3-70b...', 'llama-3.3-70b-versatile');
+      const groqModel = AiModelConfig.getGroqModel();
+      console.log(`[QuizGenerationService] Executing groq_direct with model "${groqModel}"...`);
+      options.onStageChange?.('extracting', `Generating questions with Groq (${groqModel})...`, groqModel);
       const result = await this.groqReviewer.generateDirect({
         apiKey: groqKey,
+        modelName: groqModel,
         handoutPages: options.handoutPages,
         subjectName: options.subjectName,
         targetCount,
         authoringProfile: options.authoringProfile,
         onChunk: options.onChunk
       });
+      console.log(`[QuizGenerationService] groq_direct completed in ${Date.now() - pipelineStartTime}ms with ${result.questions.length} questions.`);
       return {
         questions: result.questions,
         sourceModel: `groq/${result.model}`,
@@ -219,44 +231,82 @@ export class QuizGenerationService {
 
     // 2. Direct Gemini Mode
     if (mode === 'gemini_direct' && geminiKey) {
-      options.onStageChange?.('extracting', 'Generating questions with Gemini 3.7 Flash...', 'gemini-2.5-flash');
-      const result = await this.geminiExtractor.extract({
-        apiKey: geminiKey,
-        handoutPages: options.handoutPages,
-        subjectName: options.subjectName,
-        targetCount,
-        authoringProfile: options.authoringProfile,
-        onChunk: options.onChunk
-      });
-      return {
-        questions: result.questions,
-        sourceModel: `gemini/${result.model}`,
-        tokensUsed: result.tokensUsed,
-        pipelineMode: 'gemini_direct'
-      };
-    }
-
-    // 3. Two-Stage Pipeline (Gemini Stage 1 Extraction -> Groq Stage 2 Polish)
-    if (geminiKey) {
-      // Stage 1: Extraction & Grounding with Gemini
-      options.onStageChange?.('extracting', 'Stage 1/2: Extracting core concepts & drafting with Gemini 3.7 Flash...', 'gemini-2.5-flash');
-      let stage1Result: { questions: RawAiQuestion[]; tokensUsed: number; model: string };
-
+      const geminiModel = AiModelConfig.getGeminiModel();
+      console.log(`[QuizGenerationService] Executing gemini_direct with model "${geminiModel}"...`);
+      options.onStageChange?.('extracting', `Generating questions with Gemini (${geminiModel})...`, geminiModel);
       try {
-        stage1Result = await this.geminiExtractor.extract({
+        const result = await this.geminiExtractor.extract({
           apiKey: geminiKey,
+          modelName: geminiModel,
           handoutPages: options.handoutPages,
           subjectName: options.subjectName,
           targetCount,
           authoringProfile: options.authoringProfile,
           onChunk: options.onChunk
         });
+        console.log(`[QuizGenerationService] gemini_direct completed in ${Date.now() - pipelineStartTime}ms with ${result.questions.length} questions.`);
+        return {
+          questions: result.questions,
+          sourceModel: `gemini/${result.model}`,
+          tokensUsed: result.tokensUsed,
+          pipelineMode: 'gemini_direct'
+        };
       } catch (geminiErr: any) {
-        // Fallback to Groq direct if Gemini fails and Groq is available
+        console.error(`[QuizGenerationService] Direct Gemini extraction failed: ${geminiErr.message}`);
         if (groqKey) {
-          options.onStageChange?.('fallback', `Gemini extraction failed (${geminiErr.message}). Falling back to Groq Llama 3.3...`, 'llama-3.3-70b-versatile');
+          const fallbackGroqModel = AiModelConfig.getGroqModel();
+          console.log(`[QuizGenerationService] Falling back to Groq with "${fallbackGroqModel}"...`);
+          options.onStageChange?.('fallback', `Gemini unavailable (${geminiErr.message}). Falling back to Groq (${fallbackGroqModel})...`, fallbackGroqModel);
           const groqDirect = await this.groqReviewer.generateDirect({
             apiKey: groqKey,
+            modelName: fallbackGroqModel,
+            handoutPages: options.handoutPages,
+            subjectName: options.subjectName,
+            targetCount,
+            authoringProfile: options.authoringProfile,
+            onChunk: options.onChunk
+          });
+          return {
+            questions: groqDirect.questions,
+            sourceModel: `groq/${groqDirect.model}`,
+            tokensUsed: groqDirect.tokensUsed,
+            pipelineMode: 'groq_fallback'
+          };
+        }
+        throw geminiErr;
+      }
+    }
+
+    // 3. Two-Stage Pipeline (Gemini Draft -> Groq Polish)
+    if (geminiKey) {
+      const geminiModel = AiModelConfig.getGeminiModel();
+      const stage1Start = Date.now();
+      console.log(`[QuizGenerationService] Stage 1/2 starting: Gemini draft with "${geminiModel}"...`);
+      // Stage 1: Extraction & Grounding with Gemini
+      options.onStageChange?.('extracting', `Stage 1/2: Extracting core concepts & drafting with Gemini (${geminiModel})...`, geminiModel);
+      let stage1Result: { questions: RawAiQuestion[]; tokensUsed: number; model: string };
+
+      try {
+        stage1Result = await this.geminiExtractor.extract({
+          apiKey: geminiKey,
+          modelName: geminiModel,
+          handoutPages: options.handoutPages,
+          subjectName: options.subjectName,
+          targetCount,
+          authoringProfile: options.authoringProfile,
+          onChunk: options.onChunk
+        });
+        console.log(`[QuizGenerationService] Stage 1/2 Gemini draft succeeded in ${Date.now() - stage1Start}ms (${stage1Result.questions.length} candidate questions)`);
+      } catch (geminiErr: any) {
+        console.error(`[QuizGenerationService] Stage 1/2 Gemini extraction failed after ${Date.now() - stage1Start}ms:`, geminiErr.message);
+        // Fallback to Groq direct if Gemini fails and Groq is available
+        if (groqKey) {
+          const fallbackGroqModel = AiModelConfig.getGroqModel();
+          console.log(`[QuizGenerationService] Falling back to direct Groq with "${fallbackGroqModel}"...`);
+          options.onStageChange?.('fallback', `Gemini extraction failed (${geminiErr.message}). Falling back to Groq (${fallbackGroqModel})...`, fallbackGroqModel);
+          const groqDirect = await this.groqReviewer.generateDirect({
+            apiKey: groqKey,
+            modelName: fallbackGroqModel,
             handoutPages: options.handoutPages,
             subjectName: options.subjectName,
             targetCount,
@@ -275,17 +325,23 @@ export class QuizGenerationService {
 
       // Stage 2: Distractor Hardening & Pedagogy Review with Groq
       if (groqKey) {
-        options.onStageChange?.('reviewing', 'Stage 2/2: Polishing distractors & verifying pedagogy with Groq Llama 3.3 70B...', 'llama-3.3-70b-versatile');
+        const groqReviewModel = AiModelConfig.getGroqModel();
+        const stage2Start = Date.now();
+        console.log(`[QuizGenerationService] Stage 2/2 starting: Groq audit with "${groqReviewModel}"...`);
+        options.onStageChange?.('reviewing', `Stage 2/2: Polishing distractors & verifying pedagogy with Groq (${groqReviewModel})...`, groqReviewModel);
         try {
           const stage2Result = await this.groqReviewer.reviewAndPolish({
             apiKey: groqKey,
+            modelName: groqReviewModel,
             candidateQuestions: stage1Result.questions,
             subjectName: options.subjectName,
             authoringProfile: options.authoringProfile,
             onChunk: options.onChunk
           });
+          console.log(`[QuizGenerationService] Stage 2/2 Groq audit succeeded in ${Date.now() - stage2Start}ms`);
 
           if (QuizGenerationService.validateQuestions(stage2Result.questions)) {
+            console.log(`[QuizGenerationService] Two-stage pipeline fully complete in ${Date.now() - pipelineStartTime}ms.`);
             return {
               questions: stage2Result.questions,
               sourceModel: `gemini+groq/two-stage (${stage1Result.model} -> ${stage2Result.model})`,
@@ -297,12 +353,12 @@ export class QuizGenerationService {
             };
           }
         } catch (groqErr: any) {
-          // Graceful fallback to Stage 1 output if Groq review encounters rate limit or network error
+          console.warn(`[QuizGenerationService] Stage 2/2 Groq review bypassed (${groqErr.message}). Using Stage 1 questions.`);
           options.onStageChange?.('fallback', `Groq review bypassed (${groqErr.message}). Using validated Gemini questions.`, stage1Result.model);
         }
       }
 
-      // Return Gemini Stage 1 output if Groq key wasn't present or was bypassed
+      console.log(`[QuizGenerationService] Direct Gemini pipeline complete in ${Date.now() - pipelineStartTime}ms.`);
       return {
         questions: stage1Result.questions,
         sourceModel: `gemini/${stage1Result.model}`,
@@ -315,9 +371,11 @@ export class QuizGenerationService {
 
     // 4. Fallback to Groq direct if only Groq key is present
     if (groqKey) {
-      options.onStageChange?.('extracting', 'Generating questions with Groq Llama-3.3-70b...', 'llama-3.3-70b-versatile');
+      const groqModel = AiModelConfig.getGroqModel();
+      options.onStageChange?.('extracting', `Generating questions with Groq (${groqModel})...`, groqModel);
       const result = await this.groqReviewer.generateDirect({
         apiKey: groqKey,
+        modelName: groqModel,
         handoutPages: options.handoutPages,
         subjectName: options.subjectName,
         onChunk: options.onChunk

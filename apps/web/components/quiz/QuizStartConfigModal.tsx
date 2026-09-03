@@ -20,7 +20,7 @@ export default function QuizStartConfigModal({
   title
 }: QuizStartConfigModalProps) {
   const router = useRouter();
-  const [mode, setMode] = useState<QuizMode>('multiple_choice');
+  const [mode, setMode] = useState<QuizMode>('learn');
   const [shuffleQuestions, setShuffleQuestions] = useState(false);
   const [shuffleOptions, setShuffleOptions] = useState(true);
 
@@ -37,9 +37,15 @@ export default function QuizStartConfigModal({
 
   const modes = [
     {
+      id: 'learn' as QuizMode,
+      name: 'Learn Mode',
+      desc: 'Type the answer, get immediate feedback, and build mastery through active recall.',
+      icon: PenTool
+    },
+    {
       id: 'multiple_choice' as QuizMode,
       name: 'Multiple Choice',
-      desc: 'Standard 4-option selection with spaced repetition streak locking.',
+      desc: 'Choose from the available options when a card has multiple-choice distractors.',
       icon: Layers
     },
     {
@@ -51,7 +57,7 @@ export default function QuizStartConfigModal({
     {
       id: 'identification' as QuizMode,
       name: 'Direct Identification',
-      desc: 'Type answer directly to test maximum retrieval strength.',
+      desc: 'Legacy typed-answer mode for existing quiz cards.',
       icon: PenTool
     },
     {
@@ -66,7 +72,7 @@ export default function QuizStartConfigModal({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Start Mastery Practice"
+      title="Start Learning Session"
       description={`Configure session settings for "${title}".`}
     >
       <div className="space-y-4">
@@ -111,11 +117,12 @@ export default function QuizStartConfigModal({
               className="rounded text-primary focus:ring-primary h-4 w-4"
             />
           </label>
-          <label className="flex items-center justify-between text-xs font-semibold text-foreground cursor-pointer">
+          <label className={`flex items-center justify-between text-xs font-semibold text-foreground ${mode === 'multiple_choice' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
             <span>Randomize Option Positions</span>
             <input
               type="checkbox"
               checked={shuffleOptions}
+              disabled={mode !== 'multiple_choice'}
               onChange={(e) => setShuffleOptions(e.target.checked)}
               className="rounded text-primary focus:ring-primary h-4 w-4"
             />

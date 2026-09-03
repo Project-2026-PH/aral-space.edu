@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { PublicQuizDto } from '@quiz-creator/types';
 import {
@@ -21,9 +21,13 @@ import {
   ShieldAlert,
   Home,
   Check,
-  Award
+  Award,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import Link from 'next/link';
+import { quizAudio } from '@/lib/audio';
+import { triggerCelebrationConfetti } from '@/lib/confetti';
 
 export default function SharedStudySetPage() {
   const params = useParams();
@@ -47,6 +51,25 @@ export default function SharedStudySetPage() {
   const [studyFlipped, setStudyFlipped] = useState(false);
   const [masteredCount, setMasteredCount] = useState(0);
   const [studyCompleted, setStudyCompleted] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const studyCelebratedRef = useRef(false);
+
+  useEffect(() => {
+    setIsMuted(quizAudio.isMuted());
+    quizAudio.preload();
+    const unsub = quizAudio.subscribe((muted) => setIsMuted(muted));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (studyCompleted && !studyCelebratedRef.current) {
+      studyCelebratedRef.current = true;
+      quizAudio.playSuccessSound();
+      triggerCelebrationConfetti();
+    } else if (!studyCompleted) {
+      studyCelebratedRef.current = false;
+    }
+  }, [studyCompleted]);
 
   useEffect(() => {
     async function loadPublicQuiz() {
@@ -149,6 +172,25 @@ export default function SharedStudySetPage() {
           <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
             <button
               onClick={() => {
+                quizAudio.playSuccessSound();
+                triggerCelebrationConfetti();
+              }}
+              className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
+              title="Celebrate Again"
+            >
+              <Sparkles className="h-4 w-4 text-amber-500" />
+              <span>Celebrate Again</span>
+            </button>
+            <button
+              onClick={() => quizAudio.toggleMute()}
+              className="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
+              title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+            >
+              {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              <span>{isMuted ? 'Sound Muted' : 'Sound On'}</span>
+            </button>
+            <button
+              onClick={() => {
                 setStudyCardIdx(0);
                 setStudyFlipped(false);
                 setMasteredCount(0);
@@ -182,9 +224,20 @@ export default function SharedStudySetPage() {
           >
             ← Exit Guest Practice
           </button>
-          <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
-            Card {studyCardIdx + 1} / {quiz.questions.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => quizAudio.toggleMute()}
+              className="p-1 rounded-full border border-border/80 bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+              aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+            >
+              {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+            </button>
+            <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
+              Card {studyCardIdx + 1} / {quiz.questions.length}
+            </span>
+          </div>
         </div>
 
         {/* Practice Flashcard */}

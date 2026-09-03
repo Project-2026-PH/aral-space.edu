@@ -119,6 +119,7 @@ describe('Two-Stage Quiz Generation Pipeline', () => {
       handoutPages: [{ pageNumber: 1, text: 'Biology chapter 1 content' }],
       apiKey: 'test-gemini-key',
       groqApiKey: 'test-groq-key',
+      pipelineMode: 'two_stage',
       onStageChange: (stage) => stages.push(stage)
     });
 

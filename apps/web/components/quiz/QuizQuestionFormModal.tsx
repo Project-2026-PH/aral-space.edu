@@ -5,16 +5,21 @@ import Modal from '../ui/Modal';
 import { QuizQuestion } from '@quiz-creator/types';
 import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered } from 'lucide-react';
 
-export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
+export type QuestionType = 'multiple_choice' | 'typed_answer' | 'identification' | 'true_false' | 'enumeration';
 
 const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'multiple_choice', label: 'Multiple Choice', icon: CircleDot },
+  { id: 'typed_answer', label: 'Typed Answer', icon: PenLine },
   { id: 'identification', label: 'Identification', icon: PenLine },
   { id: 'true_false', label: 'True or False', icon: ToggleLeft },
   { id: 'enumeration', label: 'Enumeration', icon: ListOrdered },
 ];
 
-function detectQuestionType(options: string[]): QuestionType {
+function detectQuestionType(question: QuizQuestion): QuestionType {
+  const options = question.options || [];
+  if (question.question_type === 'typed_answer' || (options.length === 0 && question.answer_text)) {
+    return 'typed_answer';
+  }
   if (
     options.length === 2 &&
     options[0]?.toLowerCase() === 'true' &&
@@ -51,29 +56,34 @@ export default function QuizQuestionFormModal({
   const [questionText, setQuestionText] = useState('');
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState<number>(0);
+  const [answerText, setAnswerText] = useState<string>('');
   const [explanation, setExplanation] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (question) {
-      const detected = detectQuestionType(question.options);
+      const detected = detectQuestionType(question);
       setType(detected);
       setQuestionText(question.question_text);
       setOptions(
-        detected === 'multiple_choice'
-          ? question.options.length === 4
-            ? question.options
-            : [...question.options, '', '', '', ''].slice(0, 4)
-          : question.options
+        detected === 'typed_answer'
+          ? []
+          : detected === 'multiple_choice'
+            ? question.options.length === 4
+              ? question.options
+              : [...question.options, '', '', '', ''].slice(0, 4)
+            : question.options
       );
       setCorrectAnswer(question.correct_answer);
+      setAnswerText(question.answer_text || question.options[question.correct_answer] || '');
       setExplanation(question.explanation || '');
     } else {
       setType('multiple_choice');
       setQuestionText('');
       setOptions(['', '', '', '']);
       setCorrectAnswer(0);
+      setAnswerText('');
       setExplanation('');
     }
     setError(null);
@@ -90,11 +100,15 @@ export default function QuizQuestionFormModal({
         newOptions = newOptions.slice(0, 4);
       }
       newCorrect = Math.min(newCorrect, 3);
+    } else if (newType === 'typed_answer') {
+      setAnswerText(answerText || options[correctAnswer] || '');
+      newOptions = [];
+      newCorrect = 0;
     } else if (newType === 'true_false') {
       newOptions = ['True', 'False'];
       newCorrect = newCorrect === 1 ? 1 : 0;
     } else if (newType === 'identification') {
-      newOptions = [newOptions[0] || ''];
+      newOptions = [newOptions[0] || answerText || ''];
       newCorrect = 0;
     } else if (newType === 'enumeration') {
       const valid = newOptions.filter((o) => o.trim());
@@ -115,14 +129,24 @@ export default function QuizQuestionFormModal({
 
     let cleanedOptions = options.map((o) => o.trim());
     let cleanedCorrect = correctAnswer;
+    let cleanedAnswer = answerText.trim();
 
     if (type === 'multiple_choice') {
       if (cleanedOptions.some((o) => !o)) {
         setError('All 4 options must be filled out.');
         return;
       }
+      cleanedAnswer = cleanedOptions[cleanedCorrect] || '';
+    } else if (type === 'typed_answer') {
+      if (!cleanedAnswer) {
+        setError('Please enter the typed answer.');
+        return;
+      }
+      cleanedOptions = [];
+      cleanedCorrect = 0;
     } else if (type === 'true_false') {
       cleanedOptions = ['True', 'False'];
+      cleanedAnswer = cleanedOptions[cleanedCorrect];
     } else if (type === 'identification') {
       if (!cleanedOptions[0]) {
         setError('Please enter the identification answer.');
@@ -130,6 +154,7 @@ export default function QuizQuestionFormModal({
       }
       cleanedOptions = [cleanedOptions[0]];
       cleanedCorrect = 0;
+      cleanedAnswer = cleanedOptions[0];
     } else if (type === 'enumeration') {
       const filled = cleanedOptions.filter(Boolean);
       if (filled.length === 0) {
@@ -138,37 +163,32 @@ export default function QuizQuestionFormModal({
       }
       cleanedOptions = filled;
       cleanedCorrect = 0;
+      cleanedAnswer = cleanedAnswer || cleanedOptions[0];
     }
 
     setSaving(true);
     setError(null);
 
+    const payload = {
+      question_text: questionText.trim(),
+      answer_text: cleanedAnswer || null,
+      question_type: type === 'typed_answer' || type === 'identification' ? 'typed_answer' as const : 'multiple_choice' as const,
+      options: cleanedOptions,
+      correct_answer: cleanedCorrect,
+      explanation: explanation.trim() || null
+    };
+
     try {
-      if (isEditing && question) {
-        const res = await fetch(`/api/quizzes/${quizId}/questions/${question.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            question_text: questionText.trim(),
-            options: cleanedOptions,
-            correct_answer: cleanedCorrect,
-            explanation: explanation.trim() || null
-          })
-        });
-        if (!res.ok) throw new Error('Failed to update question');
-      } else {
-        const res = await fetch(`/api/quizzes/${quizId}/questions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            question_text: questionText.trim(),
-            options: cleanedOptions,
-            correct_answer: cleanedCorrect,
-            explanation: explanation.trim() || null
-          })
-        });
-        if (!res.ok) throw new Error('Failed to create question');
-      }
+      const url = isEditing && question
+        ? `/api/quizzes/${quizId}/questions/${question.id}`
+        : `/api/quizzes/${quizId}/questions`;
+      const res = await fetch(url, {
+        method: isEditing && question ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || (isEditing ? 'Failed to update question' : 'Failed to create question'));
 
       onOpenChange(false);
       onSaved();
@@ -316,6 +336,24 @@ export default function QuizQuestionFormModal({
           </div>
         )}
 
+        {type === 'typed_answer' && (
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Answer Learners Must Type
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Photosynthesis"
+              value={answerText}
+              onChange={(e) => setAnswerText(e.target.value)}
+              className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Learn mode uses this explicit answer instead of requiring multiple-choice options.
+            </p>
+          </div>
+        )}
+
         {type === 'identification' && (
           <div className="space-y-1.5">
             <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -325,7 +363,10 @@ export default function QuizQuestionFormModal({
               type="text"
               placeholder="e.g. Photosynthesis"
               value={options[0] || ''}
-              onChange={(e) => setOptions([e.target.value])}
+              onChange={(e) => {
+                setOptions([e.target.value]);
+                setAnswerText(e.target.value);
+              }}
               className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
             />
           </div>

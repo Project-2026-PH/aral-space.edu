@@ -44,6 +44,24 @@ export class CachedQuizRepository implements IQuizRepository {
     return subject;
   }
 
+  async getSubjectShareConfig(subjectId: string, userId?: string) {
+    return this.underlying.getSubjectShareConfig(subjectId, userId);
+  }
+
+  async updateSubjectShareConfig(
+    subjectId: string,
+    dto: { is_public?: boolean; reset_token?: boolean },
+    userId?: string
+  ) {
+    const config = await this.underlying.updateSubjectShareConfig(subjectId, dto, userId);
+    this.cache.deleteByPrefix('subjects:');
+    return config;
+  }
+
+  async getSubjectByShareToken(shareToken: string) {
+    return this.underlying.getSubjectByShareToken(shareToken);
+  }
+
   async listQuizzes(userId?: string): Promise<Quiz[]> {
     const key = this.quizzesKey(userId);
     const cached = this.cache.get(key);

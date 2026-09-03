@@ -26,7 +26,7 @@ describe('Auto-Routing Pipeline Heuristics', () => {
       extract: vi.fn().mockResolvedValue({
         questions: mockQuestions,
         tokensUsed: 200,
-        model: 'gemini-2.5-flash'
+        model: 'gemini-3.8-flash'
       })
     } as any;
 
@@ -75,17 +75,17 @@ describe('Auto-Routing Pipeline Heuristics', () => {
       expect(routing.reason).toContain('Groq provider active');
     });
 
-    it('routes standard document with both keys to two_stage for pedagogical distractor hardening', () => {
+    it('routes standard document with both keys to gemini_direct as primary free engine', () => {
       const routing = QuizGenerationService.resolveAutoPipelineMode(
         { handoutPages: singlePage },
         'gemini-api-key',
         'groq-api-key'
       );
-      expect(routing.resolvedMode).toBe('two_stage');
-      expect(routing.reason).toContain('Dual-Stage');
+      expect(routing.resolvedMode).toBe('gemini_direct');
+      expect(routing.reason).toContain('Gemini Flash active as primary high-yield engine');
     });
 
-    it('routes multi-chapter document to two_stage for cross-chapter balance', () => {
+    it('routes multi-chapter document to gemini_direct for unified cross-chapter grounding', () => {
       const multiChapterPages: HandoutPage[] = [
         { pageNumber: 1, text: 'Chapter 1 text', chapterTitle: 'Ch1.pdf' },
         { pageNumber: 2, text: 'Chapter 2 text', chapterTitle: 'Ch2.pdf' }
@@ -95,12 +95,11 @@ describe('Auto-Routing Pipeline Heuristics', () => {
         'gemini-api-key',
         'groq-api-key'
       );
-      expect(routing.resolvedMode).toBe('two_stage');
+      expect(routing.resolvedMode).toBe('gemini_direct');
       expect(routing.reason).toContain('Multi-chapter reviewer (2 chapters)');
     });
 
-    it('routes massive text (>15k tokens) to gemini_direct for 1M context processing', () => {
-      // 16,000 tokens * 4 chars/token = 64,000 characters
+    it('routes massive text to gemini_direct for 1M context processing', () => {
       const massiveText = 'A'.repeat(65000);
       const massivePages: HandoutPage[] = [
         { pageNumber: 1, text: massiveText }
@@ -112,12 +111,11 @@ describe('Auto-Routing Pipeline Heuristics', () => {
         'groq-api-key'
       );
       expect(routing.resolvedMode).toBe('gemini_direct');
-      expect(routing.reason).toContain('routed to Gemini 1M context');
     });
   });
 
   describe('end-to-end auto routing execution in generateQuiz', () => {
-    it('defaults pipelineMode to auto and executes two_stage when both keys present', async () => {
+    it('defaults pipelineMode to auto and executes gemini_direct when both keys present', async () => {
       const stages: string[] = [];
       const result = await service.generateQuiz({
         handoutPages: [{ pageNumber: 1, text: 'General biology notes' }],
@@ -127,11 +125,9 @@ describe('Auto-Routing Pipeline Heuristics', () => {
         onStageChange: (stage) => stages.push(stage)
       });
 
-      expect(result.pipelineMode).toBe('two_stage');
+      expect(result.pipelineMode).toBe('gemini_direct');
       expect(mockGeminiExtractor.extract).toHaveBeenCalledTimes(1);
-      expect(mockGroqReviewer.reviewAndPolish).toHaveBeenCalledTimes(1);
       expect(stages).toContain('extracting');
-      expect(stages).toContain('reviewing');
     });
 
     it('defaults to auto when pipelineMode is undefined in options', async () => {
@@ -141,9 +137,25 @@ describe('Auto-Routing Pipeline Heuristics', () => {
         groqApiKey: 'groq-key'
       });
 
-      expect(result.pipelineMode).toBe('two_stage');
+      expect(result.pipelineMode).toBe('gemini_direct');
       expect(mockGeminiExtractor.extract).toHaveBeenCalledTimes(1);
-      expect(mockGroqReviewer.reviewAndPolish).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to Groq if Gemini extraction throws an error', async () => {
+      (mockGeminiExtractor.extract as any).mockRejectedValueOnce(new Error('Quota exceeded 429'));
+
+      const stages: string[] = [];
+      const result = await service.generateQuiz({
+        handoutPages: [{ pageNumber: 1, text: 'General biology notes' }],
+        apiKey: 'gemini-key',
+        groqApiKey: 'groq-key',
+        pipelineMode: 'auto',
+        onStageChange: (stage) => stages.push(stage)
+      });
+
+      expect(result.pipelineMode).toBe('groq_fallback');
+      expect(mockGroqReviewer.generateDirect).toHaveBeenCalledTimes(1);
+      expect(stages).toContain('fallback');
     });
   });
 });

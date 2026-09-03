@@ -43,7 +43,7 @@ export class VerbatimQuizBuilder {
     fullSourceText: string,
     targetCount: number = 15
   ): RawAiQuestion[] {
-    // 1. Filter strictly for verified verbatim occurrences
+    // Filter strictly for verified verbatim occurrences
     const validPairs = rawPairs.filter((p) =>
       p &&
       typeof p.term === 'string' &&
@@ -53,7 +53,7 @@ export class VerbatimQuizBuilder {
       VerbatimQuizBuilder.verifyVerbatimSubstring(fullSourceText, p.verbatim_definition)
     );
 
-    // 2. Enforce minimum yield (minimum 4 unique pairs required for 4 MCQ options)
+    // Enforce minimum yield (minimum 4 unique pairs required for 4 MCQ options)
     const uniquePairs: VerbatimTermPair[] = [];
     const seenDefs = new Set<string>();
     for (const p of validPairs) {

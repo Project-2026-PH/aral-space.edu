@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS subjects (
     name TEXT NOT NULL,
     color TEXT NOT NULL DEFAULT '#86EFAC',
     user_id TEXT,
+    share_token TEXT UNIQUE,
+    is_public BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -24,8 +26,12 @@ CREATE TABLE IF NOT EXISTS quizzes (
     handout_name TEXT,
     handout_path TEXT,
     source_model TEXT NOT NULL DEFAULT 'manual',
+    description TEXT,
     subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL,
     user_id TEXT,
+    share_token TEXT UNIQUE,
+    is_public BOOLEAN NOT NULL DEFAULT TRUE,
+    allow_cloning BOOLEAN NOT NULL DEFAULT TRUE,
     generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -39,8 +45,10 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
     question_text TEXT NOT NULL,
+    answer_text TEXT,
+    question_type TEXT NOT NULL DEFAULT 'multiple_choice',
     options JSONB NOT NULL DEFAULT '[]'::jsonb,
-    correct_answer INTEGER NOT NULL,
+    correct_answer INTEGER NOT NULL DEFAULT 0,
     explanation TEXT,
     source_pages JSONB,
     order_index INTEGER NOT NULL DEFAULT 0,
@@ -81,3 +89,15 @@ CREATE TABLE IF NOT EXISTS quiz_question_progress (
 
 CREATE INDEX IF NOT EXISTS idx_quiz_question_progress_session ON quiz_question_progress (session_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_question_progress_question ON quiz_question_progress (question_id);
+
+-- Safe additions for databases created from an earlier schema version.
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_token TEXT;
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_token TEXT;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS allow_cloning BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS answer_text TEXT;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type TEXT NOT NULL DEFAULT 'multiple_choice';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subjects_share_token_unique ON subjects (share_token) WHERE share_token IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_quizzes_share_token_unique ON quizzes (share_token) WHERE share_token IS NOT NULL;

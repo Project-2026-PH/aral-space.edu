@@ -40,8 +40,10 @@ export interface AiQuizGeneratorProps {
   isModal?: boolean;
 }
 
+const EMPTY_SUBJECTS: Array<{ id: string; name: string; color?: string }> = [];
+
 export default function AiQuizGenerator({
-  subjects = [],
+  subjects = EMPTY_SUBJECTS,
   onGenerated,
   onCancel,
   isModal = false
@@ -51,7 +53,7 @@ export default function AiQuizGenerator({
   const [subjectList, setSubjectList] = useState<Array<{ id: string; name: string; color?: string }>>(subjects);
   const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || '');
   const [showSubjectModal, setShowSubjectModal] = useState(false);
-  const [pipelineMode] = useState<AiPipelineMode>('auto');
+  const pipelineMode: AiPipelineMode = 'auto';
 
   // Input source mode: 'upload' (folder/multi-file) or 'text' (raw notes)
   const [inputMode, setInputMode] = useState<'upload' | 'text'>('upload');
@@ -70,12 +72,40 @@ export default function AiQuizGenerator({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const subjectsRef = useRef(subjects);
 
   useEffect(() => {
-    setSubjectList(subjects);
-    if (!selectedSubject && subjects.length > 0) {
-      setSelectedSubject(subjects[0].id);
+    if (subjects && subjects.length > 0) {
+      const prevIds = subjectsRef.current?.map((s) => s.id).join(',');
+      const nextIds = subjects.map((s) => s.id).join(',');
+      if (prevIds !== nextIds) {
+        subjectsRef.current = subjects;
+        setSubjectList(subjects);
+        setSelectedSubject((prev) => prev || subjects[0]?.id || '');
+      }
+      return;
     }
+
+    let isMounted = true;
+    async function loadSubjects() {
+      try {
+        const res = await fetch('/api/subjects');
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && Array.isArray(data.subjects) && data.subjects.length > 0) {
+            setSubjectList(data.subjects);
+            setSelectedSubject((prev) => prev || data.subjects[0]?.id || '');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load subjects:', err);
+      }
+    }
+    loadSubjects();
+
+    return () => {
+      isMounted = false;
+    };
   }, [subjects]);
 
   const totalPagesCount = files.reduce((acc, f) => acc + (f.status === 'ready' ? f.pageCount : 0), 0);
@@ -94,8 +124,10 @@ export default function AiQuizGenerator({
     const fileId = `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 7)}`;
     try {
       if (file.name.endsWith('.pdf') || file.type === 'application/pdf') {
+        console.log(`[Frontend] Parsing PDF "${file.name}" (${file.size} bytes)...`);
         const arrayBuffer = await file.arrayBuffer();
         const { pages, pageCount } = await PdfExtractionService.parsePdf(arrayBuffer, file.name);
+        console.log(`[Frontend] PDF "${file.name}" parsed: detected ${pageCount} pages, extracted ${pages.length} chunks (sample text length: ${pages[0]?.text?.length || 0} chars).`);
         return {
           id: fileId,
           name: file.name,
@@ -276,6 +308,12 @@ export default function AiQuizGenerator({
         aggregatedPages = PdfExtractionService.aggregateMultiFilePages(
           files.map((f) => ({ name: f.name, pages: f.pages }))
         );
+        const totalExtractedChars = aggregatedPages.reduce((sum, p) => sum + (p.text?.trim().length || 0), 0);
+        if (totalExtractedChars === 0) {
+          setError('The uploaded PDF appears to be a scanned image or contains no selectable text. Please upload a searchable PDF or paste notes directly.');
+          setGenerating(false);
+          return;
+        }
         filesSummary = files.map((f) => ({
           fileName: f.name,
           pageCount: f.pageCount,
@@ -289,6 +327,13 @@ export default function AiQuizGenerator({
           : 'AI Generated Exam Reviewer'
       );
 
+      console.log(`[Frontend] Submitting generate-quiz request:`, {
+        pipelineMode,
+        title: generatedTitle,
+        totalPages: aggregatedPages.length,
+        filesSummary
+      });
+
       const response = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -298,7 +343,7 @@ export default function AiQuizGenerator({
           text: hasText ? text.trim() : undefined,
           pdfPages: aggregatedPages.length > 0 ? aggregatedPages : undefined,
           filesSummary,
-          pipelineMode: 'auto'
+          pipelineMode
         }),
       });
 
@@ -428,6 +473,7 @@ export default function AiQuizGenerator({
           setSelectedSubject(created.id);
         }}
       />
+
 
       {/* Input Source Segmented Control */}
       <div>

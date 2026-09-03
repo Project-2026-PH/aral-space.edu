@@ -1,6 +1,7 @@
 import { IQuizRepository } from './IQuizRepository';
 import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { normalizeQuestionFields } from './questionFields';
 
 function generateShareSlug(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -26,7 +27,7 @@ export class NeonQuizRepository implements IQuizRepository {
     if (userId) {
       const rows = await this.sql`
         SELECT * FROM subjects 
-        WHERE user_id = ${userId} 
+        WHERE user_id = ${userId} OR user_id IS NULL
         ORDER BY name ASC
       `;
       return rows as Subject[];
@@ -40,11 +41,118 @@ export class NeonQuizRepository implements IQuizRepository {
 
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {
     const rows = await this.sql`
-      INSERT INTO subjects (name, color, user_id)
-      VALUES (${name}, ${color}, ${userId || null})
+      INSERT INTO subjects (name, color, user_id, share_token, is_public)
+      VALUES (${name}, ${color}, ${userId || null}, ${generateShareSlug()}, true)
       RETURNING *
     `;
     return rows[0] as Subject;
+  }
+
+  async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean }> {
+    const rows = userId
+      ? await this.sql`SELECT share_token, is_public FROM subjects WHERE id = ${subjectId} AND user_id = ${userId} LIMIT 1`
+      : await this.sql`SELECT share_token, is_public FROM subjects WHERE id = ${subjectId} LIMIT 1`;
+
+    if (!rows || rows.length === 0) throw new Error(`Subject ${subjectId} not found`);
+    const subject = rows[0] as any;
+
+    if (subject.share_token) {
+      return {
+        share_token: subject.share_token,
+        is_public: subject.is_public ?? true
+      };
+    }
+
+    const share_token = generateShareSlug();
+    const updatedRows = userId
+      ? await this.sql`
+          UPDATE subjects
+          SET share_token = ${share_token}, is_public = true
+          WHERE id = ${subjectId} AND user_id = ${userId}
+          RETURNING share_token, is_public
+        `
+      : await this.sql`
+          UPDATE subjects
+          SET share_token = ${share_token}, is_public = true
+          WHERE id = ${subjectId}
+          RETURNING share_token, is_public
+        `;
+
+    if (!updatedRows || updatedRows.length === 0) throw new Error('Subject not found or update failed');
+    return {
+      share_token: updatedRows[0].share_token,
+      is_public: updatedRows[0].is_public ?? true
+    };
+  }
+
+  async updateSubjectShareConfig(
+    subjectId: string,
+    dto: { is_public?: boolean; reset_token?: boolean },
+    userId?: string
+  ): Promise<{ share_token: string; is_public: boolean }> {
+    const current = await this.getSubjectShareConfig(subjectId, userId);
+    const newShareToken = dto.reset_token ? generateShareSlug() : current.share_token;
+    const isPublic = dto.is_public !== undefined ? dto.is_public : current.is_public;
+
+    const rows = userId
+      ? await this.sql`
+          UPDATE subjects
+          SET share_token = ${newShareToken}, is_public = ${isPublic}
+          WHERE id = ${subjectId} AND user_id = ${userId}
+          RETURNING share_token, is_public
+        `
+      : await this.sql`
+          UPDATE subjects
+          SET share_token = ${newShareToken}, is_public = ${isPublic}
+          WHERE id = ${subjectId}
+          RETURNING share_token, is_public
+        `;
+
+    if (!rows || rows.length === 0) throw new Error('Subject not found or update failed');
+    return {
+      share_token: rows[0].share_token,
+      is_public: rows[0].is_public ?? true
+    };
+  }
+
+  async getSubjectByShareToken(shareToken: string) {
+    const subjectRows = await this.sql`
+      SELECT id, name, color, share_token, is_public, created_at
+      FROM subjects
+      WHERE share_token = ${shareToken}
+        AND COALESCE(is_public, TRUE) = TRUE
+      LIMIT 1
+    `;
+
+    if (!subjectRows || subjectRows.length === 0) return null;
+    const subject = subjectRows[0] as any;
+    const quizRows = await this.sql`
+      SELECT id, title, description, question_count, generated_at, share_token, is_public, created_at
+      FROM quizzes
+      WHERE subject_id = ${subject.id}
+        AND COALESCE(is_public, TRUE) = TRUE
+        AND share_token IS NOT NULL
+      ORDER BY generated_at DESC
+    `;
+
+    return {
+      id: subject.id,
+      name: subject.name,
+      color: subject.color,
+      share_token: subject.share_token,
+      is_public: subject.is_public ?? true,
+      created_at: subject.created_at,
+      quizzes: (quizRows as any[]).map((quiz) => ({
+        id: quiz.id,
+        title: quiz.title,
+        description: quiz.description || null,
+        question_count: quiz.question_count || 0,
+        generated_at: quiz.generated_at,
+        share_token: quiz.share_token,
+        is_public: quiz.is_public ?? true,
+        created_at: quiz.created_at
+      }))
+    };
   }
 
   async listQuizzes(userId?: string): Promise<Quiz[]> {
@@ -109,19 +217,27 @@ export class NeonQuizRepository implements IQuizRepository {
   async createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz> {
     const quizRows = await this.sql`
       INSERT INTO quizzes (
-        title, 
-        question_count, 
-        handout_name, 
-        source_model, 
-        subject_id, 
+        title,
+        description,
+        question_count,
+        handout_name,
+        source_model,
+        subject_id,
+        share_token,
+        is_public,
+        allow_cloning,
         user_id
       )
       VALUES (
-        ${dto.title}, 
-        ${dto.questions.length}, 
-        ${dto.handout_name || null}, 
-        ${dto.source_model || 'manual'}, 
-        ${dto.subject_id || null}, 
+        ${dto.title},
+        ${dto.description || null},
+        ${dto.questions.length},
+        ${dto.handout_name || null},
+        ${dto.source_model || 'manual'},
+        ${dto.subject_id || null},
+        ${generateShareSlug()},
+        true,
+        true,
         ${userId || null}
       )
       RETURNING *
@@ -129,90 +245,62 @@ export class NeonQuizRepository implements IQuizRepository {
 
     const createdQuiz = quizRows[0] as Quiz;
 
-    if (dto.questions.length > 0) {
-      for (let idx = 0; idx < dto.questions.length; idx++) {
-        const q = dto.questions[idx];
-        const optionsJson = JSON.stringify(q.options || []);
-        const sourcePagesJson = q.source_pages ? JSON.stringify(q.source_pages) : null;
-        
-        await this.sql`
-          INSERT INTO quiz_questions (
-            quiz_id, 
-            question_text, 
-            options, 
-            correct_answer, 
-            explanation, 
-            source_pages, 
-            order_index
-          )
-          VALUES (
-            ${createdQuiz.id}, 
-            ${q.question_text}, 
-            ${optionsJson}::jsonb, 
-            ${q.correct_answer}, 
-            ${q.explanation || null}, 
-            ${sourcePagesJson ? this.sql`${sourcePagesJson}::jsonb` : null}, 
-            ${idx}
-          )
-        `;
-      }
+    for (let idx = 0; idx < dto.questions.length; idx++) {
+      const q = dto.questions[idx];
+      const fields = normalizeQuestionFields(q);
+      const optionsJson = JSON.stringify(fields.options);
+      const sourcePagesJson = q.source_pages ? JSON.stringify(q.source_pages) : null;
+
+      await this.sql`
+        INSERT INTO quiz_questions (
+          quiz_id,
+          question_text,
+          answer_text,
+          question_type,
+          options,
+          correct_answer,
+          explanation,
+          source_pages,
+          order_index
+        )
+        VALUES (
+          ${createdQuiz.id},
+          ${q.question_text},
+          ${fields.answer_text},
+          ${fields.question_type},
+          ${optionsJson}::jsonb,
+          ${fields.correct_answer},
+          ${q.explanation || null},
+          ${sourcePagesJson ? this.sql`${sourcePagesJson}::jsonb` : null},
+          ${idx}
+        )
+      `;
     }
 
     return createdQuiz;
   }
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
-    const titleVal = dto.title !== undefined ? dto.title : null;
-    const subjectIdVal = dto.subject_id !== undefined ? dto.subject_id : null;
+    const existing = await this.getQuizById(id, userId);
+    if (!existing) throw new Error('Quiz not found');
 
-    let rows: any[];
-    if (dto.title !== undefined && dto.subject_id !== undefined) {
-      rows = userId
-        ? await this.sql`
-            UPDATE quizzes
-            SET title = ${titleVal}, subject_id = ${subjectIdVal}
-            WHERE id = ${id} AND user_id = ${userId}
-            RETURNING *
-          `
-        : await this.sql`
-            UPDATE quizzes
-            SET title = ${titleVal}, subject_id = ${subjectIdVal}
-            WHERE id = ${id}
-            RETURNING *
-          `;
-    } else if (dto.title !== undefined) {
-      rows = userId
-        ? await this.sql`
-            UPDATE quizzes
-            SET title = ${titleVal}
-            WHERE id = ${id} AND user_id = ${userId}
-            RETURNING *
-          `
-        : await this.sql`
-            UPDATE quizzes
-            SET title = ${titleVal}
-            WHERE id = ${id}
-            RETURNING *
-          `;
-    } else if (dto.subject_id !== undefined) {
-      rows = userId
-        ? await this.sql`
-            UPDATE quizzes
-            SET subject_id = ${subjectIdVal}
-            WHERE id = ${id} AND user_id = ${userId}
-            RETURNING *
-          `
-        : await this.sql`
-            UPDATE quizzes
-            SET subject_id = ${subjectIdVal}
-            WHERE id = ${id}
-            RETURNING *
-          `;
-    } else {
-      const existing = await this.getQuizById(id, userId);
-      if (!existing) throw new Error('Quiz not found');
-      return existing;
-    }
+    const rows = userId
+      ? await this.sql`
+          UPDATE quizzes
+          SET title = ${dto.title !== undefined ? dto.title : existing.title},
+              description = ${dto.description !== undefined ? dto.description : existing.description || null},
+              subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null}
+          WHERE id = ${id} AND user_id = ${userId}
+          RETURNING *
+        `
+      : await this.sql`
+          UPDATE quizzes
+          SET title = ${dto.title !== undefined ? dto.title : existing.title},
+              description = ${dto.description !== undefined ? dto.description : existing.description || null},
+              subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null}
+          WHERE id = ${id}
+          RETURNING *
+        `;
 
     if (!rows || rows.length === 0) throw new Error('Quiz not found or update failed');
     return rows[0] as Quiz;
@@ -243,13 +331,16 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async addQuestion(quizId: string, dto: CreateQuestionDto): Promise<QuizQuestion> {
-    const optionsJson = JSON.stringify(dto.options || []);
+    const fields = normalizeQuestionFields(dto);
+    const optionsJson = JSON.stringify(fields.options);
     const sourcePagesJson = dto.source_pages ? JSON.stringify(dto.source_pages) : null;
 
     const rows = await this.sql`
       INSERT INTO quiz_questions (
         quiz_id,
         question_text,
+        answer_text,
+        question_type,
         options,
         correct_answer,
         explanation,
@@ -259,8 +350,10 @@ export class NeonQuizRepository implements IQuizRepository {
       VALUES (
         ${quizId},
         ${dto.question_text},
+        ${fields.answer_text},
+        ${fields.question_type},
         ${optionsJson}::jsonb,
-        ${dto.correct_answer},
+        ${fields.correct_answer},
         ${dto.explanation || null},
         ${sourcePagesJson ? this.sql`${sourcePagesJson}::jsonb` : null},
         ${dto.order_index ?? 0}
@@ -279,25 +372,25 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async updateQuestion(questionId: string, dto: UpdateQuestionDto): Promise<QuizQuestion> {
-    const fieldsToUpdate: string[] = [];
-
-    // Check existing
     const existingRows = await this.sql`SELECT * FROM quiz_questions WHERE id = ${questionId} LIMIT 1`;
     if (!existingRows || existingRows.length === 0) throw new Error('Question not found');
-    const curr = existingRows[0];
-
+    const curr = existingRows[0] as QuizQuestion;
+    const fields = normalizeQuestionFields(dto, curr);
+    const optionsJson = JSON.stringify(fields.options);
     const questionText = dto.question_text !== undefined ? dto.question_text : curr.question_text;
-    const optionsJson = dto.options !== undefined ? JSON.stringify(dto.options) : JSON.stringify(curr.options);
-    const correctAnswer = dto.correct_answer !== undefined ? dto.correct_answer : curr.correct_answer;
     const explanation = dto.explanation !== undefined ? dto.explanation : curr.explanation;
-    const sourcePagesJson = dto.source_pages !== undefined ? (dto.source_pages ? JSON.stringify(dto.source_pages) : null) : (curr.source_pages ? JSON.stringify(curr.source_pages) : null);
+    const sourcePagesJson = dto.source_pages !== undefined
+      ? (dto.source_pages ? JSON.stringify(dto.source_pages) : null)
+      : (curr.source_pages ? JSON.stringify(curr.source_pages) : null);
 
     const rows = await this.sql`
       UPDATE quiz_questions
-      SET 
+      SET
         question_text = ${questionText},
+        answer_text = ${fields.answer_text},
+        question_type = ${fields.question_type},
         options = ${optionsJson}::jsonb,
-        correct_answer = ${correctAnswer},
+        correct_answer = ${fields.correct_answer},
         explanation = ${explanation},
         source_pages = ${sourcePagesJson ? this.sql`${sourcePagesJson}::jsonb` : null}
       WHERE id = ${questionId}
@@ -417,6 +510,7 @@ export class NeonQuizRepository implements IQuizRepository {
     return {
       id: quiz.id,
       title: quiz.title,
+      description: quiz.description || null,
       question_count: quiz.question_count || questions.length,
       generated_at: quiz.generated_at,
       source_model: quiz.source_model,
@@ -428,6 +522,8 @@ export class NeonQuizRepository implements IQuizRepository {
       questions: questions.map(q => ({
         id: q.id,
         question_text: q.question_text,
+        answer_text: q.answer_text || q.options[q.correct_answer] || null,
+        question_type: q.question_type || (q.options.length > 1 ? 'multiple_choice' : 'typed_answer'),
         options: q.options,
         correct_answer: q.correct_answer,
         explanation: q.explanation || null,
@@ -443,10 +539,13 @@ export class NeonQuizRepository implements IQuizRepository {
 
     return await this.createQuiz({
       title: `${publicQuiz.title} (Copy)`,
+      description: publicQuiz.description || null,
       subject_id: publicQuiz.subject?.id || null,
       source_model: 'cloned',
       questions: publicQuiz.questions.map(q => ({
         question_text: q.question_text,
+        answer_text: q.answer_text || null,
+        question_type: q.question_type || null,
         options: q.options,
         correct_answer: q.correct_answer,
         explanation: q.explanation || null

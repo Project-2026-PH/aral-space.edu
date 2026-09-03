@@ -1,0 +1,129 @@
+'use client';
+
+import React, { useMemo, useState } from 'react';
+import { Quiz, Subject } from '@quiz-creator/types';
+import { BookOpen, ExternalLink, Globe, Layers, Share2 } from 'lucide-react';
+import Link from 'next/link';
+import ShareSubjectModal from './ShareSubjectModal';
+
+interface SubjectLibraryProps {
+  subjects: Subject[];
+  quizzes: Quiz[];
+  loading?: boolean;
+}
+
+export default function SubjectLibrary({ subjects, quizzes, loading = false }: SubjectLibraryProps) {
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+
+  const quizCounts = useMemo(() => {
+    return new Map(
+      subjects.map((subject) => [
+        subject.id,
+        quizzes.filter((quiz) => quiz.subject_id === subject.id).length
+      ])
+    );
+  }, [subjects, quizzes]);
+
+  return (
+    <section className="space-y-4" aria-labelledby="subject-library-heading">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Your library</p>
+          <h2 id="subject-library-heading" className="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+            Subjects
+          </h2>
+        </div>
+        <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
+          {subjects.length} {subjects.length === 1 ? 'subject' : 'subjects'}
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="h-44 animate-pulse rounded-3xl border border-border/40 bg-muted/40" />
+          ))}
+        </div>
+      ) : subjects.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Layers className="h-5 w-5" />
+          </div>
+          <h3 className="mt-4 text-sm font-bold text-foreground">No subjects yet</h3>
+          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
+            Create a subject to organize your study sets and share a public subject library.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {subjects.map((subject) => {
+            const isPublic = subject.is_public !== false;
+            const quizCount = quizCounts.get(subject.id) || 0;
+
+            return (
+              <article
+                key={subject.id}
+                className="group flex min-h-44 flex-col justify-between overflow-hidden rounded-3xl border border-border/80 bg-card shadow-2xs transition-all hover:border-primary/40 hover:shadow-md"
+              >
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        style={{ backgroundColor: subject.color }}
+                        className="h-10 w-10 shrink-0 rounded-2xl border border-black/5 shadow-inner"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-extrabold text-foreground">{subject.name}</h3>
+                        <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                          <BookOpen className="h-3 w-3" />
+                          {quizCount} {quizCount === 1 ? 'study set' : 'study sets'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${isPublic ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                      <Globe className="h-3 w-3" />
+                      {isPublic ? 'Public' : 'Private'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border/40 px-5 py-3">
+                  {subject.share_token ? (
+                    <Link
+                      href={`/subjects/share/${subject.share_token}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Open public page
+                    </Link>
+                  ) : (
+                    <span className="text-[11px] font-medium text-muted-foreground">Share when ready</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSubject(subject)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-all hover:bg-primary hover:text-white active:scale-95"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    Share
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      <ShareSubjectModal
+        open={Boolean(selectedSubject)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedSubject(null);
+        }}
+        subject={selectedSubject}
+      />
+    </section>
+  );
+}

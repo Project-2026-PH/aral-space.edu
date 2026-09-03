@@ -13,7 +13,7 @@ export default function PracticePage({
   const { quizId } = React.use(params);
   const searchParams = useSearchParams();
 
-  const mode = (searchParams.get('mode') as QuizMode) || 'multiple_choice';
+  const mode = (searchParams.get('mode') as QuizMode) || 'learn';
   const shuffleQuestions = searchParams.get('shuffleQuestions') === 'true';
   const shuffleOptions = searchParams.get('shuffleOptions') !== 'false';
 
@@ -28,21 +28,25 @@ export default function PracticePage({
     async function initSession() {
       if (!quizId) return;
       try {
-        // Fetch quiz metadata
-        const quizRes = await fetch(`/api/quizzes/${quizId}`);
+        // Fetch quiz metadata and start session concurrently
+        const [quizRes, sessRes] = await Promise.all([
+          fetch(`/api/quizzes/${quizId}`),
+          fetch('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start', quizId })
+          })
+        ]);
+
         if (!quizRes.ok) throw new Error('Quiz not found');
-        const quizData = await quizRes.json();
-        setQuiz(quizData);
-
-        // Start session
-        const sessRes = await fetch('/api/sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'start', quizId })
-        });
         if (!sessRes.ok) throw new Error('Failed to start session');
-        const sessData = await sessRes.json();
 
+        const [quizData, sessData] = await Promise.all([
+          quizRes.json(),
+          sessRes.json()
+        ]);
+
+        setQuiz(quizData);
         setQuestions(sessData.questions || []);
         setSession(sessData.session || null);
         setProgress(sessData.progress || []);

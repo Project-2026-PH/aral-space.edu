@@ -61,7 +61,9 @@ export default function QuizQuestionList({
                     {q.question_text}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    Correct: <span className="font-medium text-foreground">{q.options[q.correct_answer]}</span>
+                    Correct: <span className="font-medium text-foreground">
+                      {q.answer_text || q.options[q.correct_answer] || 'Typed answer'}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -90,23 +92,29 @@ export default function QuizQuestionList({
 
             {isExpanded && (
               <div className="mt-3 pt-3 border-t border-border/40 space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {q.options.map((opt, optIdx) => (
-                    <div
-                      key={optIdx}
-                      className={`rounded-xl px-3 py-1.5 text-xs flex items-center gap-2 ${
-                        optIdx === q.correct_answer
-                          ? 'bg-primary/10 text-primary font-semibold border border-primary/20'
-                          : 'bg-muted/50 text-muted-foreground'
-                      }`}
-                    >
-                      <span className="font-bold text-[10px] uppercase">
-                        {String.fromCharCode(65 + optIdx)}:
-                      </span>
-                      <span className="truncate">{opt}</span>
-                    </div>
-                  ))}
-                </div>
+                {q.options.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {q.options.map((opt, optIdx) => (
+                      <div
+                        key={optIdx}
+                        className={`rounded-xl px-3 py-1.5 text-xs flex items-center gap-2 ${
+                          optIdx === q.correct_answer
+                            ? 'bg-primary/10 text-primary font-semibold border border-primary/20'
+                            : 'bg-muted/50 text-muted-foreground'
+                        }`}
+                      >
+                        <span className="font-bold text-[10px] uppercase">
+                          {String.fromCharCode(65 + optIdx)}:
+                        </span>
+                        <span className="truncate">{opt}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-xl bg-primary/5 px-3 py-2 text-[11px] text-primary">
+                    Typed-answer card. Learners will enter the answer in Learn mode.
+                  </p>
+                )}
                 {q.explanation && (
                   <p className="text-[11px] text-muted-foreground italic bg-muted/30 p-2 rounded-xl">
                     💡 {q.explanation}

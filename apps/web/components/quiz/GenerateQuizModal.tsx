@@ -15,7 +15,7 @@ interface GenerateQuizModalProps {
 export default function GenerateQuizModal({
   open,
   onOpenChange,
-  subjects = [],
+  subjects,
   onGenerated
 }: GenerateQuizModalProps) {
   const router = useRouter();
@@ -29,6 +29,7 @@ export default function GenerateQuizModal({
     >
       <AiQuizGenerator
         isModal={true}
+        subjects={subjects}
         onGenerated={(quizId) => {
           onOpenChange(false);
           if (onGenerated) {

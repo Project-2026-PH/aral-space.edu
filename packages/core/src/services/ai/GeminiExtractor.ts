@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { RawAiQuestion, HandoutPage, UserAuthoringProfile } from '@quiz-creator/types';
+import { AiModelConfig } from './AiModelConfig';
 
 export interface GeminiExtractionOptions {
   apiKey: string;
@@ -55,9 +56,11 @@ ${formattedContent}
 Requirements:
 1. Target: Exactly ${targetCount} rigorous, concept-testing multiple choice questions.
 2. Each question MUST have exactly 4 plausible, distinct options.
-3. correct_answer MUST be the 0-indexed integer (0, 1, 2, or 3) of the correct choice.
-4. explanation MUST cite why the answer is correct according to the text.
-5. source_pages MUST be an array of page numbers where the concept appears.${multiChapterInstruction}${styleInstruction}
+3. Psychometric Rigor: Distractors MUST represent common misconceptions or realistic alternatives. NEVER use "All of the above", "None of the above", or "Both A and B".
+4. correct_answer MUST be the 0-indexed integer (0, 1, 2, or 3) precisely pointing to the correct choice.
+5. explanation MUST cite why the answer is correct according to the text.
+6. source_pages MUST be an array of page numbers where the concept appears.
+7. Full-Document Coverage: Questions MUST span across the entire document (beginning, middle, and end) without clustering only at the start.${multiChapterInstruction}${styleInstruction}
 `;
   }
 
@@ -86,35 +89,42 @@ Requirements:
   }
 
   async extract(options: GeminiExtractionOptions): Promise<{ questions: RawAiQuestion[]; tokensUsed: number; model: string }> {
-    const model = options.modelName || 'gemini-2.5-flash';
+    const primaryModel = AiModelConfig.getGeminiModel(options.modelName);
     const ai = new GoogleGenAI({ apiKey: options.apiKey });
     const targetCount = options.targetCount || options.authoringProfile?.targetCount || 15;
     const prompt = GeminiExtractor.buildExtractionPrompt(options.handoutPages, options.subjectName, targetCount, options.authoringProfile);
 
-    const responseStream = await ai.models.generateContentStream({
-      model,
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: GeminiExtractor.getQuestionSchema(),
-        temperature: 0.2
+    const { result, activeModel } = await AiModelConfig.executeGeminiWithFallback(primaryModel, async (modelToUse) => {
+      const responseStream = await ai.models.generateContentStream({
+        model: modelToUse,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: GeminiExtractor.getQuestionSchema(),
+          temperature: 0.2
+        }
+      });
+
+      let fullText = '';
+      for await (const chunk of responseStream) {
+        const chunkText = chunk.text;
+        if (chunkText) {
+          fullText += chunkText;
+          options.onChunk?.(chunkText);
+        }
       }
+
+      const parsed = JSON.parse(fullText.trim());
+      return {
+        questions: parsed as RawAiQuestion[],
+        tokensUsed: Math.ceil(fullText.length / 4)
+      };
     });
 
-    let fullText = '';
-    for await (const chunk of responseStream) {
-      const chunkText = chunk.text;
-      if (chunkText) {
-        fullText += chunkText;
-        options.onChunk?.(chunkText);
-      }
-    }
-
-    const parsed = JSON.parse(fullText.trim());
     return {
-      questions: parsed as RawAiQuestion[],
-      tokensUsed: Math.ceil(fullText.length / 4),
-      model
+      questions: result.questions,
+      tokensUsed: result.tokensUsed,
+      model: activeModel
     };
   }
 }

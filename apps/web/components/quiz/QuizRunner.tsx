@@ -13,10 +13,14 @@ import {
   Shuffle,
   ChevronRight,
   Award,
-  Layers
+  Layers,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import Link from 'next/link';
 import BatchRestTimer from './BatchRestTimer';
+import { quizAudio } from '@/lib/audio';
+import { triggerCelebrationConfetti } from '@/lib/confetti';
 
 interface QuizRunnerProps {
   quiz: Quiz;
@@ -26,6 +30,14 @@ interface QuizRunnerProps {
   mode: QuizMode;
   shuffleQuestions?: boolean;
   shuffleOptions?: boolean;
+}
+
+function getQuestionAnswer(question: QuizQuestion): string {
+  return question.answer_text?.trim() || question.options[question.correct_answer]?.trim() || '';
+}
+
+function normalizeTypedAnswer(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
 export default function QuizRunner({
@@ -54,44 +66,43 @@ export default function QuizRunner({
     return new Map(initialProgress.map((p) => [p.question_id, p]));
   });
 
-  const [currentBatch, setCurrentBatch] = useState<number>(0);
+  const [currentBatch, setCurrentBatch] = useState<number>(() => {
+    const activeBatch = MasteryEngineService.getActiveBatchNumber(
+      questions,
+      new Map(initialProgress.map((p) => [p.question_id, p]))
+    );
+    return activeBatch >= 0 ? activeBatch : 0;
+  });
   const [cycleIndex, setCycleIndex] = useState<number>(0);
   const [isCardFlipped, setIsCardFlipped] = useState<boolean>(false);
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [identificationInput, setIdentificationInput] = useState<string>('');
   const [identificationSubmitted, setIdentificationSubmitted] = useState<boolean>(false);
+  const [typedAnswerCorrect, setTypedAnswerCorrect] = useState<boolean | null>(null);
   const [showRestTimer, setShowRestTimer] = useState<boolean>(false);
   const [restingCompletedBatch, setRestingCompletedBatch] = useState<number>(0);
   const [restingNextBatch, setRestingNextBatch] = useState<number>(1);
-  const [isCompleted, setIsCompleted] = useState<boolean>(false);
-  const correctAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isCompleted, setIsCompleted] = useState<boolean>(() => {
+    return questions.length > 0 && MasteryEngineService.isAllQuestionsLocked(questions, new Map(initialProgress.map((p) => [p.question_id, p])));
+  });
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const celebrationFiredRef = useRef<boolean>(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const audio = new Audio('/correct_sound.mp3');
-      audio.preload = 'auto';
-      correctAudioRef.current = audio;
-    }
+    setIsMuted(quizAudio.isMuted());
+    quizAudio.preload();
+    const unsub = quizAudio.subscribe((muted) => setIsMuted(muted));
+    return () => unsub();
   }, []);
 
-  const playCorrectSound = () => {
-    try {
-      if (correctAudioRef.current) {
-        correctAudioRef.current.currentTime = 0;
-        correctAudioRef.current.play().catch((err) => {
-          console.warn('Audio playback error:', err);
-        });
-      } else {
-        const audio = new Audio('/correct_sound.mp3');
-        audio.play().catch((err) => {
-          console.warn('Audio playback error:', err);
-        });
-      }
-    } catch (err) {
-      console.warn('Audio error:', err);
+  useEffect(() => {
+    if (isCompleted && !celebrationFiredRef.current) {
+      celebrationFiredRef.current = true;
+      quizAudio.playSuccessSound();
+      triggerCelebrationConfetti();
     }
-  };
+  }, [isCompleted]);
 
   // Active batch questions
   const batchQuestions = questions.filter(
@@ -131,6 +142,7 @@ export default function QuizRunner({
     setIsCardFlipped(false);
     setIdentificationInput('');
     setIdentificationSubmitted(false);
+    setTypedAnswerCorrect(null);
   }, [activeQuestion?.id, cycleIndex]);
 
   async function handleOptionSelect(option: ShuffledOption) {
@@ -141,7 +153,7 @@ export default function QuizRunner({
 
     const isCorrect = option.isCorrect;
     if (isCorrect) {
-      playCorrectSound();
+      quizAudio.playCorrectSound();
     }
     const nextProgData = MasteryEngineService.calculateNextProgress(
       currentProg,
@@ -180,6 +192,20 @@ export default function QuizRunner({
     }, mode === 'flashcard' ? 600 : 1000);
   }
 
+  function handleTypedAnswerSubmit() {
+    if (isEvaluating || !activeQuestion || !currentProg || !identificationInput.trim()) return;
+
+    const expectedAnswer = getQuestionAnswer(activeQuestion);
+    const isCorrect = normalizeTypedAnswer(identificationInput) === normalizeTypedAnswer(expectedAnswer);
+    setTypedAnswerCorrect(isCorrect);
+    setIdentificationSubmitted(true);
+    void handleOptionSelect({
+      optionId: activeQuestion.correct_answer,
+      text: identificationInput,
+      isCorrect
+    });
+  }
+
   function advanceLoop(map: Map<string, QuestionProgress>, wasLocked: boolean) {
     setIsEvaluating(false);
     setSelectedOptionId(null);
@@ -214,6 +240,11 @@ export default function QuizRunner({
 
   async function handleCompleteQuiz() {
     setIsCompleted(true);
+    if (!celebrationFiredRef.current) {
+      celebrationFiredRef.current = true;
+      quizAudio.playSuccessSound();
+      triggerCelebrationConfetti();
+    }
     try {
       await fetch('/api/sessions', {
         method: 'POST',
@@ -257,7 +288,28 @@ export default function QuizRunner({
           </div>
         </div>
 
-        <div className="flex justify-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              quizAudio.playSuccessSound();
+              triggerCelebrationConfetti();
+            }}
+            className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-card px-5 py-3 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
+            title="Replay Celebration"
+          >
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <span>Celebrate Again</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => quizAudio.toggleMute()}
+            className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-3 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
+            title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+          >
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            <span>{isMuted ? 'Sound Muted' : 'Sound On'}</span>
+          </button>
           <Link
             href={`/quizzes/${quiz.id}`}
             className="rounded-2xl bg-primary px-6 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
@@ -292,6 +344,15 @@ export default function QuizRunner({
           Exit Session
         </Link>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => quizAudio.toggleMute()}
+            className="p-1.5 rounded-full border border-border/80 bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+            aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+          >
+            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
             Batch #{currentBatch + 1}
           </span>
@@ -310,7 +371,76 @@ export default function QuizRunner({
       </div>
 
       {/* Main Question Card */}
-      {mode === 'flashcard' ? (
+      {mode === 'learn' || (mode === 'multiple_choice' && activeQuestion.options.length < 2) ? (
+        <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm space-y-6">
+          <div>
+            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <span>{mode === 'learn' ? 'Learn Mode · Type the answer' : 'No choices · Type the answer'}</span>
+              {currentProg && currentProg.streak_count > 0 && (
+                <span className="text-primary font-extrabold">Streak: {currentProg.streak_count}</span>
+              )}
+            </div>
+            <p className="text-sm sm:text-base font-bold text-foreground mt-1 leading-relaxed">
+              {activeQuestion.question_text}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <input
+              type="text"
+              autoFocus
+              placeholder="Type your answer..."
+              value={identificationInput}
+              onChange={(event) => setIdentificationInput(event.target.value)}
+              disabled={isEvaluating}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') handleTypedAnswerSubmit();
+              }}
+              className={`w-full rounded-2xl border bg-background px-4 py-3 text-sm font-medium text-foreground focus:outline-none ${
+                typedAnswerCorrect === true
+                  ? 'border-emerald-500 ring-1 ring-emerald-500'
+                  : typedAnswerCorrect === false
+                    ? 'border-destructive ring-1 ring-destructive'
+                    : 'border-border focus:border-primary'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={handleTypedAnswerSubmit}
+              disabled={isEvaluating || !identificationInput.trim()}
+              className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Check Answer
+            </button>
+          </div>
+
+          {identificationSubmitted && (
+            <div className={`rounded-2xl border p-4 text-xs space-y-2 ${
+              typedAnswerCorrect
+                ? 'border-emerald-500/30 bg-emerald-500/10'
+                : 'border-destructive/30 bg-destructive/10'
+            }`}>
+              <div className="flex items-center gap-2 font-bold">
+                {typedAnswerCorrect ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-destructive" />
+                )}
+                <span>{typedAnswerCorrect ? 'Correct answer' : 'Keep practicing'}</span>
+              </div>
+              <p className="text-foreground">
+                Correct answer: <span className="font-bold">{getQuestionAnswer(activeQuestion)}</span>
+              </p>
+              {!typedAnswerCorrect && (
+                <p className="text-muted-foreground">Your answer: {identificationInput}</p>
+              )}
+              {activeQuestion.explanation && (
+                <p className="text-muted-foreground italic">💡 {activeQuestion.explanation}</p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : mode === 'flashcard' ? (
         // 3D Flip Flashcard Mode
         <div
           onClick={() => setIsCardFlipped(!isCardFlipped)}
@@ -339,7 +469,7 @@ export default function QuizRunner({
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
               </div>
               <p className="text-base font-bold text-primary">
-                {activeQuestion.options[activeQuestion.correct_answer]}
+                {getQuestionAnswer(activeQuestion)}
               </p>
               {activeQuestion.explanation && (
                 <p className="text-xs text-muted-foreground italic leading-relaxed">
@@ -352,7 +482,7 @@ export default function QuizRunner({
                   onClick={() =>
                     handleOptionSelect({
                       optionId: activeQuestion.correct_answer,
-                      text: activeQuestion.options[activeQuestion.correct_answer],
+                      text: getQuestionAnswer(activeQuestion),
                       isCorrect: true
                     })
                   }
@@ -397,7 +527,7 @@ export default function QuizRunner({
               disabled={isEvaluating}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && identificationInput.trim()) {
-                  const correctText = activeQuestion.options[activeQuestion.correct_answer];
+                  const correctText = getQuestionAnswer(activeQuestion);
                   const isCorrect =
                     identificationInput.trim().toLowerCase() === correctText.trim().toLowerCase();
                   setIdentificationSubmitted(true);
@@ -414,7 +544,7 @@ export default function QuizRunner({
             {identificationSubmitted && (
               <div className="rounded-2xl bg-muted/40 p-3 text-xs space-y-1">
                 <p className="font-bold text-foreground">
-                  Correct Answer: {activeQuestion.options[activeQuestion.correct_answer]}
+                  Correct Answer: {getQuestionAnswer(activeQuestion)}
                 </p>
                 {activeQuestion.explanation && (
                   <p className="text-muted-foreground text-[11px]">💡 {activeQuestion.explanation}</p>

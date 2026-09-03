@@ -1,5 +1,6 @@
 import { IQuizRepository } from './IQuizRepository';
 import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
+import { normalizeQuestionFields } from './questionFields';
 
 function generateShareSlug(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -99,12 +100,15 @@ export class MemoryQuizRepository implements IQuizRepository {
 
     demoQuestions.forEach((q, idx) => {
       const id = `q-demo-${idx + 1}`;
+      const fields = normalizeQuestionFields(q);
       this.questions.set(id, {
         id,
         quiz_id: defaultQuiz.id,
         question_text: q.question_text,
-        options: q.options,
-        correct_answer: q.correct_answer,
+        answer_text: fields.answer_text,
+        question_type: fields.question_type,
+        options: fields.options,
+        correct_answer: fields.correct_answer,
         explanation: q.explanation || null,
         source_pages: q.source_pages || [],
         order_index: idx,
@@ -120,7 +124,15 @@ export class MemoryQuizRepository implements IQuizRepository {
 
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {
     const id = `sub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    const subject: Subject = { id, name, color, user_id: userId, created_at: new Date().toISOString() };
+    const subject: Subject = {
+      id,
+      name,
+      color,
+      user_id: userId,
+      share_token: generateShareSlug(),
+      is_public: true,
+      created_at: new Date().toISOString()
+    };
     this.subjects.set(id, subject);
     return subject;
   }
@@ -149,6 +161,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     const newQuiz: Quiz = {
       id: quizId,
       title: dto.title,
+      description: dto.description || null,
       question_count: dto.questions.length,
       generated_at: new Date().toISOString(),
       handout_name: dto.handout_name || null,
@@ -164,12 +177,15 @@ export class MemoryQuizRepository implements IQuizRepository {
 
     dto.questions.forEach((q, idx) => {
       const qId = `q-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
+      const fields = normalizeQuestionFields(q);
       this.questions.set(qId, {
         id: qId,
         quiz_id: quizId,
         question_text: q.question_text,
-        options: q.options,
-        correct_answer: q.correct_answer,
+        answer_text: fields.answer_text,
+        question_type: fields.question_type,
+        options: fields.options,
+        correct_answer: fields.correct_answer,
         explanation: q.explanation || null,
         source_pages: q.source_pages || [],
         order_index: idx,
@@ -184,6 +200,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     const quiz = await this.getQuizById(id, userId);
     if (!quiz) throw new Error(`Quiz ${id} not found`);
     if (dto.title !== undefined) quiz.title = dto.title;
+    if (dto.description !== undefined) quiz.description = dto.description;
     if (dto.subject_id !== undefined) quiz.subject_id = dto.subject_id;
     this.quizzes.set(id, quiz);
     return quiz;
@@ -214,13 +231,16 @@ export class MemoryQuizRepository implements IQuizRepository {
     const questions = await this.getQuestionsByQuizId(quizId);
     const orderIndex = dto.order_index !== undefined ? dto.order_index : questions.length;
     const qId = `q-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    const fields = normalizeQuestionFields(dto);
     
     const newQuestion: QuizQuestion = {
       id: qId,
       quiz_id: quizId,
       question_text: dto.question_text,
-      options: dto.options,
-      correct_answer: dto.correct_answer,
+      answer_text: fields.answer_text,
+      question_type: fields.question_type,
+      options: fields.options,
+      correct_answer: fields.correct_answer,
       explanation: dto.explanation || null,
       source_pages: dto.source_pages || [],
       order_index: orderIndex,
@@ -234,9 +254,12 @@ export class MemoryQuizRepository implements IQuizRepository {
   async updateQuestion(questionId: string, dto: UpdateQuestionDto): Promise<QuizQuestion> {
     const question = this.questions.get(questionId);
     if (!question) throw new Error(`Question ${questionId} not found`);
+    const fields = normalizeQuestionFields(dto, question);
     if (dto.question_text !== undefined) question.question_text = dto.question_text;
-    if (dto.options !== undefined) question.options = dto.options;
-    if (dto.correct_answer !== undefined) question.correct_answer = dto.correct_answer;
+    question.answer_text = fields.answer_text;
+    question.question_type = fields.question_type;
+    question.options = fields.options;
+    question.correct_answer = fields.correct_answer;
     if (dto.explanation !== undefined) question.explanation = dto.explanation;
     if (dto.source_pages !== undefined) question.source_pages = dto.source_pages;
     this.questions.set(questionId, question);
@@ -307,6 +330,74 @@ export class MemoryQuizRepository implements IQuizRepository {
     };
   }
 
+  async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean }> {
+    const subject = this.subjects.get(subjectId);
+    if (!subject || (userId && subject.user_id && subject.user_id !== userId)) {
+      throw new Error(`Subject ${subjectId} not found`);
+    }
+
+    if (!subject.share_token) {
+      subject.share_token = generateShareSlug();
+      subject.is_public = subject.is_public ?? true;
+      this.subjects.set(subjectId, subject);
+    }
+
+    return {
+      share_token: subject.share_token,
+      is_public: subject.is_public ?? true
+    };
+  }
+
+  async updateSubjectShareConfig(
+    subjectId: string,
+    dto: { is_public?: boolean; reset_token?: boolean },
+    userId?: string
+  ): Promise<{ share_token: string; is_public: boolean }> {
+    const subject = this.subjects.get(subjectId);
+    if (!subject || (userId && subject.user_id && subject.user_id !== userId)) {
+      throw new Error(`Subject ${subjectId} not found`);
+    }
+
+    if (dto.reset_token || !subject.share_token) {
+      subject.share_token = generateShareSlug();
+    }
+    if (dto.is_public !== undefined) {
+      subject.is_public = dto.is_public;
+    }
+    this.subjects.set(subjectId, subject);
+
+    return {
+      share_token: subject.share_token,
+      is_public: subject.is_public ?? true
+    };
+  }
+
+  async getSubjectByShareToken(shareToken: string) {
+    const subject = Array.from(this.subjects.values()).find((candidate) => candidate.share_token === shareToken);
+    if (!subject || subject.is_public === false) return null;
+
+    return {
+      id: subject.id,
+      name: subject.name,
+      color: subject.color,
+      share_token: subject.share_token!,
+      is_public: subject.is_public ?? true,
+      created_at: subject.created_at,
+      quizzes: Array.from(this.quizzes.values())
+        .filter((quiz) => quiz.subject_id === subject.id && quiz.is_public !== false && Boolean(quiz.share_token))
+        .map((quiz) => ({
+          id: quiz.id,
+          title: quiz.title,
+          description: quiz.description || null,
+          question_count: quiz.question_count,
+          generated_at: quiz.generated_at,
+          share_token: quiz.share_token!,
+          is_public: quiz.is_public ?? true,
+          created_at: quiz.created_at
+        }))
+    };
+  }
+
   async getQuizByShareToken(shareToken: string): Promise<PublicQuizDto | null> {
     let matchedQuiz: Quiz | null = null;
     for (const q of this.quizzes.values()) {
@@ -325,6 +416,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     return {
       id: matchedQuiz.id,
       title: matchedQuiz.title,
+      description: matchedQuiz.description || null,
       question_count: matchedQuiz.question_count || questions.length,
       generated_at: matchedQuiz.generated_at,
       source_model: matchedQuiz.source_model,
@@ -336,6 +428,8 @@ export class MemoryQuizRepository implements IQuizRepository {
       questions: questions.map(q => ({
         id: q.id,
         question_text: q.question_text,
+        answer_text: q.answer_text || q.options[q.correct_answer] || null,
+        question_type: q.question_type || (q.options.length > 1 ? 'multiple_choice' : 'typed_answer'),
         options: q.options,
         correct_answer: q.correct_answer,
         explanation: q.explanation || null,
@@ -351,10 +445,13 @@ export class MemoryQuizRepository implements IQuizRepository {
 
     return await this.createQuiz({
       title: `${publicQuiz.title} (Copy)`,
+      description: publicQuiz.description || null,
       subject_id: publicQuiz.subject?.id || null,
       source_model: 'cloned',
       questions: publicQuiz.questions.map(q => ({
         question_text: q.question_text,
+        answer_text: q.answer_text || null,
+        question_type: q.question_type || null,
         options: q.options,
         correct_answer: q.correct_answer,
         explanation: q.explanation || null

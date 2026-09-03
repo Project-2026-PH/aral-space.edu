@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CachedQuizRepository } from '../CachedQuizRepository';
+import { RepositoryFactory } from '../RepositoryFactory';
 import { IQuizRepository } from '../IQuizRepository';
 import { Quiz, QuizQuestion, Subject } from '@quiz-creator/types';
 
@@ -34,6 +35,9 @@ describe('CachedQuizRepository', () => {
     mockRepo = {
       listSubjects: vi.fn().mockResolvedValue([sampleSubject]),
       createSubject: vi.fn().mockResolvedValue(sampleSubject),
+      getSubjectShareConfig: vi.fn().mockResolvedValue({ share_token: 'subject-tok-1', is_public: true }),
+      updateSubjectShareConfig: vi.fn().mockResolvedValue({ share_token: 'subject-tok-1', is_public: true }),
+      getSubjectByShareToken: vi.fn().mockResolvedValue(null),
       listQuizzes: vi.fn().mockResolvedValue([sampleQuiz]),
       getQuizById: vi.fn().mockResolvedValue(sampleQuiz),
       createQuiz: vi.fn().mockResolvedValue(sampleQuiz),
@@ -114,5 +118,27 @@ describe('CachedQuizRepository', () => {
     // Third fetch -> cache missed, calls underlying
     await cachedRepo.getQuestionsByQuizId('quiz-1');
     expect(mockRepo.getQuestionsByQuizId).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares cache across different repository instances created by RepositoryFactory', async () => {
+    RepositoryFactory.clearSharedQuizCache();
+
+    // First factory call (e.g. Request 1)
+    const repoInstance1 = RepositoryFactory.createQuizRepository();
+    await repoInstance1.createQuiz({
+      title: 'Shared Factory Quiz',
+      questions: []
+    }, 'user-shared-1');
+
+    // Populate cache on instance 1
+    const quizzes1 = await repoInstance1.listQuizzes('user-shared-1');
+    expect(quizzes1.length).toBeGreaterThan(0);
+
+    // Second factory call (e.g. Request 2)
+    const repoInstance2 = RepositoryFactory.createQuizRepository();
+    const quizzes2 = await repoInstance2.listQuizzes('user-shared-1');
+
+    // Both instances see the cached data
+    expect(quizzes2).toEqual(quizzes1);
   });
 });

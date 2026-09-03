@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import Groq from 'groq-sdk';
 import { HandoutPage, VerbatimTermPair } from '@quiz-creator/types';
 import { GroqReviewer } from './GroqReviewer';
+import { AiModelConfig } from './AiModelConfig';
 
 export interface VerbatimExtractionOptions {
   apiKey?: string;       // Gemini API key
@@ -14,9 +15,6 @@ export interface VerbatimExtractionOptions {
 }
 
 export class VerbatimExtractor {
-  private static readonly DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
-  private static readonly DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
-
   static buildExtractionPrompt(pages: HandoutPage[], subjectName?: string, targetCount: number = 15): string {
     const formattedContent = pages
       .map((p) => {
@@ -52,7 +50,7 @@ Output a JSON array of objects with keys: "term", "verbatim_definition", "source
           source_page: { type: Type.INTEGER },
           chapter: { type: Type.STRING }
         },
-        required: ['term', 'verbatim_definition', 'source_page']
+        required: ["term", "verbatim_definition", "source_page"]
       }
     };
   }
@@ -65,28 +63,31 @@ Output a JSON array of objects with keys: "term", "verbatim_definition", "source
     // 1. Primary: Gemini extraction at temperature 0.0
     if (options.apiKey) {
       try {
-        const model = options.modelName || VerbatimExtractor.DEFAULT_GEMINI_MODEL;
+        const initialModel = AiModelConfig.getGeminiModel(options.modelName);
         const ai = new GoogleGenAI({ apiKey: options.apiKey });
         const prompt = VerbatimExtractor.buildExtractionPrompt(options.handoutPages, options.subjectName, targetCount);
 
-        const responseStream = await ai.models.generateContentStream({
-          model,
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: VerbatimExtractor.getPairSchema(),
-            temperature: 0.0 // Zero variance for verbatim exact extraction
-          }
-        });
+        const { result: fullText, activeModel } = await AiModelConfig.executeGeminiWithFallback(initialModel, async (m) => {
+          const responseStream = await ai.models.generateContentStream({
+            model: m,
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: VerbatimExtractor.getPairSchema(),
+              temperature: 0.0 // Zero variance for verbatim exact extraction
+            }
+          });
 
-        let fullText = '';
-        for await (const chunk of responseStream) {
-          const chunkText = chunk.text;
-          if (chunkText) {
-            fullText += chunkText;
-            options.onChunk?.(chunkText);
+          let text = '';
+          for await (const chunk of responseStream) {
+            const chunkText = chunk.text;
+            if (chunkText) {
+              text += chunkText;
+              options.onChunk?.(chunkText);
+            }
           }
-        }
+          return text;
+        });
 
         const parsed = JSON.parse(fullText.trim());
         const pairs: VerbatimTermPair[] = Array.isArray(parsed) ? parsed : (parsed.pairs || parsed.terms || []);
@@ -94,7 +95,7 @@ Output a JSON array of objects with keys: "term", "verbatim_definition", "source
         return {
           pairs,
           tokensUsed: Math.ceil(fullText.length / 4),
-          model: `gemini/${model}`
+          model: `gemini/${activeModel}`
         };
       } catch (geminiErr: any) {
         if (!options.groqApiKey) throw geminiErr;
@@ -104,22 +105,24 @@ Output a JSON array of objects with keys: "term", "verbatim_definition", "source
 
     // 2. Groq Extraction at temperature 0.0
     if (options.groqApiKey) {
-      const model = options.modelName || VerbatimExtractor.DEFAULT_GROQ_MODEL;
+      const initialModel = AiModelConfig.getGroqModel(options.modelName);
       const groq = new Groq({ apiKey: options.groqApiKey });
       const prompt = VerbatimExtractor.buildExtractionPrompt(options.handoutPages, options.subjectName, targetCount);
 
-      const completion = await groq.chat.completions.create({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a strict data extraction system. You output valid JSON containing an array of exact verbatim quotes.'
-          },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.0,
-        response_format: { type: 'json_object' }
-      });
+      const { result: completion, activeModel } = await AiModelConfig.executeGroqWithFallback(initialModel, (m) =>
+        groq.chat.completions.create({
+          model: m,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a strict data extraction system. You output valid JSON containing an array of exact verbatim quotes.'
+            },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.0,
+          response_format: { type: 'json_object' }
+        })
+      , options.groqApiKey);
 
       const content = completion.choices[0]?.message?.content || '{}';
       options.onChunk?.(content);
@@ -145,7 +148,7 @@ Output a JSON array of objects with keys: "term", "verbatim_definition", "source
       return {
         pairs,
         tokensUsed: completion.usage?.total_tokens || Math.ceil(content.length / 4),
-        model: `groq/${model}`
+        model: `groq/${activeModel}`
       };
     }
 

@@ -1,5 +1,6 @@
 import Groq from 'groq-sdk';
 import { RawAiQuestion, HandoutPage, UserAuthoringProfile } from '@quiz-creator/types';
+import { AiModelConfig } from './AiModelConfig';
 
 export interface GroqReviewOptions {
   apiKey: string;
@@ -21,8 +22,6 @@ export interface GroqDirectOptions {
 }
 
 export class GroqReviewer {
-  private static readonly DEFAULT_MODEL = 'llama-3.3-70b-versatile';
-
   static sanitizeJsonString(str: string): string {
     let cleaned = str.trim();
     if (cleaned.startsWith('```json')) {
@@ -43,11 +42,16 @@ export class GroqReviewer {
   }
 
   async reviewAndPolish(options: GroqReviewOptions): Promise<{ questions: RawAiQuestion[]; tokensUsed: number; model: string }> {
-    const model = options.modelName || GroqReviewer.DEFAULT_MODEL;
+    const model = AiModelConfig.getGroqModel(options.modelName);
     const groq = new Groq({ apiKey: options.apiKey });
+
+    const expectedCount = options.candidateQuestions.length;
 
     const systemPrompt = `You are a Senior Psychometrician and Lead Pedagogy Auditor.
 Your task is to audit, refine, and polish a draft set of candidate exam questions.
+
+CRITICAL: You MUST return exactly ${expectedCount} question(s) — one polished version for every input question.
+Do NOT drop, merge, or skip any question. If a question cannot be improved, return it unchanged.
 
 AUDIT RULES:
 1. Distractor Quality: Eliminate obvious/silly distractors. Replace them with realistic, high-level misconceptions.
@@ -58,22 +62,22 @@ AUDIT RULES:
 6. Preserve Citations: Retain source_pages arrays.
 7. Preserve Chapter Metadata: Retain chapter tags and distribute focus evenly across chapters.${options.authoringProfile?.styleSummary ? `\n8. User Style Alignment: ${options.authoringProfile.styleSummary}` : ''}
 
-Output ONLY valid JSON containing an array of question objects matching the input format.`;
+Output ONLY valid JSON: an object with key "questions" containing an array of exactly ${expectedCount} question objects matching the input format.`;
 
-    const userPrompt = `Audit and polish these candidate questions${options.subjectName ? ` for subject ${options.subjectName}` : ''}:
-${JSON.stringify(options.candidateQuestions, null, 2)}
+    const userPrompt = `Audit and polish these ${expectedCount} candidate question(s)${options.subjectName ? ` for subject ${options.subjectName}` : ''}. Return all ${expectedCount} as a JSON object { "questions": [...] }:
+${JSON.stringify(options.candidateQuestions, null, 2)}`;
 
-Return the polished JSON array:`;
-
-    const completion = await groq.chat.completions.create({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.2,
-      response_format: { type: 'json_object' }
-    });
+    const { result: completion, activeModel } = await AiModelConfig.executeGroqWithFallback(model, (m) =>
+      groq.chat.completions.create({
+        model: m,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.2,
+        response_format: { type: 'json_object' }
+      })
+    , options.apiKey);
 
     const content = completion.choices[0]?.message?.content || '[]';
     options.onChunk?.(content);
@@ -95,25 +99,50 @@ Return the polished JSON array:`;
       parsed = JSON.parse(sanitized);
     }
 
+    // Guard: if the model dropped questions, backfill from originals so count is preserved
+    if (Array.isArray(parsed) && parsed.length < expectedCount) {
+      console.warn(`[GroqReviewer] Model returned ${parsed.length}/${expectedCount} questions — backfilling ${expectedCount - parsed.length} dropped question(s) from originals.`);
+      const returned = new Set(parsed.map((q: any) => (q.question || q.question_text || '').trim().toLowerCase()));
+      const dropped = options.candidateQuestions.filter(
+        (q) => !returned.has(q.question.trim().toLowerCase())
+      );
+      parsed = [...parsed, ...dropped.slice(0, expectedCount - parsed.length)];
+    }
+
     return {
       questions: parsed as RawAiQuestion[],
       tokensUsed: completion.usage?.total_tokens || Math.ceil(content.length / 4),
-      model
+      model: activeModel
     };
   }
 
   async generateDirect(options: GroqDirectOptions): Promise<{ questions: RawAiQuestion[]; tokensUsed: number; model: string }> {
-    const model = options.modelName || GroqReviewer.DEFAULT_MODEL;
+    const model = AiModelConfig.getGroqModel(options.modelName);
     const groq = new Groq({ apiKey: options.apiKey });
     const targetCount = options.targetCount || options.authoringProfile?.targetCount || 15;
     const uniqueChapters = Array.from(
       new Set(options.handoutPages.map((p) => p.chapterTitle).filter((c): c is string => Boolean(c && c.trim())))
     );
 
-    const formattedContent = options.handoutPages
+    // Token-safe sampling: if content is large (>16,000 chars), sample evenly across pages
+    // to strictly respect Groq free-tier 6,000 TPM rate limit while maintaining full-document coverage
+    let pagesToUse = options.handoutPages;
+    const totalChars = pagesToUse.reduce((acc, p) => acc + (p.text?.length || 0), 0);
+    if (totalChars > 16000 && pagesToUse.length > 8) {
+      const step = pagesToUse.length / 8;
+      const sampled: HandoutPage[] = [];
+      for (let i = 0; i < 8; i++) {
+        const idx = Math.min(Math.floor(i * step), pagesToUse.length - 1);
+        sampled.push(pagesToUse[idx]);
+      }
+      pagesToUse = Array.from(new Map(sampled.map((p) => [p.pageNumber, p])).values());
+    }
+
+    const formattedContent = pagesToUse
       .map((p) => {
         const chapterHeader = p.chapterTitle ? ` [Chapter / File: ${p.chapterTitle}]` : '';
-        return `--- PAGE ${p.pageNumber}${chapterHeader} ---\n${p.text}\n`;
+        const truncatedText = p.text?.length > 2000 ? p.text.slice(0, 2000) + '...' : (p.text || '');
+        return `--- PAGE ${p.pageNumber}${chapterHeader} ---\n${truncatedText}\n`;
       })
       .join('\n');
 
@@ -147,12 +176,14 @@ Requirements:
 
 Return a JSON object with key "questions" containing the array of questions.`;
 
-    const completion = await groq.chat.completions.create({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      response_format: { type: 'json_object' }
-    });
+    const { result: completion, activeModel } = await AiModelConfig.executeGroqWithFallback(model, (m) =>
+      groq.chat.completions.create({
+        model: m,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        response_format: { type: 'json_object' }
+      })
+    , options.apiKey);
 
     const content = completion.choices[0]?.message?.content || '{}';
     options.onChunk?.(content);
@@ -163,7 +194,7 @@ Return a JSON object with key "questions" containing the array of questions.`;
     return {
       questions,
       tokensUsed: completion.usage?.total_tokens || Math.ceil(content.length / 4),
-      model
+      model: activeModel
     };
   }
 }

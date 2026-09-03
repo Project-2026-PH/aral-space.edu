@@ -9,6 +9,12 @@ interface AnonSessionData {
   label: string;
 }
 
+function getClientAnonCookie(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|;\s*)quizmaster_anon_id=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export default function AnonymousSessionBadge() {
   const [session, setSession] = useState<AnonSessionData | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -17,6 +23,16 @@ export default function AnonymousSessionBadge() {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const existingCookie = getClientAnonCookie();
+    if (existingCookie) {
+      setSession({
+        anonId: existingCookie,
+        isAnonymous: true,
+        label: `Guest-${existingCookie.replace('anon_', '').slice(0, 6)}`
+      });
+      return;
+    }
+
     async function fetchSession() {
       try {
         const res = await fetch('/api/anonymous');

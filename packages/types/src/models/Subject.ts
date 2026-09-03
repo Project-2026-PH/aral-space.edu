@@ -4,4 +4,6 @@ export interface Subject {
   color: string;
   user_id?: string;
   created_at?: string;
+  share_token?: string | null;
+  is_public?: boolean;
 }

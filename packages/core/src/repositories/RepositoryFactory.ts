@@ -9,9 +9,11 @@ import { NeonSessionRepository } from './NeonSessionRepository';
 import { CachedQuizRepository } from './CachedQuizRepository';
 import { LocalFirstQuizRepository } from './LocalFirstQuizRepository';
 import { LocalFirstSessionRepository } from './LocalFirstSessionRepository';
+import { LRUCache } from '../cache/LRUCache';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-// Singleton in-memory stores for fallback
+// Singleton in-memory stores for fallback and cross-request cache
+const sharedQuizLruCache = new LRUCache<string, any>({ maxSize: 1000, ttlMs: 60_000 });
 const sharedMemoryQuizRepo = new MemoryQuizRepository();
 const sharedMemorySessionRepo = new MemorySessionRepository();
 let sharedLocalFirstQuizRepo: LocalFirstQuizRepository | null = null;
@@ -51,7 +53,7 @@ export class RepositoryFactory {
     }
 
     if (shouldCache) {
-      return new CachedQuizRepository(repo);
+      return new CachedQuizRepository(repo, sharedQuizLruCache);
     }
     return repo;
   }
@@ -75,7 +77,15 @@ export class RepositoryFactory {
 
   static createNeonQuizRepository(databaseUrl: string, enableCache: boolean = true): IQuizRepository {
     const repo = new NeonQuizRepository(databaseUrl);
-    return enableCache ? new CachedQuizRepository(repo) : repo;
+    return enableCache ? new CachedQuizRepository(repo, sharedQuizLruCache) : repo;
+  }
+
+  static getSharedQuizCache(): LRUCache<string, any> {
+    return sharedQuizLruCache;
+  }
+
+  static clearSharedQuizCache(): void {
+    sharedQuizLruCache.clear();
   }
 
   static createNeonSessionRepository(databaseUrl: string): ISessionRepository {

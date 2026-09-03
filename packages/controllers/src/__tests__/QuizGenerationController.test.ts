@@ -243,12 +243,12 @@ describe('QuizGenerationController - pipelineMode', () => {
     };
 
     mockGenService.generateQuiz = vi.fn().mockImplementation(async (options) => {
-      options.onStageChange?.('extracting', 'Processing concepts...', 'gemini-2.5-flash');
+      options.onStageChange?.('extracting', 'Processing concepts...', 'gemini-3.8-flash');
       options.onStageChange?.('reviewing', 'Polishing distractors...', 'llama-3.3-70b-versatile');
       return {
-        sourceModel: 'gemini-2.5-flash',
+        sourceModel: 'gemini-3.8-flash',
         tokensUsed: 150,
-        pipelineMode: 'two_stage',
+        pipelineMode: 'gemini_direct',
         questions: [
           {
             question: 'Sample Q',

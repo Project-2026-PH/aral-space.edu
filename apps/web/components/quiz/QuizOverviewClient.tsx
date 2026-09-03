@@ -108,7 +108,7 @@ export default function QuizOverviewClient({
             className="flex items-center gap-2 rounded-2xl bg-primary px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
           >
             <Play className="h-3.5 w-3.5 fill-current" />
-            <span>Practice Quiz</span>
+            <span>Start Learning</span>
           </button>
         </div>
       </div>
@@ -164,6 +164,11 @@ export default function QuizOverviewClient({
                 <span>Source: {quiz.handout_name}</span>
               )}
             </div>
+            {quiz.description && (
+              <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                {quiz.description}
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -10,6 +10,8 @@ export interface HandoutPage {
   text: string;
 }
 
+export type AiPipelineMode = 'two_stage' | 'groq_direct' | 'gemini_direct';
+
 export interface GenerateQuizRequestDto {
   subjectId?: string;
   title?: string;
@@ -19,6 +21,9 @@ export interface GenerateQuizRequestDto {
   pdfPages?: HandoutPage[];
   pageStart?: number;
   pageEnd?: number;
+  pipelineMode?: AiPipelineMode;
+  apiKey?: string;
+  groqApiKey?: string;
 }
 
 export interface QuizGenerationProgressDto {
@@ -27,6 +32,10 @@ export interface QuizGenerationProgressDto {
   detail?: string;
   quizId?: string;
   tokensCount?: number;
+  stage?: 'extracting' | 'reviewing' | 'complete' | 'fallback' | 'error';
+  stageNumber?: number;
+  totalStages?: number;
+  modelUsed?: string;
 }
 
 export interface RawAiQuestion {
@@ -41,4 +50,8 @@ export interface GeneratedQuizResult {
   questions: RawAiQuestion[];
   sourceModel: string;
   tokensUsed?: number;
+  pipelineMode?: AiPipelineMode | string;
+  stage1Model?: string;
+  stage2Model?: string;
+  reviewedByGroq?: boolean;
 }

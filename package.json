@@ -9,11 +9,14 @@
   ],
   "scripts": {
     "dev": "pnpm --filter @quiz-creator/web dev",
+    "dev:local": "pnpm --filter @quiz-creator/web dev:local",
+    "dev:infisical": "pnpm dev",
     "mobile": "pnpm --filter @quiz-creator/mobile start",
     "build": "pnpm -r build",
     "start": "pnpm --filter @quiz-creator/web start",
     "lint": "pnpm -r lint",
     "test": "vitest run",
+    "test:infisical": "infisical run -- pnpm test",
     "typecheck": "pnpm -r exec tsc --noEmit"
   },
   "devDependencies": {

@@ -70,6 +70,16 @@ pnpm install
 
 ### 3. Environment Configuration
 
+#### Option A: Infisical Secrets Management (Default)
+Centralize and inject secrets dynamically across environments with KMS encryption:
+```bash
+infisical login
+infisical init
+pnpm dev
+```
+For detailed setup instructions, team onboarding, and Vercel KMS synchronization, see [INFISICAL.md](INFISICAL.md).
+
+#### Option B: Manual `.env.local` (Offline Fallback)
 Create `.env.local` in `apps/web` (or root `.env`):
 
 ```bash
@@ -85,11 +95,20 @@ NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
 ```
 
+To run with manual `.env.local` without Infisical:
+```bash
+pnpm dev:local
+```
+
 ### 4. Running Applications
 
 - **Web Application**:
   ```bash
+  # Injected via Infisical (default):
   pnpm dev
+
+  # Offline fallback using manual .env.local:
+  pnpm dev:local
   ```
   Open [http://localhost:3000](http://localhost:3000).
 
@@ -105,10 +124,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
 
 | Command | Description |
 | :--- | :--- |
-| `pnpm dev` | Starts Next.js development server (`apps/web`) |
+| `pnpm dev` | Starts Next.js dev server with secrets injected via Infisical (default) |
+| `pnpm dev:local` | Starts Next.js dev server using local `.env.local` (offline fallback) |
+| `pnpm dev:infisical` | Alias for `pnpm dev` |
 | `pnpm mobile` | Starts Expo dev server (`apps/mobile`) |
 | `pnpm build` | Compiles all packages and builds web application |
 | `pnpm test` | Runs unit test suite with Vitest across all packages |
+| `pnpm test:infisical` | Runs Vitest suite with secrets injected via Infisical |
 | `pnpm typecheck` | Typechecks all packages and apps with `tsc --noEmit` |
 | `pnpm lint` | Runs linter across all workspaces |
 

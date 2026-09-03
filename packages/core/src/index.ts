@@ -4,9 +4,14 @@ export * from './repositories/MemoryQuizRepository';
 export * from './repositories/MemorySessionRepository';
 export * from './repositories/SupabaseQuizRepository';
 export * from './repositories/SupabaseSessionRepository';
+export * from './repositories/NeonQuizRepository';
+export * from './repositories/NeonSessionRepository';
+export * from './repositories/CachedQuizRepository';
 export * from './repositories/LocalFirstQuizRepository';
 export * from './repositories/LocalFirstSessionRepository';
 export * from './repositories/RepositoryFactory';
+
+export * from './cache/LRUCache';
 
 export * from './services/QuizGenerationService';
 export * from './services/MasteryEngineService';

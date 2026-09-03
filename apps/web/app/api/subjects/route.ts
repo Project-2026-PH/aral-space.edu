@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RepositoryFactory } from '@quiz-creator/core';
 import { QuizCrudController } from '@quiz-creator/controllers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getQuizRepository } from '@/lib/db';
 
 export async function GET() {
   try {
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const subjects = await controller.listSubjects();
     return NextResponse.json({ subjects });
@@ -23,8 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Subject name is required' }, { status: 400 });
     }
 
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const created = await controller.createSubject(name.trim(), color || '#86EFAC');
     return NextResponse.json(created, { status: 201 });

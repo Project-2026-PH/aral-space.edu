@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
-import { RepositoryFactory } from '@quiz-creator/core';
 import { QuizGenerationController } from '@quiz-creator/controllers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getAnonymousUserId } from '@/lib/anonymous';
+import { getQuizRepository } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
@@ -19,8 +18,7 @@ export async function POST(req: NextRequest) {
   (async () => {
     try {
       const body = await req.json();
-      const supabase = await createServerSupabaseClient();
-      const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+      const quizRepo = await getQuizRepository();
       const controller = new QuizGenerationController(quizRepo);
 
       await controller.handleStreamingGeneration(body, (progressData) => {

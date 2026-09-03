@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RepositoryFactory } from '@quiz-creator/core';
 import { QuizCrudController } from '@quiz-creator/controllers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getQuizRepository } from '@/lib/db';
 
 export async function PATCH(
   req: NextRequest,
@@ -10,8 +9,7 @@ export async function PATCH(
   try {
     const { questionId } = await params;
     const body = await req.json();
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const updated = await controller.updateQuestion(questionId, body);
     return NextResponse.json(updated);
@@ -26,8 +24,7 @@ export async function DELETE(
 ) {
   try {
     const { questionId } = await params;
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const success = await controller.deleteQuestion(questionId);
     return NextResponse.json({ success });

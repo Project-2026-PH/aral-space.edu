@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import ManualQuizCreator from '@/components/quiz/ManualQuizCreator';
-import GenerateQuizModal from '@/components/quiz/GenerateQuizModal';
+
+const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizModal'), {
+  ssr: false,
+});
 
 export default function NewQuizPage() {
   const [showAiModal, setShowAiModal] = useState(false);

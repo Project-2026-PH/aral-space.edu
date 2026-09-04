@@ -6,8 +6,10 @@ import { createApiRoute } from '@/lib/api-handler';
 export const GET = createApiRoute(async ({ userId }) => {
   const quizRepo = await getQuizRepository();
   const controller = new QuizCrudController(quizRepo);
-  const quizzes = await controller.listQuizzes(userId);
-  const subjects = await controller.listSubjects(userId);
+  const [quizzes, subjects] = await Promise.all([
+    controller.listQuizzes(userId),
+    controller.listSubjects(userId)
+  ]);
   return { quizzes, subjects, userId };
 }, { cache: 'private' });
 

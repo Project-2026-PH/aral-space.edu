@@ -2,8 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Quiz, Subject } from '@quiz-creator/types';
-import GenerateQuizModal from '@/components/quiz/GenerateQuizModal';
+import dynamic from 'next/dynamic';
 import NewSubjectModal from '@/components/subject/NewSubjectModal';
+
+const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizModal'), {
+  ssr: false,
+});
 import SubjectLibrary from '@/components/subject/SubjectLibrary';
 import { Sparkles, Plus, BookOpen, Play, Search } from 'lucide-react';
 import Link from 'next/link';

@@ -1,4 +1,5 @@
-import { RepositoryFactory, IQuizRepository, ISessionRepository } from '@quiz-creator/core';
+import { RepositoryFactory } from '@quiz-creator/core';
+import type { IQuizRepository, ISessionRepository } from '@quiz-creator/core';
 import { createServerSupabaseClient } from './supabase/server';
 import { cache } from 'react';
 
@@ -8,6 +9,10 @@ import { cache } from 'react';
 export function getDatabaseUrl(): string | undefined {
   return process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
 }
+
+// Persistent process-level singletons for stateless Neon HTTP queries
+let cachedNeonQuizRepo: IQuizRepository | null = null;
+let cachedNeonSessionRepo: ISessionRepository | null = null;
 
 /**
  * Unified Quiz Repository Provider for Next.js App Router
@@ -20,7 +25,13 @@ export function getDatabaseUrl(): string | undefined {
 export const getQuizRepository = cache(async (enableCache: boolean = true): Promise<IQuizRepository> => {
   const databaseUrl = getDatabaseUrl();
   if (databaseUrl) {
-    return RepositoryFactory.createQuizRepository({ databaseUrl, enableCache });
+    if (enableCache) {
+      if (!cachedNeonQuizRepo) {
+        cachedNeonQuizRepo = RepositoryFactory.createQuizRepository({ databaseUrl, enableCache: true });
+      }
+      return cachedNeonQuizRepo;
+    }
+    return RepositoryFactory.createQuizRepository({ databaseUrl, enableCache: false });
   }
 
   const supabase = await createServerSupabaseClient();
@@ -33,7 +44,10 @@ export const getQuizRepository = cache(async (enableCache: boolean = true): Prom
 export const getSessionRepository = cache(async (): Promise<ISessionRepository> => {
   const databaseUrl = getDatabaseUrl();
   if (databaseUrl) {
-    return RepositoryFactory.createSessionRepository({ databaseUrl });
+    if (!cachedNeonSessionRepo) {
+      cachedNeonSessionRepo = RepositoryFactory.createSessionRepository({ databaseUrl });
+    }
+    return cachedNeonSessionRepo;
   }
 
   const supabase = await createServerSupabaseClient();

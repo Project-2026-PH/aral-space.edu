@@ -13,7 +13,7 @@ const nextConfig = {
     // Keep server manifest writes in the main process for reliable Windows builds.
     webpackBuildWorker: false,
     // Avoid bundling the full icon package for every named icon import.
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', '@quiz-creator/core', '@quiz-creator/controllers'],
   },
   typescript: {
     ignoreBuildErrors: true,
@@ -22,6 +22,12 @@ const nextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname),
+      canvas: false,
+    };
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      canvas: false,
+      fs: false,
     };
     return config;
   },

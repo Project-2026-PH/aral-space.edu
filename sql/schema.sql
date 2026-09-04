@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS quiz_question_progress (
 );
 
 CREATE INDEX IF NOT EXISTS idx_quizzes_subject_id ON quizzes(subject_id);
+CREATE INDEX IF NOT EXISTS idx_quizzes_user_id ON quizzes(user_id);
+CREATE INDEX IF NOT EXISTS idx_subjects_user_id ON subjects(user_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_questions_quiz_id ON quiz_questions(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_sessions_quiz_id ON quiz_sessions(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_question_progress_session ON quiz_question_progress(session_id);

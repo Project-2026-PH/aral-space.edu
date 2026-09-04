@@ -1,4 +1,4 @@
-import { IQuizRepository } from '@quiz-creator/core';
+import type { IQuizRepository } from '@quiz-creator/core';
 import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto, UpdateSubjectShareConfigDto } from '@quiz-creator/types';
 
 export class QuizCrudController {

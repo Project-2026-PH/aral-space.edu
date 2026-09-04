@@ -31,7 +31,7 @@ describe('AiModelConfig', () => {
 
     it('returns default Gemini model when override and env are unset', () => {
       delete process.env.GEMINI_MODEL;
-      expect(AiModelConfig.getGeminiModel()).toBe('gemini-3.7-flash');
+      expect(AiModelConfig.getGeminiModel()).toBe('gemini-3.8-flash');
     });
 
     it('returns env GEMINI_MODEL when override is unset', () => {
@@ -65,7 +65,7 @@ describe('AiModelConfig', () => {
     it('returns ranked preferred models intersected with available models', async () => {
       const available = [
         { id: 'llama-3.3-70b-versatile' },
-        { id: 'gemma2-9b-it' },
+        { id: 'llama-3.1-8b-instant' },
         { id: 'some-other-model' }
       ];
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -76,19 +76,20 @@ describe('AiModelConfig', () => {
       const result = await AiModelConfig.resolveGroqFallbacks('test-key');
       // Should be intersection ordered by GROQ_PREFERRED_MODELS
       expect(result).toContain('llama-3.3-70b-versatile');
-      expect(result).toContain('gemma2-9b-it');
+      expect(result).toContain('llama-3.1-8b-instant');
       expect(result).not.toContain('some-other-model');
-      expect(result.indexOf('llama-3.3-70b-versatile')).toBeLessThan(result.indexOf('gemma2-9b-it'));
+      expect(result.indexOf('llama-3.3-70b-versatile')).toBeLessThan(result.indexOf('llama-3.1-8b-instant'));
     });
 
     it('excludes the specified model from results', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ data: [{ id: 'llama-3.3-70b-versatile' }, { id: 'gemma2-9b-it' }] })
+        json: () => Promise.resolve({ data: [{ id: 'llama-3.3-70b-versatile' }, { id: 'llama-3.1-8b-instant' }] })
       }));
 
       const result = await AiModelConfig.resolveGroqFallbacks('test-key', 'llama-3.3-70b-versatile');
       expect(result).not.toContain('llama-3.3-70b-versatile');
+      expect(result).toContain('llama-3.1-8b-instant');
     });
 
     it('falls back to static preference list when fetch fails', async () => {
@@ -152,11 +153,11 @@ describe('AiModelConfig', () => {
         .mockRejectedValueOnce(new Error('models/gemini-3.6-flash is no longer available'))
         .mockResolvedValueOnce('fallback-gemini-ok');
 
-      const res = await AiModelConfig.executeGeminiWithFallback('gemini-3.7-flash', op);
+      const res = await AiModelConfig.executeGeminiWithFallback('gemini-3.8-flash', op);
 
       expect(res.result).toBe('fallback-gemini-ok');
       expect(op).toHaveBeenCalledTimes(3);
-      expect(op).toHaveBeenNthCalledWith(1, 'gemini-3.7-flash');
+      expect(op).toHaveBeenNthCalledWith(1, 'gemini-3.8-flash');
       expect(op).toHaveBeenNthCalledWith(2, AiModelConfig.GEMINI_FALLBACK_MODELS[0]);
     });
   });

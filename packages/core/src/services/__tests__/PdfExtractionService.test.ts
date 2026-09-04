@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PdfExtractionService } from '../PdfExtractionService';
+import { PdfEncryptedError } from '../pdf/errors/PdfEncryptedError';
+import { HandoutPageService } from '../pdf/HandoutPageService';
 import * as zlib from 'zlib';
 
 describe('PdfExtractionService', () => {
@@ -240,5 +242,63 @@ describe('PdfExtractionService', () => {
     const raw = 'Valid text\u0000 with nulls\u0007 and bells\r\nand clean lines';
     const cleaned = PdfExtractionService.sanitizeExtractedText(raw);
     expect(cleaned).toBe('Valid text with nulls and bells\nand clean lines');
+  });
+
+  it('throws typed PdfEncryptedError when encrypted PDF is uploaded', async () => {
+    const encryptedPdf =
+      '%PDF-1.4\n' +
+      '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n' +
+      '2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\n' +
+      'trailer\n<< /Size 3 /Root 1 0 R /Encrypt << /Filter /Standard /V 1 /R 2 /O (12345678901234567890123456789012) /U (12345678901234567890123456789012) /P -44 >> >>\nstartxref\n100\n%%EOF';
+
+    await expect(
+      PdfExtractionService.parsePdf(Buffer.from(encryptedPdf, 'latin1'), 'Secure.pdf')
+    ).rejects.toThrow(PdfEncryptedError);
+  });
+
+  it('HandoutPageService aggregates multi-file pages independently of PDF parser', () => {
+    const files = [
+      { name: 'File1.pdf', pages: [{ pageNumber: 1, text: 'P1' }] },
+      { name: 'File2.pdf', pages: [{ pageNumber: 1, text: 'P2' }] }
+    ];
+    const res = HandoutPageService.aggregatePages(files);
+    expect(res.length).toBe(2);
+    expect(res[0].pageNumber).toBe(1);
+    expect(res[0].chapterTitle).toBe('File1.pdf');
+    expect(res[1].pageNumber).toBe(2);
+    expect(res[1].chapterTitle).toBe('File2.pdf');
+  });
+
+  it('parses multi-page valid PDF via PdfJsParserStrategy with accurate text content', async () => {
+    const pdfData =
+      '%PDF-1.4\n' +
+      '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n' +
+      '2 0 obj\n<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>\nendobj\n' +
+      '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n' +
+      '4 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 6 0 R >>\nendobj\n' +
+      '5 0 obj\n<< /Length 44 >>\nstream\nBT /F1 24 Tf 100 100 Td (Page 1 Text Content) Tj ET\nendstream\nendobj\n' +
+      '6 0 obj\n<< /Length 44 >>\nstream\nBT /F1 24 Tf 100 100 Td (Page 2 Text Content) Tj ET\nendstream\nendobj\n' +
+      'xref\n' +
+      '0 7\n' +
+      '0000000000 65535 f \n' +
+      '0000000009 00000 n \n' +
+      '0000000058 00000 n \n' +
+      '0000000123 00000 n \n' +
+      '0000000214 00000 n \n' +
+      '0000000305 00000 n \n' +
+      '0000000405 00000 n \n' +
+      'trailer\n' +
+      '<< /Size 7 /Root 1 0 R >>\n' +
+      'startxref\n' +
+      '505\n' +
+      '%%EOF';
+
+    const result = await PdfExtractionService.parsePdf(Buffer.from(pdfData, 'latin1'), 'MultiPage.pdf');
+    expect(result.pageCount).toBe(2);
+    expect(result.pages.length).toBe(2);
+    expect(result.pages[0].pageNumber).toBe(1);
+    expect(result.pages[0].text).toContain('Page 1 Text Content');
+    expect(result.pages[1].pageNumber).toBe(2);
+    expect(result.pages[1].text).toContain('Page 2 Text Content');
   });
 });

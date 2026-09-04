@@ -11,7 +11,8 @@
     "@neondatabase/serverless": "^0.10.4",
     "@quiz-creator/types": "workspace:*",
     "@supabase/supabase-js": "^2.112.1",
-    "groq-sdk": "^0.15.0"
+    "groq-sdk": "^0.15.0",
+    "pdfjs-dist": "^6.3.289"
   },
   "devDependencies": {
     "@types/node": "^20.19.43"

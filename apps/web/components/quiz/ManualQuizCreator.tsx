@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, ArrowLeft, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, GripVertical, Tag, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, GripVertical, Tag, Sparkles, ClipboardPaste } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import NewSubjectModal from '../subject/NewSubjectModal';
+import { parseSmartClipboard, type ParsedClipboard } from '@/lib/clipboardParser';
 
 export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
 
@@ -36,6 +37,7 @@ export default function ManualQuizCreator({
   const [subjectList, setSubjectList] = useState<Array<{ id: string; name: string; color?: string }>>(subjects || []);
   const [subjectId, setSubjectId] = useState(subjects?.[0]?.id || '');
   const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [pendingImport, setPendingImport] = useState<ParsedClipboard | null>(null);
   const [questions, setQuestions] = useState<QuestionDraft[]>([
     {
       type: 'multiple_choice',
@@ -176,6 +178,110 @@ export default function ManualQuizCreator({
     setQuestions(next);
   }
 
+  function handlePromptPaste(qIdx: number, e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData('text');
+    if (!text) return;
+
+    const parsed = parseSmartClipboard(text);
+    if (parsed && parsed.type === 'single_pair') {
+      e.preventDefault();
+      const next = [...questions];
+      next[qIdx] = {
+        ...next[qIdx],
+        type: 'identification',
+        question_text: parsed.definition,
+        options: [parsed.term],
+        correct_answer: 0
+      };
+      setQuestions(next);
+      return;
+    }
+
+    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'enumeration_blocks')) {
+      e.preventDefault();
+      setPendingImport(parsed);
+    }
+  }
+
+  function handleTargetAnswerPaste(qIdx: number, e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData('text');
+    if (!text) return;
+
+    const parsed = parseSmartClipboard(text);
+    if (parsed && parsed.type === 'single_pair') {
+      e.preventDefault();
+      const next = [...questions];
+      next[qIdx] = {
+        ...next[qIdx],
+        type: 'identification',
+        question_text: parsed.definition,
+        options: [parsed.term],
+        correct_answer: 0
+      };
+      setQuestions(next);
+      return;
+    }
+
+    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'enumeration_blocks')) {
+      e.preventDefault();
+      setPendingImport(parsed);
+    }
+  }
+
+  function handleContainerPaste(e: React.ClipboardEvent<HTMLDivElement>) {
+    const target = e.target as HTMLElement;
+    // If user is pasting into title, description, or subject selector, do not intercept
+    if (target.closest('[data-skip-clipboard-intercept="true"]')) return;
+
+    const text = e.clipboardData.getData('text');
+    if (!text) return;
+
+    const parsed = parseSmartClipboard(text);
+    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'enumeration_blocks')) {
+      e.preventDefault();
+      setPendingImport(parsed);
+    }
+  }
+
+  function applyPendingImport() {
+    if (!pendingImport) return;
+
+    if (pendingImport.type === 'bulk_terms') {
+      const newCards: QuestionDraft[] = pendingImport.items.map((item) => ({
+        type: 'identification',
+        question_text: item.definition,
+        options: [item.term],
+        correct_answer: 0,
+        explanation: ''
+      }));
+
+      // If existing list only contains 1 empty initial card, replace it
+      const isFirstEmpty =
+        questions.length === 1 &&
+        !questions[0].question_text.trim() &&
+        questions[0].options.every((o) => !o.trim());
+
+      setQuestions((prev) => (isFirstEmpty ? newCards : [...prev, ...newCards]));
+    } else if (pendingImport.type === 'enumeration_blocks') {
+      const newCards: QuestionDraft[] = pendingImport.blocks.map((block) => ({
+        type: 'enumeration',
+        question_text: `Enumerate: ${block.header}`,
+        options: block.items.length > 0 ? [...block.items] : ['', ''],
+        correct_answer: 0,
+        explanation: ''
+      }));
+
+      const isFirstEmpty =
+        questions.length === 1 &&
+        !questions[0].question_text.trim() &&
+        questions[0].options.every((o) => !o.trim());
+
+      setQuestions((prev) => (isFirstEmpty ? newCards : [...prev, ...newCards]));
+    }
+
+    setPendingImport(null);
+  }
+
   async function handleSave() {
     if (!title.trim()) {
       setError('Please provide a title for the study set.');
@@ -265,7 +371,71 @@ export default function ManualQuizCreator({
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20">
+    <div
+      onPaste={handleContainerPaste}
+      className="max-w-4xl mx-auto space-y-6 pb-20 relative"
+    >
+      {/* Smart Clipboard Import Preview Modal / Banner */}
+      {pendingImport && (
+        <div className="sticky top-4 z-40 rounded-3xl border border-primary/30 bg-card/95 backdrop-blur-md p-5 shadow-2xl ring-1 ring-primary/20 space-y-3 animate-in fade-in slide-in-from-top-3 duration-200">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-extrabold text-foreground flex items-center gap-2">
+                  <span>Smart Clipboard Detected</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                    {pendingImport.type === 'bulk_terms' ? 'Term/Definition List' : 'Slide Enumeration'}
+                  </span>
+                </h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {pendingImport.type === 'bulk_terms'
+                    ? `✨ Detected ${pendingImport.items.length} Term/Definition pairs ready to convert into identification cards.`
+                    : pendingImport.type === 'enumeration_blocks'
+                    ? `✨ Detected ${pendingImport.blocks.length} Enumeration group(s) (${pendingImport.blocks.map((b) => b.header).slice(0, 2).join(', ')}${pendingImport.blocks.length > 2 ? '...' : ''}) ready to convert.`
+                    : '✨ Detected structured text ready to convert.'}
+                </p>
+              </div>  
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPendingImport(null)}
+              className="text-muted-foreground hover:text-foreground p-1 rounded-xl hover:bg-muted transition-colors cursor-pointer"
+              title="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={() => setPendingImport(null)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={applyPendingImport}
+              className="px-5 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-md shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+            >
+              <ClipboardPaste className="h-4 w-4" />
+              <span>
+                {pendingImport.type === 'bulk_terms'
+                  ? `Import ${pendingImport.items.length} Question Cards`
+                  : pendingImport.type === 'enumeration_blocks'
+                  ? `Import ${pendingImport.blocks.length} Enumeration Cards`
+                  : 'Import Cards'}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-3">
         <Link
           href="/"
@@ -304,7 +474,10 @@ export default function ManualQuizCreator({
       )}
 
       {/* Quiz metadata */}
-      <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm space-y-4">
+      <div
+        data-skip-clipboard-intercept="true"
+        className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm space-y-4"
+      >
         <div className="flex items-center gap-2">
           <Tag className="h-4 w-4 text-primary" />
           <h2 className="text-base font-bold text-foreground">Quiz Details</h2>
@@ -508,9 +681,10 @@ export default function ManualQuizCreator({
               <div>
                 <input
                   type="text"
-                  placeholder="Enter your question prompt..."
+                  placeholder="Enter your question prompt (or paste term/definition pair)..."
                   value={q.question_text}
                   onChange={(e) => updateQuestionText(qIdx, e.target.value)}
+                  onPaste={(e) => handlePromptPaste(qIdx, e)}
                   className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
                 />
               </div>
@@ -605,6 +779,7 @@ export default function ManualQuizCreator({
                     placeholder="e.g. Photosynthesis"
                     value={q.options[0] || ''}
                     onChange={(e) => updateOptionText(qIdx, 0, e.target.value)}
+                    onPaste={(e) => handleTargetAnswerPaste(qIdx, e)}
                     className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
                   />
                 </div>

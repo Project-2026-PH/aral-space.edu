@@ -33,6 +33,7 @@ export interface QuizQuestion {
   distractor_explanations?: Record<number, string> | null;
   /** Array of specific technical keywords separating the correct choice from the nearest distractor. */
   discriminatory_keywords?: string[] | null;
+  concept_tags?: string[] | null;
   source_pages?: number[] | null;
   order_index: number;
   created_at?: string;
@@ -42,5 +43,27 @@ export interface ShuffledOption {
   optionId: number;
   text: string;
   isCorrect: boolean;
+}
+
+export interface CardTelemetryRecord {
+  questionId: string;
+  firstPassCorrect: boolean;
+  totalAttempts: number;
+  totalMisses: number;
+  timeToCorrectMs?: number;
+  conceptTags: string[];
+  latenciesMs?: number[];
+}
+
+export type MasteryBucket = 'red' | 'yellow' | 'green';
+
+export interface SessionMasterySummary {
+  deckMedianLatencyMs: number;
+  buckets: {
+    red: string[];    // Question IDs
+    yellow: string[]; // Question IDs
+    green: string[];  // Question IDs
+  };
+  conceptErrorDensity: Record<string, number>; // tag -> total misses
 }
 

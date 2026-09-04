@@ -8,6 +8,7 @@ export interface NormalizedQuestionFields {
   correct_explanation: string | null;
   distractor_explanations: Record<number, string> | null;
   discriminatory_keywords: string[] | null;
+  concept_tags: string[] | null;
 }
 
 function normalizeOptions(options: unknown): string[] {
@@ -98,6 +99,10 @@ export function normalizeQuestionFields(
     ? normalizeKeywords(input.discriminatory_keywords)
     : (existing?.discriminatory_keywords !== undefined ? normalizeKeywords(existing.discriminatory_keywords) : null);
 
+  const conceptTags = input.concept_tags !== undefined
+    ? normalizeKeywords(input.concept_tags)
+    : (existing?.concept_tags !== undefined ? normalizeKeywords(existing.concept_tags) : null);
+
   return {
     options,
     correct_answer: correctAnswer,
@@ -105,6 +110,7 @@ export function normalizeQuestionFields(
     question_type: questionType,
     correct_explanation: correctExplanation,
     distractor_explanations: distractorExplanations,
-    discriminatory_keywords: discriminatoryKeywords
+    discriminatory_keywords: discriminatoryKeywords,
+    concept_tags: conceptTags
   };
 }

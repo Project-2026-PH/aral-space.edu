@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await getAnonymousUserId(req);
     const body = await req.json();
-    const { action, quizId, sessionId, questionId, isCorrect, sessionType } = body;
+    const { action, quizId, sessionId, questionId, isCorrect, sessionType, latencyMs, summary } = body;
     
     const [sessionRepo, quizRepo] = await Promise.all([
       getSessionRepository(),
@@ -21,12 +21,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'answer') {
-      const progress = await controller.recordAnswer(sessionId, questionId, isCorrect, sessionType);
+      const progress = await controller.recordAnswer(sessionId, questionId, isCorrect, sessionType, latencyMs);
       return NextResponse.json(progress);
     }
 
     if (action === 'complete') {
-      const result = await controller.completeSession(sessionId, quizId, userId);
+      const result = await controller.completeSession(sessionId, quizId, userId, summary);
       return NextResponse.json(result);
     }
 

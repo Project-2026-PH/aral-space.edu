@@ -1,5 +1,5 @@
 import { ISessionRepository, IQuizRepository, MasteryEngineService, SAMPLE_QUIZ_ID, SAMPLE_QUIZ_QUESTIONS, MemorySessionRepository } from '@quiz-creator/core';
-import { SessionType, QuestionProgress } from '@quiz-creator/types';
+import { SessionType, QuestionProgress, SessionMasterySummary } from '@quiz-creator/types';
 
 function isUuid(str?: string | null): boolean {
   if (!str || typeof str !== 'string') return false;
@@ -76,7 +76,13 @@ export class MasterySessionController {
     return { session, questions, progress: progressList };
   }
 
-  async recordAnswer(sessionId: string, questionId: string, isCorrect: boolean, sessionType: SessionType = 'initial') {
+  async recordAnswer(
+    sessionId: string,
+    questionId: string,
+    isCorrect: boolean,
+    sessionType: SessionType = 'initial',
+    _latencyMs?: number
+  ) {
     if (!isUuid(sessionId)) {
       // In-memory session. Never send non-UUID to Postgres.
       const progressList = await MasterySessionController.sampleSessionRepo.getProgressForSession(sessionId);
@@ -115,7 +121,12 @@ export class MasterySessionController {
     return await this.sessionRepo.saveQuestionProgress(updated);
   }
 
-  async completeSession(sessionId: string, quizId: string, userId?: string) {
+  async completeSession(
+    sessionId: string,
+    quizId: string,
+    userId?: string,
+    summary?: SessionMasterySummary
+  ) {
     if (!isUuid(sessionId) || !isUuid(quizId)) {
       // In-memory session / quiz. Never send non-UUID to Postgres.
       try {
@@ -126,7 +137,7 @@ export class MasterySessionController {
           scheduledSession = await MasterySessionController.sampleSessionRepo.createSession(quizId, nextPlan.sessionType, nextPlan.availableAt, userId);
           await MasterySessionController.sampleSessionRepo.updateSessionStatus(scheduledSession.id, 'scheduled');
         }
-        return { completedSession: completed, scheduledSession, nextPlan };
+        return { completedSession: completed, scheduledSession, nextPlan, summary: summary || null };
       } catch {
         return {
           completedSession: {
@@ -140,7 +151,8 @@ export class MasterySessionController {
             completed_at: new Date().toISOString()
           },
           scheduledSession: null,
-          nextPlan: null
+          nextPlan: null,
+          summary: summary || null
         };
       }
     }
@@ -154,6 +166,7 @@ export class MasterySessionController {
       await this.sessionRepo.updateSessionStatus(scheduledSession.id, 'scheduled');
     }
 
-    return { completedSession: completed, scheduledSession, nextPlan };
+    return { completedSession: completed, scheduledSession, nextPlan, summary: summary || null };
   }
 }
+

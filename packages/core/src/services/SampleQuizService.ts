@@ -47,6 +47,7 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
       3: "Random shuffling without tracking destroys the error-priority queue and invalidates spaced repetition."
     },
     discriminatory_keywords: ["working memory capacity", "sliding window", "cognitive load", "buffer"],
+    concept_tags: ["working-memory", "sliding-window", "cognitive-load"],
     source_pages: [1],
     order_index: 0
   },
@@ -67,6 +68,7 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
       3: "Immediate repetition without intermediate items merely tests short-term sensory echo rather than long-term semantic retrieval."
     },
     discriminatory_keywords: ["spaced reinsertion", "retrieval spacing", "recognition heuristic", "Leitner"],
+    concept_tags: ["spaced-repetition", "leitner-spacing", "retrieval-practice"],
     source_pages: [1],
     order_index: 1
   },
@@ -87,6 +89,7 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
       3: "Audio effects are asynchronous and do not dictate the retrieval pedagogical timer."
     },
     discriminatory_keywords: ["pre-commitment", "forced retrieval", "recognition heuristic", "semantic memory"],
+    concept_tags: ["pre-commitment-delay", "recognition-heuristic", "retrieval-practice"],
     source_pages: [2],
     order_index: 2
   },
@@ -107,6 +110,7 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
       3: "Exiting a session pauses or preserves state, but does not move cards to the Struggle Pile."
     },
     discriminatory_keywords: ["attempt cap", "struggle pile", "fatigue guardrail", "burnout prevention"],
+    concept_tags: ["anti-fatigue", "struggle-pile", "cognitive-load"],
     source_pages: [2],
     order_index: 3
   },
@@ -127,6 +131,7 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
       3: "Adjusting question difficulty dynamically is adaptive testing, not elaborative conceptual feedback."
     },
     discriminatory_keywords: ["elaborative feedback", "distractor fallacies", "discriminatory keywords", "conceptual discrimination"],
+    concept_tags: ["elaborative-feedback", "conceptual-discrimination", "feature-contrast"],
     source_pages: [3],
     order_index: 4
   },
@@ -147,6 +152,7 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
       3: "Requiring 5 error-free repeats causes overlearning and excessive cognitive fatigue."
     },
     discriminatory_keywords: ["mastery criteria", "queue resolution", "batch completion", "active queue exhaustion"],
+    concept_tags: ["mastery-criteria", "queue-resolution", "sliding-window"],
     source_pages: [3],
     order_index: 5
   },
@@ -167,6 +173,7 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
       3: "Prior mastered cards remain locked and scored; only the struggle cards are re-queued."
     },
     discriminatory_keywords: ["targeted review", "deliberate practice", "struggle review", "isolated focus"],
+    concept_tags: ["struggle-pile", "targeted-review", "retrieval-practice"],
     source_pages: [4],
     order_index: 6
   },
@@ -187,6 +194,7 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
       3: "Confirmation bias impedes error correction; feedback must challenge false assumptions."
     },
     discriminatory_keywords: ["feature contrast", "semantic boundary", "boundary conditions", "conceptual discrimination"],
+    concept_tags: ["feature-contrast", "conceptual-discrimination", "semantic-boundary"],
     source_pages: [4],
     order_index: 7
   }
@@ -207,6 +215,7 @@ export const SAMPLE_QUIZ_QUESTIONS: QuizQuestion[] = SAMPLE_QUESTIONS.map((q, id
     correct_explanation: q.correct_explanation || null,
     distractor_explanations: q.distractor_explanations || null,
     discriminatory_keywords: q.discriminatory_keywords || null,
+    concept_tags: q.concept_tags || null,
     source_pages: q.source_pages || [],
     order_index: idx,
     created_at: '2026-01-01T00:00:00.000Z'

@@ -36,3 +36,4 @@ export * from './services/QuizTransformService';
 export * from './services/QuizRenamingService';
 export * from './services/ai/UserAuthoringProfileService';
 export * from './services/SampleQuizService';
+export * from './services/SessionTelemetryService';

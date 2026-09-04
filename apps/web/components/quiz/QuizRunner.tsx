@@ -8,13 +8,16 @@ import {
   QuestionProgress,
   QuizMode,
   ShuffledOption,
-  PracticeSessionState
+  PracticeSessionState,
+  CardTelemetryRecord,
+  SessionMasterySummary
 } from '@quiz-creator/types';
 import {
   MasteryEngineService,
   CognitiveMasteryQueue,
   QuizShuffleService,
   QuizTransformService,
+  SessionTelemetryService,
   BATCH_SIZE
 } from '@quiz-creator/core';
 import {
@@ -32,7 +35,10 @@ import {
   VolumeX,
   AlertTriangle,
   Tag,
-  Brain
+  Brain,
+  Gauge,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import BatchRestTimer from './BatchRestTimer';
@@ -128,6 +134,13 @@ export default function QuizRunner({
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const celebrationFiredRef = useRef<boolean>(false);
 
+  // Response Latency & Telemetry Tracking
+  const questionStartTimeRef = useRef<number>(Date.now());
+  const cardTelemetryRef = useRef<Record<string, CardTelemetryRecord>>({});
+  const [cardTelemetry, setCardTelemetry] = useState<Record<string, CardTelemetryRecord>>({});
+  const [sessionSummary, setSessionSummary] = useState<SessionMasterySummary | null>(null);
+  const [activeTelemetryTab, setActiveTelemetryTab] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
+
   useEffect(() => {
     setIsMuted(quizAudio.isMuted());
     quizAudio.preload();
@@ -140,6 +153,12 @@ export default function QuizRunner({
       celebrationFiredRef.current = true;
       quizAudio.playSuccessSound();
       triggerCelebrationConfetti();
+    }
+  }, [isCompleted]);
+
+  useEffect(() => {
+    if (isCompleted && !sessionSummary) {
+      setSessionSummary(SessionTelemetryService.generateSessionSummary(cardTelemetryRef.current, questions));
     }
   }, [isCompleted]);
 
@@ -158,6 +177,10 @@ export default function QuizRunner({
   const activeQuestion = activeQuestionId
     ? questions.find((q) => q.id === activeQuestionId) || null
     : null;
+
+  useEffect(() => {
+    questionStartTimeRef.current = Date.now();
+  }, [activeQuestion?.id]);
 
   const currentProg = activeQuestion ? progressMap.get(activeQuestion.id) : null;
 
@@ -238,6 +261,38 @@ export default function QuizRunner({
     setSelectedOptionId(option.optionId);
 
     const isCorrect = option.isCorrect;
+    const latencyMs = Math.max(1, Date.now() - questionStartTimeRef.current);
+    const qId = activeQuestion.id;
+    const prevRec = cardTelemetryRef.current[qId];
+    const isFirstPass = !prevRec;
+    const firstPassCorrect = isFirstPass ? isCorrect : prevRec.firstPassCorrect;
+    const totalAttempts = (prevRec?.totalAttempts || 0) + 1;
+    const totalMisses = (prevRec?.totalMisses || 0) + (isCorrect ? 0 : 1);
+    const timeToCorrectMs = isCorrect ? latencyMs : prevRec?.timeToCorrectMs;
+    const latenciesMs = [...(prevRec?.latenciesMs || []), latencyMs];
+    const resolvedTags = activeQuestion.concept_tags && activeQuestion.concept_tags.length > 0
+      ? activeQuestion.concept_tags
+      : (activeQuestion.discriminatory_keywords && activeQuestion.discriminatory_keywords.length > 0
+          ? activeQuestion.discriminatory_keywords
+          : ['general']);
+
+    const updatedRec: CardTelemetryRecord = {
+      questionId: qId,
+      firstPassCorrect,
+      totalAttempts,
+      totalMisses,
+      timeToCorrectMs,
+      conceptTags: resolvedTags,
+      latenciesMs
+    };
+
+    const nextTelemetry = {
+      ...cardTelemetryRef.current,
+      [qId]: updatedRec
+    };
+    cardTelemetryRef.current = nextTelemetry;
+    setCardTelemetry(nextTelemetry);
+
     if (isCorrect) {
       quizAudio.playCorrectSound();
     }
@@ -279,7 +334,8 @@ export default function QuizRunner({
           sessionId: session.id,
           questionId: activeQuestion.id,
           isCorrect,
-          sessionType: session.session_type
+          sessionType: session.session_type,
+          latencyMs
         })
       });
     } catch (err) {
@@ -341,6 +397,9 @@ export default function QuizRunner({
 
   async function handleCompleteQuiz() {
     setIsCompleted(true);
+    const summary = SessionTelemetryService.generateSessionSummary(cardTelemetryRef.current, questions);
+    setSessionSummary(summary);
+
     if (!celebrationFiredRef.current) {
       celebrationFiredRef.current = true;
       quizAudio.playSuccessSound();
@@ -353,7 +412,8 @@ export default function QuizRunner({
         body: JSON.stringify({
           action: 'complete',
           sessionId: session.id,
-          quizId: quiz.id
+          quizId: quiz.id,
+          summary
         })
       });
     } catch (err) {
@@ -362,41 +422,244 @@ export default function QuizRunner({
   }
 
   if (isCompleted) {
+    const summary = sessionSummary || SessionTelemetryService.generateSessionSummary(cardTelemetryRef.current, questions);
+    const deckMedianSec = (summary.deckMedianLatencyMs / 1000).toFixed(1);
+    const hesitationThresholdSec = ((summary.deckMedianLatencyMs * 1.5) / 1000).toFixed(1);
+
+    const conceptEntries = Object.entries(summary.conceptErrorDensity).sort((a, b) => b[1] - a[1]);
+    const firstPassMasteryScore = questions.length > 0
+      ? Math.round((summary.buckets.green.length / questions.length) * 100)
+      : 100;
+
     return (
-      <div className="max-w-xl mx-auto py-12 px-4 text-center space-y-6 animate-fade-in">
-        <div className="inline-flex p-5 rounded-full bg-emerald-500/10 text-emerald-500">
-          <Award className="h-12 w-12" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-extrabold text-foreground">Session Completed!</h2>
-          <p className="text-xs text-muted-foreground mt-1.5 max-w-sm mx-auto leading-relaxed">
-            All {questions.length} questions in &quot;{quiz.title}&quot; were successfully mastered in this loop.
-          </p>
+      <div className="max-w-2xl mx-auto py-10 px-4 space-y-6 animate-fade-in text-center">
+        {/* Completion Header */}
+        <div className="space-y-3">
+          <div className="inline-flex p-4 rounded-full bg-emerald-500/10 text-emerald-500 shadow-sm ring-1 ring-emerald-500/20">
+            <Award className="h-10 w-10" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-foreground tracking-tight">Session Mastery Analysis</h2>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
+              Objective cognitive telemetry: response latency, first-pass retrieval accuracy, and concept error density.
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm space-y-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Session Mode:</span>
-            <span className="font-bold text-foreground capitalize">{mode.replace('_', ' ')}</span>
+        {/* Cognitive Intelligence Metrics */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs text-center space-y-1">
+            <span className="text-[11px] font-semibold text-muted-foreground flex items-center justify-center gap-1">
+              <Clock className="h-3.5 w-3.5 text-primary" />
+              Median Latency
+            </span>
+            <p className="text-xl font-black text-foreground">{deckMedianSec}s</p>
+            <p className="text-[10px] text-muted-foreground">Deck baseline</p>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Mastery Score:</span>
-            <span className="font-bold text-emerald-500">
-              {questions.length > 0 ? Math.round(((questions.length - accumulatedStruggleIds.length) / questions.length) * 100) : 100}% Mastered
+          <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs text-center space-y-1">
+            <span className="text-[11px] font-semibold text-muted-foreground flex items-center justify-center gap-1">
+              <Gauge className="h-3.5 w-3.5 text-amber-500" />
+              Hesitation Index
+            </span>
+            <p className="text-xl font-black text-amber-500">&gt; {hesitationThresholdSec}s</p>
+            <p className="text-[10px] text-muted-foreground">1.5× median ceiling</p>
+          </div>
+          <div className="col-span-2 sm:col-span-1 rounded-2xl border border-border/80 bg-card p-4 shadow-2xs text-center space-y-1">
+            <span className="text-[11px] font-semibold text-muted-foreground flex items-center justify-center gap-1">
+              <Brain className="h-3.5 w-3.5 text-emerald-500" />
+              First-Pass Mastery
+            </span>
+            <p className="text-xl font-black text-emerald-500">{firstPassMasteryScore}%</p>
+            <p className="text-[10px] text-muted-foreground">Zero-hesitation recall</p>
+          </div>
+        </div>
+
+        {/* Objective Mastery Tiering (Red / Yellow / Green) */}
+        <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm space-y-4 text-left">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+              <Layers className="h-4 w-4 text-primary" />
+              <span>Objective Mastery Tiering</span>
+            </h3>
+            <span className="text-[11px] text-muted-foreground font-medium">
+              {questions.length} cards categorized
             </span>
           </div>
-          {accumulatedStruggleIds.length > 0 && (
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Struggle Pile:</span>
-              <span className="font-bold text-amber-500 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                {accumulatedStruggleIds.length} Flagged for Targeted Review
-              </span>
+
+          <div className="grid grid-cols-3 gap-2.5">
+            {/* Green Bucket */}
+            <div
+              onClick={() => setActiveTelemetryTab(activeTelemetryTab === 'green' ? 'all' : 'green')}
+              className={`cursor-pointer rounded-2xl border p-3 text-center transition-all ${
+                activeTelemetryTab === 'green'
+                  ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30'
+                  : 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-1 text-emerald-600 font-bold text-xs">
+                <span>🟢</span>
+                <span>Mastered</span>
+              </div>
+              <p className="text-2xl font-black text-emerald-600 mt-1">{summary.buckets.green.length}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">First-pass &le; 1.5x</p>
             </div>
-          )}
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Next Review:</span>
-            <span className="font-bold text-primary">In 24 Hours</span>
+
+            {/* Yellow Bucket */}
+            <div
+              onClick={() => setActiveTelemetryTab(activeTelemetryTab === 'yellow' ? 'all' : 'yellow')}
+              className={`cursor-pointer rounded-2xl border p-3 text-center transition-all ${
+                activeTelemetryTab === 'yellow'
+                  ? 'border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/30'
+                  : 'border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-1 text-amber-600 font-bold text-xs">
+                <span>🟡</span>
+                <span>Frail / Hesitant</span>
+              </div>
+              <p className="text-2xl font-black text-amber-600 mt-1">{summary.buckets.yellow.length}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Retry or &gt; 1.5x</p>
+            </div>
+
+            {/* Red Bucket */}
+            <div
+              onClick={() => setActiveTelemetryTab(activeTelemetryTab === 'red' ? 'all' : 'red')}
+              className={`cursor-pointer rounded-2xl border p-3 text-center transition-all ${
+                activeTelemetryTab === 'red'
+                  ? 'border-destructive bg-destructive/10 ring-2 ring-destructive/30'
+                  : 'border-destructive/30 bg-destructive/5 hover:border-destructive/50'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-1 text-destructive font-bold text-xs">
+                <span>🔴</span>
+                <span>At-Risk</span>
+              </div>
+              <p className="text-2xl font-black text-destructive mt-1">{summary.buckets.red.length}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">&ge; 2 misses</p>
+            </div>
+          </div>
+
+          {/* Filtered Cards List */}
+          <div className="space-y-2 pt-2 border-t border-border/60">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+              <span>Card Breakdown {activeTelemetryTab !== 'all' ? `(${activeTelemetryTab.toUpperCase()})` : ''}</span>
+              {activeTelemetryTab !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTelemetryTab('all')}
+                  className="text-primary hover:underline"
+                >
+                  Show all
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {questions
+                .filter((q) => {
+                  if (activeTelemetryTab === 'green') return summary.buckets.green.includes(q.id);
+                  if (activeTelemetryTab === 'yellow') return summary.buckets.yellow.includes(q.id);
+                  if (activeTelemetryTab === 'red') return summary.buckets.red.includes(q.id);
+                  return true;
+                })
+                .map((q) => {
+                  const rec = cardTelemetry[q.id] || cardTelemetryRef.current[q.id];
+                  const bucket = summary.buckets.green.includes(q.id)
+                    ? 'green'
+                    : summary.buckets.yellow.includes(q.id)
+                      ? 'yellow'
+                      : 'red';
+                  const latencySec = rec?.timeToCorrectMs
+                    ? (rec.timeToCorrectMs / 1000).toFixed(1) + 's'
+                    : (rec?.latenciesMs?.[0] ? (rec.latenciesMs[0] / 1000).toFixed(1) + 's' : '—');
+                  const isHesitant = rec && rec.firstPassCorrect && SessionTelemetryService.isHesitant((rec.latenciesMs?.[0] || rec.timeToCorrectMs || 0), summary.deckMedianLatencyMs);
+
+                  return (
+                    <div
+                      key={q.id}
+                      className="rounded-2xl border border-border/60 bg-muted/20 p-3 text-left space-y-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-semibold text-foreground line-clamp-2">
+                          {q.question_text}
+                        </p>
+                        <div className="shrink-0 flex items-center gap-1.5">
+                          {bucket === 'green' && (
+                            <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                              <span>🟢</span> Mastered ({latencySec})
+                            </span>
+                          )}
+                          {bucket === 'yellow' && (
+                            <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-600 flex items-center gap-1">
+                              <span>🟡</span> {isHesitant ? `Hesitant (${latencySec})` : 'Recovered'}
+                            </span>
+                          )}
+                          {bucket === 'red' && (
+                            <span className="rounded-full bg-destructive/10 border border-destructive/20 px-2 py-0.5 text-[10px] font-bold text-destructive flex items-center gap-1">
+                              <span>🔴</span> At-Risk ({rec?.totalMisses || 0} misses)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Concept Tags */}
+                      {q.concept_tags && q.concept_tags.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {q.concept_tags.map((tag, idx) => (
+                            <span
+                              key={idx}
+                              className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+
+        {/* Concept Error Density & Knowledge Gaps */}
+        <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm space-y-3 text-left">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+              <Tag className="h-4 w-4 text-primary" />
+              <span>Concept Error Density (Systemic Gaps)</span>
+            </h3>
+            <span className="text-[11px] text-muted-foreground">
+              {conceptEntries.filter(([_, misses]) => misses > 0).length} gap(s) detected
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            {conceptEntries.map(([tag, misses]) => {
+              if (misses > 0) {
+                return (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1.5 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
+                  >
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    <span>#{tag}</span>
+                    <span className="rounded-full bg-destructive/20 px-1.5 py-0.2 text-[10px]">
+                      {misses} miss{misses > 1 ? 'es' : ''}
+                    </span>
+                  </span>
+                );
+              }
+              return (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-semibold text-emerald-600"
+                >
+                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>#{tag}</span>
+                </span>
+              );
+            })}
           </div>
         </div>
 
@@ -420,7 +683,7 @@ export default function QuizRunner({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           <button
             type="button"
             onClick={() => {

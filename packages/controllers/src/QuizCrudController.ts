@@ -1,25 +1,43 @@
 import type { IQuizRepository } from '@quiz-creator/core';
+import { SAMPLE_QUIZ, SAMPLE_SUBJECT, SAMPLE_QUIZ_ID, SAMPLE_SUBJECT_ID, SAMPLE_QUIZ_QUESTIONS } from '@quiz-creator/core';
 import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto, UpdateSubjectShareConfigDto } from '@quiz-creator/types';
 
 export class QuizCrudController {
   constructor(private quizRepo: IQuizRepository) {}
 
   async listQuizzes(userId?: string) {
-    return await this.quizRepo.listQuizzes(userId);
+    const list = await this.quizRepo.listQuizzes(userId);
+    if (!list.some(q => q.id === SAMPLE_QUIZ_ID)) {
+      return [SAMPLE_QUIZ, ...list];
+    }
+    return list;
   }
 
   async listSubjects(userId?: string) {
-    return await this.quizRepo.listSubjects(userId);
+    const list = await this.quizRepo.listSubjects(userId);
+    if (!list.some(s => s.id === SAMPLE_SUBJECT_ID)) {
+      return [SAMPLE_SUBJECT, ...list];
+    }
+    return list;
   }
 
   async listQuizzesAndSubjects(userId?: string) {
+    let result: { quizzes: any[]; subjects: any[] };
     if (this.quizRepo.listQuizzesAndSubjects) {
-      return await this.quizRepo.listQuizzesAndSubjects(userId);
+      result = await this.quizRepo.listQuizzesAndSubjects(userId);
+    } else {
+      const [quizzes, subjects] = await Promise.all([
+        this.quizRepo.listQuizzes(userId),
+        this.quizRepo.listSubjects(userId),
+      ]);
+      result = { quizzes, subjects };
     }
-    const [quizzes, subjects] = await Promise.all([
-      this.quizRepo.listQuizzes(userId),
-      this.quizRepo.listSubjects(userId),
-    ]);
+    const quizzes = result.quizzes.some(q => q.id === SAMPLE_QUIZ_ID)
+      ? result.quizzes
+      : [SAMPLE_QUIZ, ...result.quizzes];
+    const subjects = result.subjects.some(s => s.id === SAMPLE_SUBJECT_ID)
+      ? result.subjects
+      : [SAMPLE_SUBJECT, ...result.subjects];
     return { quizzes, subjects };
   }
 
@@ -36,10 +54,20 @@ export class QuizCrudController {
   }
 
   async getSubjectByShareToken(shareToken: string) {
+    if (shareToken === SAMPLE_SUBJECT.share_token) {
+      const found = await this.quizRepo.getSubjectByShareToken(shareToken);
+      return found || SAMPLE_SUBJECT;
+    }
     return await this.quizRepo.getSubjectByShareToken(shareToken);
   }
 
   async getQuiz(id: string, userId?: string) {
+    if (id === SAMPLE_QUIZ_ID) {
+      return {
+        ...SAMPLE_QUIZ,
+        questions: SAMPLE_QUIZ_QUESTIONS
+      };
+    }
     const quiz = await this.quizRepo.getQuizById(id, userId);
     if (!quiz) return null;
     const questions = await this.quizRepo.getQuestionsByQuizId(id);

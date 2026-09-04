@@ -77,6 +77,9 @@ export interface RawAiQuestion {
   explanation: string;
   source_pages?: number[];
   chapter?: string;
+  correct_explanation?: string;
+  distractor_explanations?: Record<number, string>;
+  discriminatory_keywords?: string[];
 }
 
 export interface GeneratedQuizResult {

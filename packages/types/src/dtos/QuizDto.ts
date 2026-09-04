@@ -7,6 +7,9 @@ export interface QuizQuestionInput {
   options?: string[];
   correct_answer?: number;
   explanation?: string | null;
+  correct_explanation?: string | null;
+  distractor_explanations?: Record<number, string> | null;
+  discriminatory_keywords?: string[] | null;
   source_pages?: number[] | null;
 }
 
@@ -36,6 +39,9 @@ export interface UpdateQuestionDto {
   options?: string[];
   correct_answer?: number;
   explanation?: string | null;
+  correct_explanation?: string | null;
+  distractor_explanations?: Record<number, string> | null;
+  discriminatory_keywords?: string[] | null;
   source_pages?: number[] | null;
 }
 
@@ -100,6 +106,9 @@ export interface PublicQuizDto {
     options: string[];
     correct_answer: number;
     explanation?: string | null;
+    correct_explanation?: string | null;
+    distractor_explanations?: Record<number, string> | null;
+    discriminatory_keywords?: string[] | null;
     order_index: number;
   }>;
 }

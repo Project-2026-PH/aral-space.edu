@@ -59,8 +59,11 @@ Requirements:
 3. Psychometric Rigor: Distractors MUST represent common misconceptions or realistic alternatives. NEVER use "All of the above", "None of the above", or "Both A and B".
 4. correct_answer MUST be the 0-indexed integer (0, 1, 2, or 3) precisely pointing to the correct choice.
 5. explanation MUST cite why the answer is correct according to the text.
-6. source_pages MUST be an array of page numbers where the concept appears.
-7. Full-Document Coverage: Questions MUST span across the entire document (beginning, middle, and end) without clustering only at the start.${multiChapterInstruction}${styleInstruction}
+6. correct_explanation: Verbatim rule or principle explaining why the answer is correct.
+7. distractor_explanations: An object mapping each distractor option index (e.g. {"1": "...", "2": "..."}) explaining why that choice is incorrect.
+8. discriminatory_keywords: Array of specific technical keywords separating the correct choice from the nearest distractor.
+9. source_pages MUST be an array of page numbers where the concept appears.
+10. Full-Document Coverage: Questions MUST span across the entire document (beginning, middle, and end) without clustering only at the start.${multiChapterInstruction}${styleInstruction}
 `;
   }
 
@@ -77,6 +80,15 @@ Requirements:
           },
           correct_answer: { type: Type.INTEGER },
           explanation: { type: Type.STRING },
+          correct_explanation: { type: Type.STRING },
+          distractor_explanations: {
+            type: Type.OBJECT,
+            description: "Map of option index string to why it is incorrect"
+          },
+          discriminatory_keywords: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          },
           source_pages: {
             type: Type.ARRAY,
             items: { type: Type.INTEGER }

@@ -99,5 +99,9 @@ ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT 
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS allow_cloning BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS answer_text TEXT;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type TEXT NOT NULL DEFAULT 'multiple_choice';
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS correct_explanation TEXT;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS distractor_explanations JSONB;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS discriminatory_keywords JSONB;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_subjects_share_token_unique ON subjects (share_token) WHERE share_token IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_quizzes_share_token_unique ON quizzes (share_token) WHERE share_token IS NOT NULL;
+

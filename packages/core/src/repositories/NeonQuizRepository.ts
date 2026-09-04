@@ -258,6 +258,8 @@ export class NeonQuizRepository implements IQuizRepository {
       const fields = normalizeQuestionFields(q);
       const optionsJson = JSON.stringify(fields.options);
       const sourcePagesJson = q.source_pages ? JSON.stringify(q.source_pages) : null;
+      const distractorExpJson = fields.distractor_explanations ? JSON.stringify(fields.distractor_explanations) : null;
+      const discriminatoryKwJson = fields.discriminatory_keywords ? JSON.stringify(fields.discriminatory_keywords) : null;
 
       await this.sql`
         INSERT INTO quiz_questions (
@@ -268,6 +270,9 @@ export class NeonQuizRepository implements IQuizRepository {
           options,
           correct_answer,
           explanation,
+          correct_explanation,
+          distractor_explanations,
+          discriminatory_keywords,
           source_pages,
           order_index
         )
@@ -279,6 +284,9 @@ export class NeonQuizRepository implements IQuizRepository {
           ${optionsJson}::jsonb,
           ${fields.correct_answer},
           ${q.explanation || null},
+          ${fields.correct_explanation || null},
+          ${distractorExpJson ? this.sql`${distractorExpJson}::jsonb` : null},
+          ${discriminatoryKwJson ? this.sql`${discriminatoryKwJson}::jsonb` : null},
           ${sourcePagesJson ? this.sql`${sourcePagesJson}::jsonb` : null},
           ${idx}
         )
@@ -342,6 +350,8 @@ export class NeonQuizRepository implements IQuizRepository {
     const fields = normalizeQuestionFields(dto);
     const optionsJson = JSON.stringify(fields.options);
     const sourcePagesJson = dto.source_pages ? JSON.stringify(dto.source_pages) : null;
+    const distractorExpJson = fields.distractor_explanations ? JSON.stringify(fields.distractor_explanations) : null;
+    const discriminatoryKwJson = fields.discriminatory_keywords ? JSON.stringify(fields.discriminatory_keywords) : null;
 
     const rows = await this.sql`
       INSERT INTO quiz_questions (
@@ -352,6 +362,9 @@ export class NeonQuizRepository implements IQuizRepository {
         options,
         correct_answer,
         explanation,
+        correct_explanation,
+        distractor_explanations,
+        discriminatory_keywords,
         source_pages,
         order_index
       )
@@ -363,6 +376,9 @@ export class NeonQuizRepository implements IQuizRepository {
         ${optionsJson}::jsonb,
         ${fields.correct_answer},
         ${dto.explanation || null},
+        ${fields.correct_explanation || null},
+        ${distractorExpJson ? this.sql`${distractorExpJson}::jsonb` : null},
+        ${discriminatoryKwJson ? this.sql`${discriminatoryKwJson}::jsonb` : null},
         ${sourcePagesJson ? this.sql`${sourcePagesJson}::jsonb` : null},
         ${dto.order_index ?? 0}
       )
@@ -390,6 +406,12 @@ export class NeonQuizRepository implements IQuizRepository {
     const sourcePagesJson = dto.source_pages !== undefined
       ? (dto.source_pages ? JSON.stringify(dto.source_pages) : null)
       : (curr.source_pages ? JSON.stringify(curr.source_pages) : null);
+    const distractorExpJson = fields.distractor_explanations !== null
+      ? JSON.stringify(fields.distractor_explanations)
+      : null;
+    const discriminatoryKwJson = fields.discriminatory_keywords !== null
+      ? JSON.stringify(fields.discriminatory_keywords)
+      : null;
 
     const rows = await this.sql`
       UPDATE quiz_questions
@@ -400,6 +422,9 @@ export class NeonQuizRepository implements IQuizRepository {
         options = ${optionsJson}::jsonb,
         correct_answer = ${fields.correct_answer},
         explanation = ${explanation},
+        correct_explanation = ${fields.correct_explanation || null},
+        distractor_explanations = ${distractorExpJson ? this.sql`${distractorExpJson}::jsonb` : null},
+        discriminatory_keywords = ${discriminatoryKwJson ? this.sql`${discriminatoryKwJson}::jsonb` : null},
         source_pages = ${sourcePagesJson ? this.sql`${sourcePagesJson}::jsonb` : null}
       WHERE id = ${questionId}
       RETURNING *
@@ -535,6 +560,9 @@ export class NeonQuizRepository implements IQuizRepository {
         options: q.options,
         correct_answer: q.correct_answer,
         explanation: q.explanation || null,
+        correct_explanation: q.correct_explanation || null,
+        distractor_explanations: q.distractor_explanations || null,
+        discriminatory_keywords: q.discriminatory_keywords || null,
         order_index: q.order_index
       }))
     };
@@ -556,7 +584,10 @@ export class NeonQuizRepository implements IQuizRepository {
         question_type: q.question_type || null,
         options: q.options,
         correct_answer: q.correct_answer,
-        explanation: q.explanation || null
+        explanation: q.explanation || null,
+        correct_explanation: q.correct_explanation || null,
+        distractor_explanations: q.distractor_explanations || null,
+        discriminatory_keywords: q.discriminatory_keywords || null
       }))
     }, userId);
   }

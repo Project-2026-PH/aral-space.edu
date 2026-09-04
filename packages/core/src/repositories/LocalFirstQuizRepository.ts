@@ -1,6 +1,7 @@
 import { IQuizRepository } from './IQuizRepository';
 import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject } from '@quiz-creator/types';
 import { normalizeQuestionFields } from './questionFields';
+import { SAMPLE_SUBJECT, SAMPLE_QUIZ, SAMPLE_QUIZ_QUESTIONS, SAMPLE_QUIZ_ID } from '../services/SampleQuizService';
 
 const STORAGE_KEY_QUIZZES = 'quiz_creator_quizzes_v1';
 const STORAGE_KEY_QUESTIONS = 'quiz_creator_questions_v1';
@@ -13,6 +14,17 @@ export class LocalFirstQuizRepository implements IQuizRepository {
 
   constructor() {
     this.hydrateFromStorage();
+    this.seedDefaultDataIfEmpty();
+  }
+
+  private seedDefaultDataIfEmpty(): void {
+    if (!this.inMemoryQuizzes.has(SAMPLE_QUIZ_ID)) {
+      this.inMemorySubjects.set(SAMPLE_SUBJECT.id, SAMPLE_SUBJECT);
+      this.inMemoryQuizzes.set(SAMPLE_QUIZ.id, SAMPLE_QUIZ);
+      SAMPLE_QUIZ_QUESTIONS.forEach(q => {
+        this.inMemoryQuestions.set(q.id, q);
+      });
+    }
   }
 
   private isBrowser(): boolean {
@@ -80,7 +92,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
 
   async listQuizzes(userId?: string): Promise<Quiz[]> {
     const all = Array.from(this.inMemoryQuizzes.values());
-    const filtered = userId ? all.filter(q => q.user_id === userId) : all;
+    const filtered = userId ? all.filter(q => !q.user_id || q.user_id === userId) : all;
     return filtered.map(q => ({
       ...q,
       subject: q.subject_id ? this.inMemorySubjects.get(q.subject_id) || null : null
@@ -128,6 +140,9 @@ export class LocalFirstQuizRepository implements IQuizRepository {
         options: fields.options,
         correct_answer: fields.correct_answer,
         explanation: q.explanation || null,
+        correct_explanation: fields.correct_explanation || null,
+        distractor_explanations: fields.distractor_explanations || null,
+        discriminatory_keywords: fields.discriminatory_keywords || null,
         source_pages: q.source_pages || [],
         order_index: idx,
         created_at: new Date().toISOString()
@@ -186,6 +201,9 @@ export class LocalFirstQuizRepository implements IQuizRepository {
       options: fields.options,
       correct_answer: fields.correct_answer,
       explanation: dto.explanation || null,
+      correct_explanation: fields.correct_explanation || null,
+      distractor_explanations: fields.distractor_explanations || null,
+      discriminatory_keywords: fields.discriminatory_keywords || null,
       source_pages: dto.source_pages || [],
       order_index: orderIndex,
       created_at: new Date().toISOString()
@@ -206,6 +224,9 @@ export class LocalFirstQuizRepository implements IQuizRepository {
     question.options = fields.options;
     question.correct_answer = fields.correct_answer;
     if (dto.explanation !== undefined) question.explanation = dto.explanation;
+    question.correct_explanation = fields.correct_explanation;
+    question.distractor_explanations = fields.distractor_explanations;
+    question.discriminatory_keywords = fields.discriminatory_keywords;
     if (dto.source_pages !== undefined) question.source_pages = dto.source_pages;
     this.inMemoryQuestions.set(questionId, question);
     this.persistToStorage();

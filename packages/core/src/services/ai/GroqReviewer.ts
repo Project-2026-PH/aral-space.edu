@@ -60,7 +60,8 @@ AUDIT RULES:
 4. Index Integrity: Ensure correct_answer is strictly 0, 1, 2, or 3, precisely matching the intended option index.
 5. Explanation: Keep explanations razor-sharp and instructional.
 6. Preserve Citations: Retain source_pages arrays.
-7. Preserve Chapter Metadata: Retain chapter tags and distribute focus evenly across chapters.${options.authoringProfile?.styleSummary ? `\n8. User Style Alignment: ${options.authoringProfile.styleSummary}` : ''}
+7. Preserve Chapter Metadata: Retain chapter tags and distribute focus evenly across chapters.
+8. Elaborative Feedback Architecture: Retain and polish "correct_explanation", "distractor_explanations" (map of distractor option indices to why incorrect), and "discriminatory_keywords" (technical keywords separating correct choice from distractors).${options.authoringProfile?.styleSummary ? `\n9. User Style Alignment: ${options.authoringProfile.styleSummary}` : ''}
 
 Output ONLY valid JSON: an object with key "questions" containing an array of exactly ${expectedCount} question objects matching the input format.`;
 
@@ -172,7 +173,8 @@ Requirements:
 2. 4 plausible options per question.
 3. correct_answer is the 0-indexed integer (0, 1, 2, or 3).
 4. explanation cites why it is correct.
-5. source_pages is an array of page numbers.${multiChapterInstruction}${styleInstruction}
+5. Elaborative Feedback: include "correct_explanation" (verbatim rule or principle), "distractor_explanations" (object mapping option indices to why incorrect), and "discriminatory_keywords" (array of keywords separating correct from distractors).
+6. source_pages is an array of page numbers.${multiChapterInstruction}${styleInstruction}
 
 Return a JSON object with key "questions" containing the array of questions.`;
 

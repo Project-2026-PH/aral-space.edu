@@ -272,6 +272,9 @@ export class SupabaseQuizRepository implements IQuizRepository {
           options: fields.options,
           correct_answer: fields.correct_answer,
           explanation: dto.explanation,
+          correct_explanation: fields.correct_explanation,
+          distractor_explanations: fields.distractor_explanations,
+          discriminatory_keywords: fields.discriminatory_keywords,
           source_pages: dto.source_pages,
           order_index: dto.order_index ?? 0
         })
@@ -300,6 +303,9 @@ export class SupabaseQuizRepository implements IQuizRepository {
         options: fields.options,
         correct_answer: fields.correct_answer,
         ...(dto.explanation !== undefined ? { explanation: dto.explanation } : {}),
+        correct_explanation: fields.correct_explanation,
+        distractor_explanations: fields.distractor_explanations,
+        discriminatory_keywords: fields.discriminatory_keywords,
         ...(dto.source_pages !== undefined ? { source_pages: dto.source_pages } : {})
       };
       const { data, error } = await this.supabase

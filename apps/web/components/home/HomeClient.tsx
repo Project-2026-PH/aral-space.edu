@@ -54,6 +54,13 @@ export default function HomeClient({ initialQuizzes, initialSubjects }: HomeClie
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <Link
+            href="/practice/quiz-cognitive-mastery-sample"
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 text-xs font-bold text-white shadow-lg shadow-indigo-500/25 transition-all hover:brightness-110 active:scale-95"
+          >
+            <Play className="h-4 w-4 fill-current" />
+            <span>Try Sample Mastery Quiz</span>
+          </Link>
           <button
             onClick={() => setShowAiModal(true)}
             className="flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95"
@@ -113,7 +120,13 @@ export default function HomeClient({ initialQuizzes, initialSubjects }: HomeClie
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-[11px] font-medium text-muted-foreground">Reviewer</span>
+                  {quiz.id === 'quiz-cognitive-mastery-sample' ? (
+                    <span className="rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[11px] font-bold text-indigo-500">
+                      Cognitive Mastery Loop
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-medium text-muted-foreground">Reviewer</span>
+                  )}
                   <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground">
                     {quiz.question_count} Qs
                   </span>

@@ -1,6 +1,7 @@
 import { IQuizRepository } from './IQuizRepository';
 import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
 import { normalizeQuestionFields } from './questionFields';
+import { SAMPLE_SUBJECT, SAMPLE_QUIZ, SAMPLE_QUIZ_QUESTIONS } from '../services/SampleQuizService';
 
 function generateShareSlug(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -21,6 +22,13 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   private seedDefaultData() {
+    // Seed Sample Cognitive Mastery Quiz by default
+    this.subjects.set(SAMPLE_SUBJECT.id, SAMPLE_SUBJECT);
+    this.quizzes.set(SAMPLE_QUIZ.id, SAMPLE_QUIZ);
+    SAMPLE_QUIZ_QUESTIONS.forEach(q => {
+      this.questions.set(q.id, q);
+    });
+
     const defaultSubject: Subject = {
       id: 'sub-default-1',
       name: 'General Knowledge',
@@ -187,6 +195,9 @@ export class MemoryQuizRepository implements IQuizRepository {
         options: fields.options,
         correct_answer: fields.correct_answer,
         explanation: q.explanation || null,
+        correct_explanation: fields.correct_explanation || null,
+        distractor_explanations: fields.distractor_explanations || null,
+        discriminatory_keywords: fields.discriminatory_keywords || null,
         source_pages: q.source_pages || [],
         order_index: idx,
         created_at: new Date().toISOString()
@@ -242,6 +253,9 @@ export class MemoryQuizRepository implements IQuizRepository {
       options: fields.options,
       correct_answer: fields.correct_answer,
       explanation: dto.explanation || null,
+      correct_explanation: fields.correct_explanation || null,
+      distractor_explanations: fields.distractor_explanations || null,
+      discriminatory_keywords: fields.discriminatory_keywords || null,
       source_pages: dto.source_pages || [],
       order_index: orderIndex,
       created_at: new Date().toISOString()
@@ -261,6 +275,9 @@ export class MemoryQuizRepository implements IQuizRepository {
     question.options = fields.options;
     question.correct_answer = fields.correct_answer;
     if (dto.explanation !== undefined) question.explanation = dto.explanation;
+    question.correct_explanation = fields.correct_explanation;
+    question.distractor_explanations = fields.distractor_explanations;
+    question.discriminatory_keywords = fields.discriminatory_keywords;
     if (dto.source_pages !== undefined) question.source_pages = dto.source_pages;
     this.questions.set(questionId, question);
     return question;

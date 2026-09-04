@@ -136,6 +136,9 @@ export class QuizGenerationController {
         options: q.options,
         correct_answer: q.correct_answer,
         explanation: q.explanation,
+        correct_explanation: q.correct_explanation || null,
+        distractor_explanations: q.distractor_explanations || null,
+        discriminatory_keywords: q.discriminatory_keywords || null,
         source_pages: q.source_pages || [],
         order_index: idx
       }))

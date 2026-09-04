@@ -141,4 +141,22 @@ describe('CachedQuizRepository', () => {
     // Both instances see the cached data
     expect(quizzes2).toEqual(quizzes1);
   });
+
+  it('serves listQuizzesAndSubjects from cache and delegates to underlying batch fetcher when cold', async () => {
+    mockRepo.listQuizzesAndSubjects = vi.fn().mockResolvedValue({
+      quizzes: [sampleQuiz],
+      subjects: [sampleSubject],
+    });
+
+    const first = await cachedRepo.listQuizzesAndSubjects('user-test-1');
+    expect(first.quizzes).toEqual([sampleQuiz]);
+    expect(first.subjects).toEqual([sampleSubject]);
+    expect(mockRepo.listQuizzesAndSubjects).toHaveBeenCalledTimes(1);
+
+    // Second call should hit LRU cache for both quizzes and subjects without DB hit
+    const second = await cachedRepo.listQuizzesAndSubjects('user-test-1');
+    expect(second.quizzes).toEqual([sampleQuiz]);
+    expect(second.subjects).toEqual([sampleSubject]);
+    expect(mockRepo.listQuizzesAndSubjects).toHaveBeenCalledTimes(1);
+  });
 });

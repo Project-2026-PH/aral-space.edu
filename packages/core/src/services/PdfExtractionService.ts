@@ -1,7 +1,5 @@
 import { HandoutPage } from '@quiz-creator/types';
 import { IPdfParserStrategy } from './pdf/strategies/IPdfParserStrategy';
-import { PdfJsParserStrategy } from './pdf/strategies/PdfJsParserStrategy';
-import { StreamScannerParserStrategy } from './pdf/strategies/StreamScannerParserStrategy';
 import { HandoutPageService } from './pdf/HandoutPageService';
 import { PdfEncryptedError } from './pdf/errors/PdfEncryptedError';
 import { PdfLiteralDecoder } from './pdf/decoders/PdfLiteralDecoder';
@@ -15,8 +13,24 @@ import { PdfStreamTextExtractor } from './pdf/decoders/PdfStreamTextExtractor';
  * to the stream scanner for synthetic/malformed stream snippets.
  */
 export class PdfExtractionService {
-  private static readonly primaryStrategy: IPdfParserStrategy = new PdfJsParserStrategy();
-  private static readonly fallbackStrategy: IPdfParserStrategy = new StreamScannerParserStrategy();
+  private static primaryStrategy: IPdfParserStrategy | null = null;
+  private static fallbackStrategy: IPdfParserStrategy | null = null;
+
+  private static async getPrimaryStrategy(): Promise<IPdfParserStrategy> {
+    if (!PdfExtractionService.primaryStrategy) {
+      const { PdfJsParserStrategy } = await import('./pdf/strategies/PdfJsParserStrategy');
+      PdfExtractionService.primaryStrategy = new PdfJsParserStrategy();
+    }
+    return PdfExtractionService.primaryStrategy;
+  }
+
+  private static async getFallbackStrategy(): Promise<IPdfParserStrategy> {
+    if (!PdfExtractionService.fallbackStrategy) {
+      const { StreamScannerParserStrategy } = await import('./pdf/strategies/StreamScannerParserStrategy');
+      PdfExtractionService.fallbackStrategy = new StreamScannerParserStrategy();
+    }
+    return PdfExtractionService.fallbackStrategy;
+  }
 
   /**
    * Parses binary PDF data or plain text string into categorized HandoutPage[] streams.
@@ -50,7 +64,8 @@ export class PdfExtractionService {
     // Conforming standard PDFs or encrypted documents are parsed via Mozilla PDF.js
     if (isConformingPdf || isEncrypted) {
       try {
-        return await PdfExtractionService.primaryStrategy.parse(uint8, fileName);
+        const primary = await PdfExtractionService.getPrimaryStrategy();
+        return await primary.parse(uint8, fileName);
       } catch (err: any) {
         // Re-throw encryption/password domain errors immediately — NEVER swallow into fallback
         if (err instanceof PdfEncryptedError || err?.name === 'PdfEncryptedError') {
@@ -64,7 +79,8 @@ export class PdfExtractionService {
     }
 
     // Fallback stream scanner for synthetic test buffers or malformed stream fragments
-    return await PdfExtractionService.fallbackStrategy.parse(uint8, fileName);
+    const fallback = await PdfExtractionService.getFallbackStrategy();
+    return await fallback.parse(uint8, fileName);
   }
 
   // --- Static Compatibility Delegates ---

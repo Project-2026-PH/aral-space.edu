@@ -7,6 +7,7 @@ export interface IQuizRepository {
   updateSubjectShareConfig(subjectId: string, dto: UpdateSubjectShareConfigDto, userId?: string): Promise<SubjectShareConfig>;
   getSubjectByShareToken(shareToken: string): Promise<PublicSubjectDto | null>;
   listQuizzes(userId?: string): Promise<Quiz[]>;
+  listQuizzesAndSubjects?(userId?: string): Promise<{ quizzes: Quiz[]; subjects: Subject[] }>;
   getQuizById(id: string, userId?: string): Promise<Quiz | null>;
   createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz>;
   updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz>;

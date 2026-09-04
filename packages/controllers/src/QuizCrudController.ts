@@ -12,6 +12,17 @@ export class QuizCrudController {
     return await this.quizRepo.listSubjects(userId);
   }
 
+  async listQuizzesAndSubjects(userId?: string) {
+    if (this.quizRepo.listQuizzesAndSubjects) {
+      return await this.quizRepo.listQuizzesAndSubjects(userId);
+    }
+    const [quizzes, subjects] = await Promise.all([
+      this.quizRepo.listQuizzes(userId),
+      this.quizRepo.listSubjects(userId),
+    ]);
+    return { quizzes, subjects };
+  }
+
   async createSubject(name: string, color: string, userId?: string) {
     return await this.quizRepo.createSubject(name, color, userId);
   }

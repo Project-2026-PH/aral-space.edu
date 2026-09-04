@@ -18,6 +18,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  turbopack: {
+    resolveAlias: {
+      canvas: './lib/empty.ts',
+    },
+  },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,

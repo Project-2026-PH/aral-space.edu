@@ -183,6 +183,14 @@ export class NeonQuizRepository implements IQuizRepository {
     return rows as Quiz[];
   }
 
+  async listQuizzesAndSubjects(userId?: string): Promise<{ quizzes: Quiz[]; subjects: Subject[] }> {
+    const [quizzes, subjects] = await Promise.all([
+      this.listQuizzes(userId),
+      this.listSubjects(userId)
+    ]);
+    return { quizzes, subjects };
+  }
+
   async getQuizById(id: string, userId?: string): Promise<Quiz | null> {
     const rows = userId
       ? await this.sql`

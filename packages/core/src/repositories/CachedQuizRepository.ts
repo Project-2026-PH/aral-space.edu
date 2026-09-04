@@ -72,6 +72,30 @@ export class CachedQuizRepository implements IQuizRepository {
     return quizzes;
   }
 
+  async listQuizzesAndSubjects(userId?: string): Promise<{ quizzes: Quiz[]; subjects: Subject[] }> {
+    const qKey = this.quizzesKey(userId);
+    const sKey = this.subjectKey(userId);
+    const cachedQuizzes = this.cache.get(qKey);
+    const cachedSubjects = this.cache.get(sKey);
+
+    if (cachedQuizzes !== undefined && cachedSubjects !== undefined) {
+      return { quizzes: cachedQuizzes, subjects: cachedSubjects };
+    }
+
+    if (this.underlying.listQuizzesAndSubjects) {
+      const data = await this.underlying.listQuizzesAndSubjects(userId);
+      this.cache.set(qKey, data.quizzes);
+      this.cache.set(sKey, data.subjects);
+      return data;
+    }
+
+    const [quizzes, subjects] = await Promise.all([
+      this.listQuizzes(userId),
+      this.listSubjects(userId),
+    ]);
+    return { quizzes, subjects };
+  }
+
   async getQuizById(id: string, userId?: string): Promise<Quiz | null> {
     const key = this.quizKey(id, userId);
     const cached = this.cache.get(key);

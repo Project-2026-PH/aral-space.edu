@@ -6,3 +6,6 @@ allowBuilds:
   '@google/genai': true
   esbuild: true
   protobufjs: true
+
+overrides:
+  '@xmldom/xmldom': ^0.9.12

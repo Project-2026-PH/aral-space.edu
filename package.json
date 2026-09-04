@@ -2,6 +2,7 @@
   "name": "quiz-creator-monorepo",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@11.21.0",
   "description": "Monorepo Quiz Creation & Spaced-Repetition Mastery System (MSRC + SOLID + SOC)",
   "workspaces": [
     "packages/*",
@@ -12,17 +13,18 @@
     "dev:local": "pnpm --filter @quiz-creator/web dev:local",
     "dev:infisical": "pnpm dev",
     "mobile": "pnpm --filter @quiz-creator/mobile start",
-    "build": "pnpm -r build",
+    "build": "turbo run build",
     "start": "pnpm --filter @quiz-creator/web start",
-    "lint": "pnpm -r lint",
+    "lint": "turbo run lint",
     "test": "vitest run",
     "test:infisical": "infisical run -- pnpm test",
-    "typecheck": "pnpm -r exec tsc --noEmit",
+    "typecheck": "turbo run typecheck",
     "migrate": "node scripts/migrate.mjs",
     "migrate:infisical": "infisical run -- node scripts/migrate.mjs"
   },
   "devDependencies": {
-    "typescript": "7.1.0-dev.20260902.1",
+    "turbo": "^2.10.12",
+    "typescript": "5.9.3",
     "vitest": "^3.0.7"
   }
 }

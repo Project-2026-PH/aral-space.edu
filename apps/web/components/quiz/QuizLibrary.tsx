@@ -48,7 +48,11 @@ export default function QuizLibrary({ quizzes, loading = false }: QuizLibraryPro
               key={quiz.id}
               className="group flex min-h-44 flex-col justify-between rounded-3xl border border-border/80 bg-card p-5 shadow-2xs transition-all hover:border-primary/40 hover:shadow-md"
             >
-              <div className="space-y-2">
+              <Link
+                href={`/review/${quiz.id}`}
+                aria-label={`Review ${quiz.title}`}
+                className="block space-y-2 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
                 <div className="flex items-center justify-between gap-2 text-xs">
                   {quiz.id === 'quiz-cognitive-mastery-sample' ? (
                     <span className="rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[11px] font-bold text-indigo-500">
@@ -62,11 +66,9 @@ export default function QuizLibrary({ quizzes, loading = false }: QuizLibraryPro
                   </span>
                 </div>
 
-                <Link href={`/quizzes/${quiz.id}`}>
-                  <h3 className="line-clamp-2 text-sm font-bold text-foreground transition-colors group-hover:text-primary">
-                    {quiz.title}
-                  </h3>
-                </Link>
+                <h3 className="line-clamp-2 text-sm font-bold text-foreground transition-colors group-hover:text-primary">
+                  {quiz.title}
+                </h3>
 
                 {quiz.description ? (
                   <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
@@ -82,7 +84,7 @@ export default function QuizLibrary({ quizzes, loading = false }: QuizLibraryPro
                     {quiz.subject.name}
                   </p>
                 ) : null}
-              </div>
+              </Link>
 
               <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-4">
                 <Link

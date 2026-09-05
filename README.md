@@ -37,12 +37,12 @@ quiz-creator/
   - **Two-Stage Pipeline** (`two_stage`): Gemini extracts and drafts questions; Groq (Llama-3.3-70b) reviews, verifies distractors, and ensures pedagogical quality.
   - **Gemini Direct** (`gemini_direct`): Fast single-stage generation using Google Gemini (`@google/genai`).
   - **Groq Direct** (`groq_direct`): High-speed single-stage generation using Groq API.
-  - **Mock Generator** (`mock`): Zero-credential fallback with pre-computed questions for local offline development.
+  - **Local Generator** (`local`): Zero-credential deterministic fallback that extracts source-grounded questions for offline use.
   - **PDF Parser**: Extract lecture handouts and notes directly into questions.
   - **Real-Time Streaming**: Server-Sent Events (SSE) stream generation stage progress to the UI.
 - **Mastery Engine & Spaced Repetition**:
   - 4 study modes: Multiple Choice, Flashcards, Direct Identification, and Reverse Questioning.
-  - 5-question micro-batches with streak-based progress locking and rest timers.
+  - Continuous 7-item sliding-window mastery queue with streak-based progress locking and targeted struggle-pile review.
   - Ebbinghaus forgetting curve scheduling: Initial -> 24h -> 3d -> 7d -> 14d reviews.
 - **Flexible Multi-Backend Storage**:
   - **Neon Serverless Postgres**: Cloud PostgreSQL via `@neondatabase/serverless` with pooled HTTP queries and migration script.
@@ -83,7 +83,7 @@ For detailed setup instructions, team onboarding, and Vercel KMS synchronization
 Create `.env.local` in `apps/web` (or root `.env`):
 
 ```bash
-# AI Providers (At least one recommended; fallback mock used if omitted)
+# AI Providers (Optional; local deterministic generation is used if omitted)
 GEMINI_API_KEY="your-gemini-api-key"
 GROQ_API_KEY="your-groq-api-key"
 

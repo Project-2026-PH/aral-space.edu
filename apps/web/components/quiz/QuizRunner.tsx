@@ -17,8 +17,7 @@ import {
   CognitiveMasteryQueue,
   QuizShuffleService,
   QuizTransformService,
-  SessionTelemetryService,
-  BATCH_SIZE
+  SessionTelemetryService
 } from '@quiz-creator/core';
 import {
   ArrowLeft,
@@ -42,7 +41,6 @@ import {
   BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
-import BatchRestTimer from './BatchRestTimer';
 import { quizAudio } from '@/lib/audio';
 import { triggerCelebrationConfetti } from '@/lib/confetti';
 
@@ -105,24 +103,11 @@ export default function QuizRunner({
     return new Map(initialProgress.map((p) => [p.question_id, p]));
   });
 
-  const [currentBatch, setCurrentBatch] = useState<number>(() => {
-    const activeBatch = MasteryEngineService.getActiveBatchNumber(
-      questions,
-      new Map(initialProgress.map((p) => [p.question_id, p]))
-    );
-    return activeBatch >= 0 ? activeBatch : 0;
-  });
-
   const [queueState, setQueueState] = useState<PracticeSessionState>(() => {
-    const activeBatch = MasteryEngineService.getActiveBatchNumber(
-      questions,
-      new Map(initialProgress.map((p) => [p.question_id, p]))
-    );
-    const batchNum = activeBatch >= 0 ? activeBatch : 0;
-    const batchQs = questions.filter(
-      (q) => MasteryEngineService.getBatchNumber(q.order_index) === batchNum
-    );
-    const unlockedIds = batchQs.filter((q) => !initialProgress.find(p => p.question_id === q.id)?.locked).map((q) => q.id);
+    const progressMap = new Map(initialProgress.map((p) => [p.question_id, p]));
+    const unlockedIds = questions
+      .filter((q) => !progressMap.get(q.id)?.locked)
+      .map((q) => q.id);
     return CognitiveMasteryQueue.initialize(unlockedIds);
   });
 
@@ -145,9 +130,6 @@ export default function QuizRunner({
   const [identificationInput, setIdentificationInput] = useState<string>('');
   const [identificationSubmitted, setIdentificationSubmitted] = useState<boolean>(false);
   const [typedAnswerCorrect, setTypedAnswerCorrect] = useState<boolean | null>(null);
-  const [showRestTimer, setShowRestTimer] = useState<boolean>(false);
-  const [restingCompletedBatch, setRestingCompletedBatch] = useState<number>(0);
-  const [restingNextBatch, setRestingNextBatch] = useState<number>(1);
   const [isCompleted, setIsCompleted] = useState<boolean>(() => {
     return questions.length > 0 && MasteryEngineService.isAllQuestionsLocked(questions, new Map(initialProgress.map((p) => [p.question_id, p])));
   });
@@ -190,16 +172,6 @@ export default function QuizRunner({
       setSessionSummary(SessionTelemetryService.generateSessionSummary(cardTelemetryRef.current, questions));
     }
   }, [isCompleted]);
-
-  useEffect(() => {
-    if (isStruggleReviewMode) return;
-    const batchQs = questions.filter(
-      (q) => MasteryEngineService.getBatchNumber(q.order_index) === currentBatch
-    );
-    const unlockedIds = batchQs.filter((q) => !progressMap.get(q.id)?.locked).map((q) => q.id);
-    setQueueState(CognitiveMasteryQueue.initialize(unlockedIds));
-    setLastOutcome(null);
-  }, [currentBatch, isStruggleReviewMode]);
 
   // Active question from CognitiveMasteryQueue
   const activeQuestionId = CognitiveMasteryQueue.getCurrentQuestionId(queueState);
@@ -275,12 +247,13 @@ export default function QuizRunner({
     setRetrievalCountdown(0);
   }
 
-  function startStrugglePileReview() {
-    if (accumulatedStruggleIds.length === 0) return;
+  function startStrugglePileReview(ids: string[] = accumulatedStruggleIds) {
+    if (ids.length === 0) return;
+    setAccumulatedStruggleIds(ids);
     setIsCompleted(false);
     celebrationFiredRef.current = false;
     setIsStruggleReviewMode(true);
-    setQueueState(CognitiveMasteryQueue.initialize(accumulatedStruggleIds));
+    setQueueState(CognitiveMasteryQueue.initialize(ids));
   }
 
   function handleOptionSelect(option: ShuffledOption) {
@@ -466,14 +439,15 @@ export default function QuizRunner({
         return;
       }
 
-      // Advance to next batch
-      const nextBatchNum = MasteryEngineService.getActiveBatchNumber(questions, map);
-      if (nextBatchNum === -1) {
-        handleCompleteQuiz();
+      // Review cards that reached the struggle pile before completing the session.
+      const struggleIds = Array.from(new Set([
+        ...accumulatedStruggleIds,
+        ...nextQueue.strugglePile
+      ]));
+      if (struggleIds.length > 0) {
+        startStrugglePileReview(struggleIds);
       } else {
-        setRestingCompletedBatch(currentBatch);
-        setRestingNextBatch(nextBatchNum);
-        setShowRestTimer(true);
+        handleCompleteQuiz();
       }
     }
   }
@@ -753,7 +727,7 @@ export default function QuizRunner({
             </p>
             <button
               type="button"
-              onClick={startStrugglePileReview}
+              onClick={() => startStrugglePileReview()}
               className="inline-flex items-center gap-1.5 rounded-2xl bg-amber-500 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 transition-all active:scale-95"
             >
               <RotateCw className="h-3.5 w-3.5" />
@@ -778,7 +752,7 @@ export default function QuizRunner({
           {accumulatedStruggleIds.length > 0 && (
             <button
               type="button"
-              onClick={startStrugglePileReview}
+              onClick={() => startStrugglePileReview()}
               className="inline-flex items-center gap-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-6 py-3 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95 shadow-sm"
             >
               <RotateCw className="h-3.5 w-3.5" />
@@ -898,13 +872,9 @@ export default function QuizRunner({
           >
             {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>
-          {isStruggleReviewMode ? (
+          {isStruggleReviewMode && (
             <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-bold text-amber-500">
               Struggle Pile Review
-            </span>
-          ) : (
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-              Batch #{currentBatch + 1}
             </span>
           )}
           {accumulatedStruggleIds.length > 0 && (
@@ -1290,21 +1260,6 @@ export default function QuizRunner({
         </div>
       )}
 
-      {showRestTimer && (
-        <BatchRestTimer
-          completedBatch={restingCompletedBatch}
-          nextBatch={restingNextBatch}
-          onContinue={() => {
-            setShowRestTimer(false);
-            setCurrentBatch(restingNextBatch);
-            const nextBatchQs = questions.filter(
-              (q) => MasteryEngineService.getBatchNumber(q.order_index) === restingNextBatch
-            );
-            const unlockedIds = nextBatchQs.filter((q) => !progressMap.get(q.id)?.locked).map((q) => q.id);
-            setQueueState(CognitiveMasteryQueue.initialize(unlockedIds));
-          }}
-        />
-      )}
     </div>
   );
 }

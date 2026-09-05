@@ -68,10 +68,10 @@ export class MemoryQuizRepository implements IQuizRepository {
         order_index: 0
       },
       {
-        question_text: "In this Quiz Mastery engine, what is the default batch size of active questions?",
-        options: ["10 questions", "5 questions", "3 questions", "20 questions"],
-        correct_answer: 1,
-        explanation: "Batches are grouped into 5 questions to maximize focus without cognitive overload.",
+        question_text: "What does the reviewer use to maintain focus while serving a full quiz?",
+        options: ["A 7-item dynamic sliding window", "A fixed subset that excludes the rest of the quiz", "A separate session for every question", "A random timer that ends the review"],
+        correct_answer: 0,
+        explanation: "The reviewer serves the full quiz through a continuous queue while keeping only a focused seven-item working window active.",
         source_pages: [1],
         order_index: 1
       },

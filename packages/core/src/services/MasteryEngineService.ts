@@ -1,6 +1,4 @@
-import { QuizQuestion, QuizSession, QuestionProgress, SessionType, QuizBatchInfo, BatchMasteryStats, ScheduleNextResult, NextSessionPlan } from '@quiz-creator/types';
-
-export const BATCH_SIZE = 5;
+import { QuizQuestion, QuizSession, QuestionProgress, SessionType, ScheduleNextResult, NextSessionPlan } from '@quiz-creator/types';
 
 export const SESSION_INTERVALS: Record<SessionType, number> = {
   initial: 0,
@@ -19,45 +17,6 @@ export const NEXT_SESSION_MAP: Record<SessionType, SessionType | null> = {
 };
 
 export class MasteryEngineService {
-  static getBatchNumber(orderIndex: number): number {
-    return Math.floor(orderIndex / BATCH_SIZE);
-  }
-
-  static getTotalBatches(totalQuestions: number): number {
-    return Math.max(1, Math.ceil(totalQuestions / BATCH_SIZE));
-  }
-
-  static getBatches(questions: QuizQuestion[], progressMap: Map<string, QuestionProgress>): QuizBatchInfo[] {
-    const totalBatches = this.getTotalBatches(questions.length);
-    const batches: QuizBatchInfo[] = [];
-
-    for (let i = 0; i < totalBatches; i++) {
-      const batchQuestions = questions.filter((q) => this.getBatchNumber(q.order_index) === i);
-      const lockedCount = batchQuestions.filter((q) => progressMap.get(q.id)?.locked).length;
-      const isCompleted = batchQuestions.length > 0 && lockedCount === batchQuestions.length;
-      const isUnlocked = i === 0 || (batches[i - 1]?.isCompleted ?? false);
-
-      batches.push({
-        batchNumber: i,
-        questions: batchQuestions,
-        totalQuestions: batchQuestions.length,
-        lockedQuestions: lockedCount,
-        isUnlocked,
-        isCompleted
-      });
-    }
-
-    return batches;
-  }
-
-  static getActiveBatchNumber(questions: QuizQuestion[], progressMap: Map<string, QuestionProgress>): number {
-    const batches = this.getBatches(questions, progressMap);
-    for (const b of batches) {
-      if (!b.isCompleted) return b.batchNumber;
-    }
-    return -1; // All batches complete
-  }
-
   static isAllQuestionsLocked(questions: QuizQuestion[], progressMap: Map<string, QuestionProgress>): boolean {
     if (questions.length === 0) return false;
     return questions.every((q) => progressMap.get(q.id)?.locked);

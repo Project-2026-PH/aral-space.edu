@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { Quiz, QuizQuestion, QuizSession } from '@quiz-creator/types';
-import QuizBatchesSection from './QuizBatchesSection';
 import QuizQuestionList from './QuizQuestionList';
 import QuizQuestionFormModal from './QuizQuestionFormModal';
 import QuizStartConfigModal from './QuizStartConfigModal';
@@ -172,9 +171,6 @@ export default function QuizOverviewClient({
           </div>
         </div>
       </div>
-
-      {/* Batches Mastery Section */}
-      <QuizBatchesSection quizId={quiz.id} questions={questions} />
 
       {/* Question Bank */}
       <div className="space-y-3">

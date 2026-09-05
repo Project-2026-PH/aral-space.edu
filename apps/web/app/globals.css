@@ -63,6 +63,10 @@ body {
   transform: rotateY(180deg);
 }
 
+.rotate-x-180 {
+  transform: rotateX(180deg);
+}
+
 @keyframes subject-card-enter {
   from {
     opacity: 0;

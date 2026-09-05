@@ -99,7 +99,7 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
       "Failing the same card 3 times in a single session",
       "Taking longer than 60 seconds to answer any single question",
       "Answering 5 consecutive questions correctly",
-      "Exiting the session before all batches are complete"
+      "Exiting the session before the full mastery queue is complete"
     ],
     correct_answer: 0,
     explanation: "After 3 consecutive or accumulated misses on a single card, continuing to loop it causes cognitive exhaustion and rage-quitting.",
@@ -136,22 +136,22 @@ export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
     order_index: 4
   },
   {
-    question_text: "When does a batch or round achieve the Mastery Completion Criteria in the Cognitive Mastery Loop?",
+    question_text: "When does the mastery queue achieve its completion criteria?",
     options: [
-      "When every card in the active batch has either been answered correctly at least once or moved to the Struggle Pile",
+      "When every card has been answered correctly or moved to the Struggle Pile",
       "As soon as 50% of the questions have been attempted once",
       "When the countdown timer for the entire session reaches zero",
       "Only after answering all questions 5 times in a row without a single error"
     ],
     correct_answer: 0,
-    explanation: "A round only concludes when the active working queue is emptied by either achieving correct retrieval or escalating to the struggle pile.",
-    correct_explanation: "Active error queues require 100% resolution (mastery or struggle escalation) before advancing to the next batch.",
+    explanation: "A mastery round concludes when the active working queue is emptied by either achieving correct retrieval or escalating cards to the Struggle Pile.",
+    correct_explanation: "The full quiz is served through a continuous queue; completion depends on resolving every card, not on fixed batches.",
     distractor_explanations: {
       1: "Partial attempts leave unresolved errors uncorrected in working memory.",
       2: "The loop is governed by mastery completion, not a strict countdown time limit.",
       3: "Requiring 5 error-free repeats causes overlearning and excessive cognitive fatigue."
     },
-    discriminatory_keywords: ["mastery criteria", "queue resolution", "batch completion", "active queue exhaustion"],
+    discriminatory_keywords: ["mastery criteria", "queue resolution", "continuous queue", "active queue exhaustion"],
     concept_tags: ["mastery-criteria", "queue-resolution", "sliding-window"],
     source_pages: [3],
     order_index: 5

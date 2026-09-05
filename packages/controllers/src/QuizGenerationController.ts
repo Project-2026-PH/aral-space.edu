@@ -1,6 +1,12 @@
 import { IQuizRepository, QuizGenerationService, PdfExtractionService, UserAuthoringProfileService } from '@quiz-creator/core';
 import { GenerateQuizRequestDto, QuizGenerationProgressDto } from '@quiz-creator/types';
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeSubjectId(subjectId?: string): string | null {
+  return subjectId && UUID_PATTERN.test(subjectId) ? subjectId : null;
+}
+
 export class QuizGenerationController {
   constructor(
     private quizRepo: IQuizRepository,
@@ -58,6 +64,7 @@ export class QuizGenerationController {
     let liveTokens = 0;
     const generated = await this.genService.generateQuiz({
       handoutPages: pages,
+      subjectName: dto.title || dto.handoutName || uniqueChapters[0],
       pageStart: dto.pageStart,
       pageEnd: dto.pageEnd,
       pipelineMode: dto.pipelineMode || 'auto',
@@ -128,7 +135,7 @@ export class QuizGenerationController {
 
     const createdQuiz = await this.quizRepo.createQuiz({
       title,
-      subject_id: dto.subjectId || null,
+      subject_id: normalizeSubjectId(dto.subjectId),
       handout_name: handoutName,
       source_model: generated.sourceModel,
       questions: generated.questions.map((q, idx) => ({

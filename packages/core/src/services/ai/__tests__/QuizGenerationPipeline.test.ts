@@ -171,13 +171,31 @@ describe('Two-Stage Quiz Generation Pipeline', () => {
     expect(result.pipelineMode).toBe('gemini_direct');
   });
 
-  it('returns mock questions when no API keys are provided', async () => {
+  it('generates deterministic local questions when no API keys are provided', async () => {
+    const pages = [{
+      pageNumber: 1,
+      chapterTitle: 'Biology',
+      text: [
+        'Photosynthesis: The process by which plants convert light energy into chemical energy.',
+        'Chlorophyll: The pigment that absorbs light during photosynthesis.',
+        'Stroma: The fluid-filled space surrounding the grana.',
+        'Thylakoid: A membrane structure that contains the electron transport chain.'
+      ].join('\n')
+    }];
+
     const result = await service.generateQuiz({
-      handoutPages: [{ pageNumber: 1, text: 'Sample text' }]
+      handoutPages: pages,
+      targetCount: 4
     });
 
-    expect(result.pipelineMode).toBe('mock');
-    expect(result.questions.length).toBeGreaterThan(0);
+    expect(result.pipelineMode).toBe('local');
+    expect(result.sourceModel).toBe('local/deterministic-generator');
+    expect(result.questions).toHaveLength(4);
+    expect(result.questions[0].question).toBe('What is Photosynthesis?');
+    expect(result.questions[0].options).toContain('Chlorophyll');
+    expect(result.questions[0].options).toHaveLength(4);
+    expect(result.questions[0].options[result.questions[0].correct_answer]).toBe('Photosynthesis');
+    expect(result.questions[0].source_pages).toEqual([1]);
     expect(mockGeminiExtractor.extract).not.toHaveBeenCalled();
     expect(mockGroqReviewer.reviewAndPolish).not.toHaveBeenCalled();
   });

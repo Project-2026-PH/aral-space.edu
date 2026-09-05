@@ -159,7 +159,7 @@ export class CognitiveMasteryQueue {
   }
 
   /**
-   * Checks whether the active batch/round is finished (activeQueue and unservedQueue both empty).
+   * Checks whether the active round is finished (activeQueue and unservedQueue both empty).
    */
   static isRoundFinished(state: PracticeSessionState): boolean {
     return state.activeQueue.length === 0 && (!state.unservedQueue || state.unservedQueue.length === 0);

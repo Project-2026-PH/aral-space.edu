@@ -4,6 +4,7 @@ import { GroqReviewer } from './ai/GroqReviewer';
 import { VerbatimExtractor } from './ai/VerbatimExtractor';
 import { VerbatimQuizBuilder } from './ai/VerbatimQuizBuilder';
 import { AiModelConfig } from './ai/AiModelConfig';
+import { LocalQuizGenerator } from './LocalQuizGenerator';
 
 export interface GenerateOptions {
   handoutPages: HandoutPage[];
@@ -148,19 +149,24 @@ export class QuizGenerationService {
     console.log(`[QuizGenerationService] Provider Keys: [Gemini: ${Boolean(geminiKey)}, Groq: ${Boolean(groqKey)}]`);
     console.log(`[QuizGenerationService] Material: ${options.handoutPages.length} pages | ${totalChars} chars | ~${estimatedTokens} tokens`);
 
-    // Mock fallback when no keys are provided
+    const targetCount = options.targetCount || options.authoringProfile?.targetCount || 10;
+
+    // Deterministic local fallback when no provider keys are available.
     if (!geminiKey && !groqKey) {
-      console.warn(`[QuizGenerationService] No API keys configured. Falling back to mock demo.`);
-      options.onStageChange?.('fallback', 'No API keys detected; generating demo quiz data...', 'mock');
+      console.warn(`[QuizGenerationService] No API keys configured. Generating quiz locally from source material.`);
+      options.onStageChange?.('fallback', 'No API keys detected; generating questions locally from the source material...', 'local');
+      const questions = LocalQuizGenerator.generate({
+        handoutPages: options.handoutPages,
+        subjectName: options.subjectName,
+        targetCount
+      });
       return {
-        sourceModel: 'mock-demo-generator',
-        tokensUsed: 450,
-        pipelineMode: 'mock',
-        questions: QuizGenerationService.getMockQuestions(options.pageStart || 1)
+        sourceModel: 'local/deterministic-generator',
+        tokensUsed: 0,
+        pipelineMode: 'local',
+        questions
       };
     }
-
-    const targetCount = options.targetCount || options.authoringProfile?.targetCount || 10;
 
     // 0. Verbatim Exact Mode (Zero-variance extraction + programmatic distractor assembly)
     if (mode === 'verbatim_exact') {

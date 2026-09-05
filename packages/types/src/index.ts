@@ -3,7 +3,6 @@ export * from './models/Quiz';
 export * from './models/QuizQuestion';
 export * from './models/QuizSession';
 export * from './models/QuestionProgress';
-export * from './models/Batch';
 export * from './enums/QuizMode';
 export * from './dtos/GenerateQuizDto';
 export * from './dtos/QuizDto';

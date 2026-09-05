@@ -69,6 +69,43 @@ describe('QuizGenerationController - pipelineMode', () => {
     expect(completeEvent?.quizId).toBe('quiz-123');
   });
 
+  it('does not persist virtual sample subject IDs into UUID-backed quizzes', async () => {
+    await controller.handleStreamingGeneration(
+      {
+        title: 'Sample-derived Quiz',
+        subjectId: 'sub-cognitive-mastery',
+        text: 'Sample notes',
+        pipelineMode: 'two_stage'
+      },
+      () => {},
+      'user-1'
+    );
+
+    expect(mockRepo.createQuiz).toHaveBeenCalledWith(
+      expect.objectContaining({ subject_id: null }),
+      'user-1'
+    );
+  });
+
+  it('preserves valid UUID subject IDs for persistence', async () => {
+    const subjectId = '123e4567-e89b-12d3-a456-426614174000';
+
+    await controller.handleStreamingGeneration(
+      {
+        title: 'Subject Quiz',
+        subjectId,
+        text: 'Subject notes',
+        pipelineMode: 'two_stage'
+      },
+      () => {},
+      'user-1'
+    );
+
+    expect(mockRepo.createQuiz).toHaveBeenCalledWith(
+      expect.objectContaining({ subject_id: subjectId }),
+      'user-1'
+    );
+  });
   it('adjusts stage messages for single-stage groq_direct pipeline', async () => {
     const progressEvents: QuizGenerationProgressDto[] = [];
     const dto: GenerateQuizRequestDto = {

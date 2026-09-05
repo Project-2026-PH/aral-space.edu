@@ -53,7 +53,7 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
             Quiz Creation & Mastery Studio
           </h1>
           <p className="max-w-xl text-xs leading-relaxed text-muted-foreground">
-            Generate high-yield exam question banks from lecture materials or manually build interactive multiple-choice decks with systematic 5-question spaced-repetition loops.
+            Generate high-yield exam question banks from lecture materials or manually build interactive multiple-choice decks with a continuous 7-item sliding-window mastery queue.
           </p>
         </div>
 

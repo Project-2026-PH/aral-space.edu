@@ -186,10 +186,65 @@ export class NeonSessionRepository implements ISessionRepository {
   }
 
   async batchSaveQuestionProgress(progressList: QuestionProgress[]): Promise<QuestionProgress[]> {
-    const results: QuestionProgress[] = [];
-    for (const p of progressList) {
-      results.push(await this.saveQuestionProgress(p));
+    if (progressList.length === 0) return [];
+
+    const existing = progressList.filter((p) => p.id);
+    const pending = progressList.filter((p) => !p.id);
+    const saved: QuestionProgress[] = [];
+
+    if (pending.length > 0) {
+      const payload = JSON.stringify(pending.map((p) => ({
+        session_id: p.session_id,
+        question_id: p.question_id,
+        streak_count: p.streak_count,
+        has_missed: p.has_missed,
+        locked: p.locked,
+        locked_at: p.locked_at || null
+      })));
+
+      const rows = await this.sql`
+        INSERT INTO quiz_question_progress (
+          session_id,
+          question_id,
+          streak_count,
+          has_missed,
+          locked,
+          locked_at
+        )
+        SELECT
+          p.session_id,
+          p.question_id,
+          p.streak_count,
+          p.has_missed,
+          p.locked,
+          p.locked_at
+        FROM jsonb_to_recordset(${payload}::jsonb) AS p(
+          session_id uuid,
+          question_id uuid,
+          streak_count integer,
+          has_missed boolean,
+          locked boolean,
+          locked_at timestamptz
+        )
+        ON CONFLICT (session_id, question_id)
+        DO UPDATE SET
+          streak_count = EXCLUDED.streak_count,
+          has_missed = EXCLUDED.has_missed,
+          locked = EXCLUDED.locked,
+          locked_at = EXCLUDED.locked_at
+        RETURNING *
+      `;
+      saved.push(...(rows as QuestionProgress[]));
     }
-    return results;
+
+    if (existing.length > 0) {
+      saved.push(...await Promise.all(existing.map((p) => this.saveQuestionProgress(p))));
+    }
+
+    const byId = new Map(saved.filter((p) => p.id).map((p) => [p.id, p]));
+    const byKey = new Map(saved.map((p) => [`${p.session_id}:${p.question_id}`, p]));
+    return progressList
+      .map((p) => p.id ? byId.get(p.id) : byKey.get(`${p.session_id}:${p.question_id}`))
+      .filter((p): p is QuestionProgress => Boolean(p));
   }
 }

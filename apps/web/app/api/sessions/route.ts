@@ -9,16 +9,18 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, quizId, sessionId, questionId, isCorrect, sessionType, latencyMs, summary } = body;
     
-    const [sessionRepo, quizRepo] = await Promise.all([
-      getSessionRepository(),
-      getQuizRepository()
-    ]);
-    const controller = new MasterySessionController(sessionRepo, quizRepo);
-
     if (action === 'start') {
+      const [sessionRepo, quizRepo] = await Promise.all([
+        getSessionRepository(),
+        getQuizRepository()
+      ]);
+      const controller = new MasterySessionController(sessionRepo, quizRepo);
       const data = await controller.getOrStartSession(quizId, sessionType, userId);
       return NextResponse.json(data);
     }
+
+    const sessionRepo = await getSessionRepository();
+    const controller = new MasterySessionController(sessionRepo);
 
     if (action === 'answer') {
       const progress = await controller.recordAnswer(sessionId, questionId, isCorrect, sessionType, latencyMs);

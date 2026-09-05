@@ -68,9 +68,11 @@ export class QuizCrudController {
         questions: SAMPLE_QUIZ_QUESTIONS
       };
     }
-    const quiz = await this.quizRepo.getQuizById(id, userId);
+    const [quiz, questions] = await Promise.all([
+      this.quizRepo.getQuizById(id, userId),
+      this.quizRepo.getQuestionsByQuizId(id)
+    ]);
     if (!quiz) return null;
-    const questions = await this.quizRepo.getQuestionsByQuizId(id);
     return { ...quiz, questions };
   }
 

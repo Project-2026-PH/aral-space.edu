@@ -132,11 +132,11 @@ export default function QuizQuestionFormModal({
     let cleanedAnswer = answerText.trim();
 
     if (type === 'multiple_choice') {
-      if (cleanedOptions.some((o) => !o)) {
-        setError('All 4 options must be filled out.');
+      if (!cleanedOptions[cleanedCorrect]) {
+        setError('Please fill in the selected correct option. Other options may be left blank.');
         return;
       }
-      cleanedAnswer = cleanedOptions[cleanedCorrect] || '';
+      cleanedAnswer = cleanedOptions[cleanedCorrect];
     } else if (type === 'typed_answer') {
       if (!cleanedAnswer) {
         setError('Please enter the typed answer.');
@@ -259,7 +259,7 @@ export default function QuizQuestionFormModal({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
               <span>Options & Correct Answer</span>
-              <span className="text-[11px] font-normal lowercase italic text-muted-foreground">click radio to mark correct</span>
+              <span className="text-[11px] font-normal lowercase italic text-muted-foreground">select the entire option card to mark it correct</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {options.map((opt, idx) => {
@@ -268,7 +268,16 @@ export default function QuizQuestionFormModal({
                   <div
                     key={idx}
                     onClick={() => setCorrectAnswer(idx)}
-                    className={`flex items-center gap-2 rounded-2xl border p-2.5 cursor-pointer transition-all ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setCorrectAnswer(idx);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="radio"
+                    aria-checked={isSelected}
+                    className={`flex items-center gap-2 rounded-2xl border p-2.5 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                       isSelected
                         ? 'border-primary bg-primary/5 ring-1 ring-primary'
                         : 'border-border bg-background hover:bg-muted/40'
@@ -315,7 +324,16 @@ export default function QuizQuestionFormModal({
                   <div
                     key={tf.val}
                     onClick={() => setCorrectAnswer(tf.val)}
-                    className={`flex items-center justify-center gap-2 rounded-2xl border py-3.5 px-4 cursor-pointer font-bold text-xs transition-all ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setCorrectAnswer(tf.val);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="radio"
+                    aria-checked={isSelected}
+                    className={`flex items-center justify-center gap-2 rounded-2xl border py-3.5 px-4 cursor-pointer font-bold text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                       isSelected
                         ? tf.activeBg
                         : 'border-border bg-background hover:bg-muted/40 text-muted-foreground'

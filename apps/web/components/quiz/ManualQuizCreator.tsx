@@ -302,11 +302,11 @@ export default function ManualQuizCreator({
       let questionType: 'multiple_choice' | 'typed_answer' = 'multiple_choice';
 
       if (q.type === 'multiple_choice') {
-        if (opts.some((o) => !o)) {
-          setError(`Question #${i + 1} must have all 4 choices filled.`);
+        if (!opts[correct]) {
+          setError(`Question #${i + 1} must have a filled correct choice. Other choices may be left blank.`);
           return;
         }
-        answerText = opts[correct] || opts[0];
+        answerText = opts[correct];
         questionType = 'multiple_choice';
       } else if (q.type === 'true_false') {
         opts = ['True', 'False'];
@@ -694,7 +694,7 @@ export default function ManualQuizCreator({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
                     <span>Choice Options</span>
-                    <span className="italic">Select the circle on the correct answer choice</span>
+                    <span className="italic">Select the entire option card to mark the correct answer</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {q.options.map((opt, optIdx) => {
@@ -703,7 +703,16 @@ export default function ManualQuizCreator({
                         <div
                           key={optIdx}
                           onClick={() => setCorrectOption(qIdx, optIdx)}
-                          className={`flex items-center gap-3 rounded-2xl border p-3 cursor-pointer transition-all ${
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setCorrectOption(qIdx, optIdx);
+                            }
+                          }}
+                          tabIndex={0}
+                          role="radio"
+                          aria-checked={isSelected}
+                          className={`flex items-center gap-3 rounded-2xl border p-3 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                             isSelected
                               ? 'border-primary bg-primary/5 ring-1 ring-primary'
                               : 'border-border bg-background/50 hover:bg-muted/40'
@@ -748,7 +757,16 @@ export default function ManualQuizCreator({
                         <div
                           key={tf.val}
                           onClick={() => setCorrectOption(qIdx, tf.val)}
-                          className={`flex items-center justify-center gap-2.5 rounded-2xl border py-4 px-4 cursor-pointer font-bold text-xs transition-all ${
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setCorrectOption(qIdx, tf.val);
+                            }
+                          }}
+                          tabIndex={0}
+                          role="radio"
+                          aria-checked={isSelected}
+                          className={`flex items-center justify-center gap-2.5 rounded-2xl border py-4 px-4 cursor-pointer font-bold text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                             isSelected
                               ? tf.activeBg
                               : 'border-border bg-background/50 hover:bg-muted/40 text-muted-foreground'

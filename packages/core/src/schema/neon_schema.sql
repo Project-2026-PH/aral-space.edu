@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_quiz_questions_quiz_id ON quiz_questions (quiz_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_questions_quiz_order ON quiz_questions (quiz_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_quiz_questions_order ON quiz_questions (quiz_id, order_index ASC);
 
 -- 4. Quiz Sessions Table
@@ -72,6 +73,7 @@ CREATE TABLE IF NOT EXISTS quiz_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_quiz_sessions_lookup ON quiz_sessions (quiz_id, user_id, status);
+CREATE INDEX IF NOT EXISTS idx_quiz_sessions_active_lookup ON quiz_sessions (quiz_id, user_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quiz_sessions_quiz_id ON quiz_sessions (quiz_id);
 
 -- 5. Quiz Question Progress Table

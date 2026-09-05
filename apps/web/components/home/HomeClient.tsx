@@ -5,7 +5,8 @@ import { Quiz, Subject } from '@quiz-creator/types';
 import dynamic from 'next/dynamic';
 import NewSubjectModal from '@/components/subject/NewSubjectModal';
 import SubjectLibrary from '@/components/subject/SubjectLibrary';
-import { Sparkles, Plus, BookOpen, Play, Search } from 'lucide-react';
+import QuizLibrary from '@/components/quiz/QuizLibrary';
+import { Sparkles, Plus, Search } from 'lucide-react';
 import Link from 'next/link';
 
 const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizModal'), {
@@ -54,13 +55,6 @@ export default function HomeClient({ initialQuizzes, initialSubjects }: HomeClie
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <Link
-            href="/practice/quiz-cognitive-mastery-sample"
-            className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 text-xs font-bold text-white shadow-lg shadow-indigo-500/25 transition-all hover:brightness-110 active:scale-95"
-          >
-            <Play className="h-4 w-4 fill-current" />
-            <span>Try Sample Mastery Quiz</span>
-          </Link>
           <button
             onClick={() => setShowAiModal(true)}
             className="flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95"
@@ -73,7 +67,7 @@ export default function HomeClient({ initialQuizzes, initialSubjects }: HomeClie
             className="flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 text-xs font-bold text-foreground transition-all hover:bg-muted active:scale-95"
           >
             <Plus className="h-4 w-4" />
-            <span>Manual Builder</span>
+            <span>Create Manually</span>
           </Link>
         </div>
       </div>
@@ -102,68 +96,7 @@ export default function HomeClient({ initialQuizzes, initialSubjects }: HomeClie
 
       <SubjectLibrary subjects={subjects} quizzes={quizzes} loading={false} />
 
-      {/* Quizzes Grid */}
-      {filtered.length === 0 ? (
-        <div className="space-y-4 rounded-3xl border border-dashed border-border p-12 text-center">
-          <BookOpen className="mx-auto h-8 w-8 text-muted-foreground" />
-          <p className="text-sm font-bold text-foreground">No quizzes found</p>
-          <p className="mx-auto max-w-sm text-xs text-muted-foreground">
-            Click &quot;Generate with AI&quot; or &quot;Manual Builder&quot; to author your first question bank.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {filtered.map((quiz) => (
-            <div
-              key={quiz.id}
-              className="group flex flex-col justify-between rounded-3xl border border-border/80 bg-card p-5 shadow-2xs transition-all hover:border-primary/40 hover:shadow-md"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  {quiz.id === 'quiz-cognitive-mastery-sample' ? (
-                    <span className="rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[11px] font-bold text-indigo-500">
-                      Cognitive Mastery Loop
-                    </span>
-                  ) : (
-                    <span className="text-[11px] font-medium text-muted-foreground">Reviewer</span>
-                  )}
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground">
-                    {quiz.question_count} Qs
-                  </span>
-                </div>
-
-                <Link href={`/quizzes/${quiz.id}`}>
-                  <h3 className="line-clamp-2 text-sm font-bold text-foreground transition-colors group-hover:text-primary">
-                    {quiz.title}
-                  </h3>
-                </Link>
-
-                {quiz.handout_name && (
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    Source: {quiz.handout_name}
-                  </p>
-                )}
-              </div>
-
-              <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-4">
-                <Link
-                  href={`/quizzes/${quiz.id}`}
-                  className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Manage Bank
-                </Link>
-                <Link
-                  href={`/practice/${quiz.id}`}
-                  className="flex items-center gap-1 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary shadow-2xs transition-all hover:bg-primary hover:text-white active:scale-95"
-                >
-                  <Play className="h-3 w-3 fill-current" />
-                  <span>Practice</span>
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <QuizLibrary quizzes={filtered} loading={false} />
 
       <NewSubjectModal
         open={showSubjectModal}

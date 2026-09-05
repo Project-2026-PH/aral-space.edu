@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Quiz,
   QuizQuestion,
@@ -38,7 +38,8 @@ import {
   Brain,
   Gauge,
   Check,
-  AlertCircle
+  AlertCircle,
+  BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import BatchRestTimer from './BatchRestTimer';
@@ -54,6 +55,14 @@ interface QuizRunnerProps {
   shuffleQuestions?: boolean;
   shuffleOptions?: boolean;
 }
+
+interface PendingQueueTransition {
+  nextQueue: PracticeSessionState;
+  progressMap: Map<string, QuestionProgress>;
+  recapQuestionIds: string[];
+}
+
+const QUESTION_EXIT_DURATION_MS = 180;
 
 function getQuestionAnswer(question: QuizQuestion): string {
   return question.answer_text?.trim() || question.options[question.correct_answer]?.trim() || '';
@@ -72,10 +81,17 @@ export default function QuizRunner({
   shuffleQuestions = false,
   shuffleOptions = true
 }: QuizRunnerProps) {
-  // Process questions based on mode
-  const processedQuestions = mode === 'reverse'
-    ? QuizTransformService.generateReverseQuestions(initialQuestions)
-    : initialQuestions;
+  const processedQuestions = useMemo(() => {
+    // Build ephemeral choices only for modes that need them. Saved reviewer data
+    // remains sparse, and this avoids one query or AI request per question.
+    const optionReadyQuestions = mode === 'multiple_choice' || mode === 'reverse'
+      ? QuizTransformService.prepareQuestionsForOptions(initialQuestions)
+      : initialQuestions;
+
+    return mode === 'reverse'
+      ? QuizTransformService.generateReverseQuestions(optionReadyQuestions)
+      : optionReadyQuestions;
+  }, [initialQuestions, mode]);
 
   const [questions] = useState<QuizQuestion[]>(() => {
     if (shuffleQuestions) {
@@ -122,6 +138,10 @@ export default function QuizRunner({
   const [isCardFlipped, setIsCardFlipped] = useState<boolean>(false);
   const [selectedOptionId, setSelectedOptionId] = useState<number | null>(null);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+  const [evaluatedCardIds, setEvaluatedCardIds] = useState<string[]>([]);
+  const [pendingAdvance, setPendingAdvance] = useState<PendingQueueTransition | null>(null);
+  const [isRecapVisible, setIsRecapVisible] = useState<boolean>(false);
+  const [isQuestionTransitioning, setIsQuestionTransitioning] = useState<boolean>(false);
   const [identificationInput, setIdentificationInput] = useState<string>('');
   const [identificationSubmitted, setIdentificationSubmitted] = useState<boolean>(false);
   const [typedAnswerCorrect, setTypedAnswerCorrect] = useState<boolean | null>(null);
@@ -140,6 +160,15 @@ export default function QuizRunner({
   const [cardTelemetry, setCardTelemetry] = useState<Record<string, CardTelemetryRecord>>({});
   const [sessionSummary, setSessionSummary] = useState<SessionMasterySummary | null>(null);
   const [activeTelemetryTab, setActiveTelemetryTab] = useState<'all' | 'green' | 'yellow' | 'red'>('all');
+  const questionTransitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (questionTransitionTimeoutRef.current) {
+        clearTimeout(questionTransitionTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setIsMuted(quizAudio.isMuted());
@@ -254,7 +283,7 @@ export default function QuizRunner({
     setQueueState(CognitiveMasteryQueue.initialize(accumulatedStruggleIds));
   }
 
-  async function handleOptionSelect(option: ShuffledOption) {
+  function handleOptionSelect(option: ShuffledOption) {
     if (isEvaluating || !activeQuestion || !currentProg) return;
 
     setIsEvaluating(true);
@@ -273,8 +302,8 @@ export default function QuizRunner({
     const resolvedTags = activeQuestion.concept_tags && activeQuestion.concept_tags.length > 0
       ? activeQuestion.concept_tags
       : (activeQuestion.discriminatory_keywords && activeQuestion.discriminatory_keywords.length > 0
-          ? activeQuestion.discriminatory_keywords
-          : ['general']);
+        ? activeQuestion.discriminatory_keywords
+        : ['general']);
 
     const updatedRec: CardTelemetryRecord = {
       questionId: qId,
@@ -324,31 +353,85 @@ export default function QuizRunner({
       setAccumulatedStruggleIds((prev) => Array.from(new Set([...prev, activeQuestion.id])));
     }
 
-    // Save to API
-    try {
-      await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'answer',
-          sessionId: session.id,
-          questionId: activeQuestion.id,
-          isCorrect,
-          sessionType: session.session_type,
-          latencyMs
-        })
-      });
-    } catch (err) {
+    // Keep the queue transition ready while feedback remains visible. A recap is
+    // triggered by seven distinct evaluated cards, independently of the queue window.
+    const nextEvaluatedCardIds = evaluatedCardIds.includes(qId)
+      ? evaluatedCardIds
+      : [...evaluatedCardIds, qId];
+    const recapQuestionIds = nextEvaluatedCardIds.length >= 7
+      ? nextEvaluatedCardIds.slice(0, 7)
+      : [];
+
+    setEvaluatedCardIds(recapQuestionIds.length > 0 ? [] : nextEvaluatedCardIds);
+    setPendingAdvance({
+      nextQueue: queueResult.nextState,
+      progressMap: nextMap,
+      recapQuestionIds
+    });
+
+    // Save to API without making the user wait before they can advance.
+    void fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'answer',
+        sessionId: session.id,
+        questionId: activeQuestion.id,
+        isCorrect,
+        sessionType: session.session_type,
+        latencyMs
+      })
+    }).catch((err) => {
       console.warn('Failed to sync progress:', err);
+    });
+  }
+
+  function isInteractiveTarget(target: EventTarget | null): boolean {
+    return target instanceof HTMLElement && Boolean(
+      target.closest('button, a, input, textarea, select, [role="button"], [contenteditable="true"]')
+    );
+  }
+
+  function advanceFromSurface() {
+    if (!pendingAdvance) return;
+
+    if (isRecapVisible) {
+      const transition = pendingAdvance;
+      setIsRecapVisible(false);
+      setPendingAdvance(null);
+      setEvaluatedCardIds([]);
+      advanceLoop(transition.nextQueue, transition.progressMap);
+      return;
     }
 
-    const delayMs = mode === 'flashcard'
-      ? 600
-      : (activeQuestion.correct_explanation || activeQuestion.distractor_explanations || activeQuestion.explanation ? 1800 : 1200);
+    if (pendingAdvance.recapQuestionIds.length > 0) {
+      setIsRecapVisible(true);
+      return;
+    }
 
-    setTimeout(() => {
-      advanceLoop(queueResult.nextState, nextMap);
-    }, delayMs);
+    if (isQuestionTransitioning) return;
+
+    const transition = pendingAdvance;
+    setIsQuestionTransitioning(true);
+    questionTransitionTimeoutRef.current = setTimeout(() => {
+      questionTransitionTimeoutRef.current = null;
+      setPendingAdvance(null);
+      advanceLoop(transition.nextQueue, transition.progressMap);
+      setIsQuestionTransitioning(false);
+    }, QUESTION_EXIT_DURATION_MS);
+  }
+
+  function handleSurfaceClick(event: React.MouseEvent<HTMLDivElement>) {
+    if (isInteractiveTarget(event.target)) return;
+    advanceFromSurface();
+  }
+
+  function handleSurfaceKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (isInteractiveTarget(event.target)) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      advanceFromSurface();
+    }
   }
 
   function handleTypedAnswerSubmit() {
@@ -427,6 +510,7 @@ export default function QuizRunner({
     const hesitationThresholdSec = ((summary.deckMedianLatencyMs * 1.5) / 1000).toFixed(1);
 
     const conceptEntries = Object.entries(summary.conceptErrorDensity).sort((a, b) => b[1] - a[1]);
+    const reviewTopicCount = conceptEntries.filter(([_, misses]) => misses > 0).length;
     const firstPassMasteryScore = questions.length > 0
       ? Math.round((summary.buckets.green.length / questions.length) * 100)
       : 100;
@@ -438,11 +522,9 @@ export default function QuizRunner({
           <div className="inline-flex p-4 rounded-full bg-emerald-500/10 text-emerald-500 shadow-sm ring-1 ring-emerald-500/20">
             <Award className="h-10 w-10" />
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-foreground tracking-tight">Session Mastery Analysis</h2>
-            <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
-              Objective cognitive telemetry: response latency, first-pass retrieval accuracy, and concept error density.
-            </p>
+          <div className="space-y-0.5">
+            <h2 className="text-2xl font-black text-foreground tracking-tight">Reviewer Mastery</h2>
+            <p className="text-xs text-muted-foreground">Your Performance Breakdown</p>
           </div>
         </div>
 
@@ -451,26 +533,26 @@ export default function QuizRunner({
           <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs text-center space-y-1">
             <span className="text-[11px] font-semibold text-muted-foreground flex items-center justify-center gap-1">
               <Clock className="h-3.5 w-3.5 text-primary" />
-              Median Latency
+              Typical Speed
             </span>
             <p className="text-xl font-black text-foreground">{deckMedianSec}s</p>
-            <p className="text-[10px] text-muted-foreground">Deck baseline</p>
+            <p className="text-[10px] text-muted-foreground">per Question</p>
           </div>
           <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-2xs text-center space-y-1">
             <span className="text-[11px] font-semibold text-muted-foreground flex items-center justify-center gap-1">
               <Gauge className="h-3.5 w-3.5 text-amber-500" />
-              Hesitation Index
+              Longest Pause
             </span>
             <p className="text-xl font-black text-amber-500">&gt; {hesitationThresholdSec}s</p>
-            <p className="text-[10px] text-muted-foreground">1.5× median ceiling</p>
+            <p className="text-[10px] text-muted-foreground">Slower than your usual pace</p>
           </div>
           <div className="col-span-2 sm:col-span-1 rounded-2xl border border-border/80 bg-card p-4 shadow-2xs text-center space-y-1">
             <span className="text-[11px] font-semibold text-muted-foreground flex items-center justify-center gap-1">
               <Brain className="h-3.5 w-3.5 text-emerald-500" />
-              First-Pass Mastery
+              First-Try Mastery
             </span>
             <p className="text-xl font-black text-emerald-500">{firstPassMasteryScore}%</p>
-            <p className="text-[10px] text-muted-foreground">Zero-hesitation recall</p>
+            <p className="text-[10px] text-muted-foreground">Answers on first try</p>
           </div>
         </div>
 
@@ -490,52 +572,46 @@ export default function QuizRunner({
             {/* Green Bucket */}
             <div
               onClick={() => setActiveTelemetryTab(activeTelemetryTab === 'green' ? 'all' : 'green')}
-              className={`cursor-pointer rounded-2xl border p-3 text-center transition-all ${
-                activeTelemetryTab === 'green'
-                  ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30'
-                  : 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50'
-              }`}
+              className={`cursor-pointer rounded-2xl border p-3 text-center transition-all ${activeTelemetryTab === 'green'
+                ? 'border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/30'
+                : 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50'
+                }`}
             >
               <div className="flex items-center justify-center gap-1 text-emerald-600 font-bold text-xs">
-                <span>🟢</span>
-                <span>Mastered</span>
+                <span>Got it</span>
               </div>
               <p className="text-2xl font-black text-emerald-600 mt-1">{summary.buckets.green.length}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">First-pass &le; 1.5x</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Answers on first try</p>
             </div>
 
             {/* Yellow Bucket */}
             <div
               onClick={() => setActiveTelemetryTab(activeTelemetryTab === 'yellow' ? 'all' : 'yellow')}
-              className={`cursor-pointer rounded-2xl border p-3 text-center transition-all ${
-                activeTelemetryTab === 'yellow'
-                  ? 'border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/30'
-                  : 'border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50'
-              }`}
+              className={`cursor-pointer rounded-2xl border p-3 text-center transition-all ${activeTelemetryTab === 'yellow'
+                ? 'border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/30'
+                : 'border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50'
+                }`}
             >
               <div className="flex items-center justify-center gap-1 text-amber-600 font-bold text-xs">
-                <span>🟡</span>
-                <span>Frail / Hesitant</span>
+                <span>Needs Practice</span>
               </div>
               <p className="text-2xl font-black text-amber-600 mt-1">{summary.buckets.yellow.length}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Retry or &gt; 1.5x</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Slow or took a second try</p>
             </div>
 
             {/* Red Bucket */}
             <div
               onClick={() => setActiveTelemetryTab(activeTelemetryTab === 'red' ? 'all' : 'red')}
-              className={`cursor-pointer rounded-2xl border p-3 text-center transition-all ${
-                activeTelemetryTab === 'red'
-                  ? 'border-destructive bg-destructive/10 ring-2 ring-destructive/30'
-                  : 'border-destructive/30 bg-destructive/5 hover:border-destructive/50'
-              }`}
+              className={`cursor-pointer rounded-2xl border p-3 text-center transition-all ${activeTelemetryTab === 'red'
+                ? 'border-destructive bg-destructive/10 ring-2 ring-destructive/30'
+                : 'border-destructive/30 bg-destructive/5 hover:border-destructive/50'
+                }`}
             >
               <div className="flex items-center justify-center gap-1 text-destructive font-bold text-xs">
-                <span>🔴</span>
-                <span>At-Risk</span>
+                <span>Keep Studying</span>
               </div>
               <p className="text-2xl font-black text-destructive mt-1">{summary.buckets.red.length}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">&ge; 2 misses</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Missed more than once</p>
             </div>
           </div>
 
@@ -586,7 +662,7 @@ export default function QuizRunner({
                         <div className="shrink-0 flex items-center gap-1.5">
                           {bucket === 'green' && (
                             <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600 flex items-center gap-1">
-                              <span>🟢</span> Mastered ({latencySec})
+                              <span>✓ Got it ({latencySec})</span>
                             </span>
                           )}
                           {bucket === 'yellow' && (
@@ -622,20 +698,23 @@ export default function QuizRunner({
           </div>
         </div>
 
-        {/* Concept Error Density & Knowledge Gaps */}
+        {/* Topics to Review */}
         <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm space-y-3 text-left">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
               <Tag className="h-4 w-4 text-primary" />
-              <span>Concept Error Density (Systemic Gaps)</span>
+              <span>Topics to Review</span>
             </h3>
             <span className="text-[11px] text-muted-foreground">
-              {conceptEntries.filter(([_, misses]) => misses > 0).length} gap(s) detected
+              {reviewTopicCount > 0
+                ? `${reviewTopicCount} topic${reviewTopicCount > 1 ? 's' : ''} to review`
+                : 'Nothing to review — nice work!'}
             </span>
           </div>
 
           <div className="flex flex-wrap gap-2 pt-1">
             {conceptEntries.map(([tag, misses]) => {
+              const displayTag = tag === 'general' ? 'All Topics' : `#${tag}`;
               if (misses > 0) {
                 return (
                   <span
@@ -643,7 +722,7 @@ export default function QuizRunner({
                     className="inline-flex items-center gap-1.5 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive"
                   >
                     <AlertCircle className="h-3.5 w-3.5" />
-                    <span>#{tag}</span>
+                    <span>{displayTag}</span>
                     <span className="rounded-full bg-destructive/20 px-1.5 py-0.2 text-[10px]">
                       {misses} miss{misses > 1 ? 'es' : ''}
                     </span>
@@ -656,7 +735,7 @@ export default function QuizRunner({
                   className="inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-semibold text-emerald-600"
                 >
                   <Check className="h-3.5 w-3.5 text-emerald-500" />
-                  <span>#{tag}</span>
+                  <span>{displayTag}</span>
                 </span>
               );
             })}
@@ -684,7 +763,7 @@ export default function QuizRunner({
         )}
 
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <button
+          {/* <button
             type="button"
             onClick={() => {
               quizAudio.playSuccessSound();
@@ -695,22 +774,89 @@ export default function QuizRunner({
           >
             <Sparkles className="h-4 w-4 text-amber-500" />
             <span>Celebrate Again</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => quizAudio.toggleMute()}
-            className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-3 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
-            title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
-          >
-            {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-            <span>{isMuted ? 'Sound Muted' : 'Sound On'}</span>
-          </button>
+          </button> */}
+          {accumulatedStruggleIds.length > 0 && (
+            <button
+              type="button"
+              onClick={startStrugglePileReview}
+              className="inline-flex items-center gap-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-6 py-3 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95 shadow-sm"
+            >
+              <RotateCw className="h-3.5 w-3.5" />
+              <span>Review Struggle Pile ({accumulatedStruggleIds.length})</span>
+            </button>
+          )}
           <Link
             href={`/quizzes/${quiz.id}`}
-            className="rounded-2xl bg-primary px-6 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+            className="rounded-2xl bg-primary px-6 py-3 text-xs font-bold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all active:scale-95"
           >
-            Back to Quiz Overview
+            Back to Overview
           </Link>
+          <Link
+            href="/quizzes"
+            className="rounded-2xl border border-border bg-card px-6 py-3 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all active:scale-95"
+          >
+            Back to Library
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isRecapVisible && pendingAdvance) {
+    const recapQuestions = pendingAdvance.recapQuestionIds
+      .map((questionId) => questions.find((question) => question.id === questionId))
+      .filter((question): question is QuizQuestion => Boolean(question));
+
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleSurfaceClick}
+        onKeyDown={handleSurfaceKeyDown}
+        aria-label="Seven-card recap. Tap anywhere to continue."
+        className="max-w-3xl mx-auto space-y-6 pb-20 outline-none cursor-pointer"
+      >
+        <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6 text-center shadow-sm">
+          <div className="mx-auto mb-3 inline-flex rounded-2xl bg-primary/10 p-3 text-primary">
+            <BookOpen className="h-7 w-7" />
+          </div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-primary">Quick Recap</p>
+          <h2 className="mt-1 text-2xl font-black text-foreground">Seven cards to remember</h2>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Review the terms and definitions, then tap anywhere to continue.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {recapQuestions.map((question, index) => (
+            <div
+              key={question.id}
+              className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm"
+            >
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] sm:items-start sm:gap-5">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {index + 1}. Term
+                  </span>
+                  <p className="mt-1 text-sm font-bold leading-relaxed text-foreground">
+                    {question.question_text}
+                  </p>
+                </div>
+                <div className="border-t border-border/60 pt-3 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Definition</span>
+                  <p className="mt-1 text-sm font-medium leading-relaxed text-foreground">
+                    {getQuestionAnswer(question) || 'No definition provided.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-muted-foreground">
+          <ChevronRight className="h-4 w-4 animate-pulse text-primary" />
+          <span>Tap anywhere to continue</span>
+          <ChevronRight className="h-4 w-4 animate-pulse text-primary" />
         </div>
       </div>
     );
@@ -728,7 +874,11 @@ export default function QuizRunner({
   const overallPercent = Math.round((totalLockedCount / questions.length) * 100);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-20">
+    <div
+      className="max-w-3xl mx-auto space-y-6 pb-20"
+      onClick={handleSurfaceClick}
+      onKeyDown={handleSurfaceKeyDown}
+    >
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <Link
@@ -778,11 +928,16 @@ export default function QuizRunner({
       </div>
 
       {/* Main Question Card */}
-      {mode === 'learn' || (mode === 'multiple_choice' && activeQuestion.options.length < 2) ? (
+      <div className="overflow-hidden">
+        <div
+          key={activeQuestion.id}
+          className={isQuestionTransitioning ? 'quiz-question-card-exit' : 'quiz-question-card-enter'}
+        >
+          {mode === 'learn' || ((mode === 'multiple_choice' || mode === 'reverse') && activeQuestion.options.length < 2) ? (
         <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm space-y-6">
           <div>
             <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              <span>{mode === 'learn' ? 'Learn Mode · Type the answer' : 'No choices · Type the answer'}</span>
+              <span>{mode === 'learn' ? 'Learn Mode · Type the answer' : 'Not enough choices · Type the answer'}</span>
               {currentProg && currentProg.streak_count > 0 && (
                 <span className="text-primary font-extrabold">Streak: {currentProg.streak_count}</span>
               )}
@@ -803,13 +958,12 @@ export default function QuizRunner({
               onKeyDown={(event) => {
                 if (event.key === 'Enter') handleTypedAnswerSubmit();
               }}
-              className={`w-full rounded-2xl border bg-background px-4 py-3 text-sm font-medium text-foreground focus:outline-none ${
-                typedAnswerCorrect === true
-                  ? 'border-emerald-500 ring-1 ring-emerald-500'
-                  : typedAnswerCorrect === false
-                    ? 'border-destructive ring-1 ring-destructive'
-                    : 'border-border focus:border-primary'
-              }`}
+              className={`w-full rounded-2xl border bg-background px-4 py-3 text-sm font-medium text-foreground focus:outline-none ${typedAnswerCorrect === true
+                ? 'border-emerald-500 ring-1 ring-emerald-500'
+                : typedAnswerCorrect === false
+                  ? 'border-destructive ring-1 ring-destructive'
+                  : 'border-border focus:border-primary'
+                }`}
             />
             <button
               type="button"
@@ -822,11 +976,10 @@ export default function QuizRunner({
           </div>
 
           {identificationSubmitted && (
-            <div className={`rounded-2xl border p-4 text-xs space-y-2 ${
-              typedAnswerCorrect
-                ? 'border-emerald-500/30 bg-emerald-500/10'
-                : 'border-destructive/30 bg-destructive/10'
-            }`}>
+            <div className={`rounded-2xl border p-4 text-xs space-y-2 ${typedAnswerCorrect
+              ? 'border-emerald-500/30 bg-emerald-500/10'
+              : 'border-destructive/30 bg-destructive/10'
+              }`}>
               <div className="flex items-center gap-2 font-bold">
                 {typedAnswerCorrect ? (
                   <CheckCircle2 className="h-4 w-4 text-emerald-500" />
@@ -854,9 +1007,8 @@ export default function QuizRunner({
           className="perspective-1000 cursor-pointer min-h-[320px]"
         >
           <div
-            className={`relative w-full h-full rounded-3xl border border-border/80 bg-card p-8 shadow-sm transition-transform duration-500 transform-style-3d ${
-              isCardFlipped ? 'rotate-y-180' : ''
-            }`}
+            className={`relative w-full h-full rounded-3xl border border-border/80 bg-card p-8 shadow-sm transition-transform duration-500 transform-style-3d ${isCardFlipped ? 'rotate-y-180' : ''
+              }`}
           >
             {/* Front */}
             <div className={`space-y-4 backface-hidden ${isCardFlipped ? 'hidden' : 'block'}`}>
@@ -1126,6 +1278,15 @@ export default function QuizRunner({
               )}
             </div>
           )}
+        </div>
+        )}
+        </div>
+      </div>
+
+      {pendingAdvance && !isRecapVisible && (
+        <div className="flex items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-xs font-semibold text-primary animate-fade-in">
+          <span>{pendingAdvance.recapQuestionIds.length > 0 ? 'Tap anywhere to open your seven-card recap' : 'Tap anywhere when you are ready for the next question'}</span>
+          <ChevronRight className="h-4 w-4" />
         </div>
       )}
 

@@ -11,7 +11,7 @@ export class MasterySessionController {
 
   constructor(
     private sessionRepo: ISessionRepository,
-    private quizRepo: IQuizRepository,
+    private quizRepo?: IQuizRepository,
     sampleSessionRepo?: ISessionRepository
   ) {
     if (sampleSessionRepo) {
@@ -29,7 +29,9 @@ export class MasterySessionController {
 
       const questions = quizId === SAMPLE_QUIZ_ID
         ? SAMPLE_QUIZ_QUESTIONS
-        : await this.quizRepo.getQuestionsByQuizId(quizId);
+        : this.quizRepo
+          ? await this.quizRepo.getQuestionsByQuizId(quizId)
+          : (() => { throw new Error('Quiz repository is required to start this session'); })();
 
       let progressList = await MasterySessionController.sampleSessionRepo.getProgressForSession(session.id);
       const existingMap = new Map(progressList.map(p => [p.question_id, p]));
@@ -55,6 +57,9 @@ export class MasterySessionController {
       session = await this.sessionRepo.createSession(quizId, sessionType, new Date().toISOString(), userId);
     }
 
+    if (!this.quizRepo) {
+      throw new Error('Quiz repository is required to start this session');
+    }
     const questions = await this.quizRepo.getQuestionsByQuizId(quizId);
     let progressList = await this.sessionRepo.getProgressForSession(session.id);
 

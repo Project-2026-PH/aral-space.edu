@@ -1,86 +1,46 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import QuizRunner from '@/components/quiz/QuizRunner';
-import { Quiz, QuizQuestion, QuizSession, QuestionProgress, QuizMode } from '@quiz-creator/types';
+import { MasterySessionController } from '@quiz-creator/controllers';
+import { getAnonymousUserId } from '@/lib/anonymous';
+import { getQuizRepository, getSessionRepository } from '@/lib/db';
+import { QuizMode } from '@quiz-creator/types';
 
-export default function PracticePage({
+export default async function PracticePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ quizId: string }>;
+  searchParams: Promise<{
+    mode?: string;
+    shuffleQuestions?: string;
+    shuffleOptions?: string;
+  }>;
 }) {
-  const { quizId } = React.use(params);
-  const searchParams = useSearchParams();
+  const { quizId } = await params;
+  const query = await searchParams;
+  const mode = (query.mode as QuizMode) || 'learn';
+  const shuffleQuestions = query.shuffleQuestions === 'true';
+  const shuffleOptions = query.shuffleOptions !== 'false';
+  const userId = await getAnonymousUserId();
 
-  const mode = (searchParams.get('mode') as QuizMode) || 'learn';
-  const shuffleQuestions = searchParams.get('shuffleQuestions') === 'true';
-  const shuffleOptions = searchParams.get('shuffleOptions') !== 'false';
+  const [quizRepo, sessionRepo] = await Promise.all([
+    getQuizRepository(),
+    getSessionRepository()
+  ]);
+  const sessionController = new MasterySessionController(sessionRepo, quizRepo);
 
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [session, setSession] = useState<QuizSession | null>(null);
-  const [progress, setProgress] = useState<QuestionProgress[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Verify ownership before creating or reusing a session.
+  const quiz = await quizRepo.getQuizById(quizId, userId);
+  if (!quiz) notFound();
 
-  useEffect(() => {
-    async function initSession() {
-      if (!quizId) return;
-      try {
-        // Fetch quiz metadata and start session concurrently
-        const [quizRes, sessRes] = await Promise.all([
-          fetch(`/api/quizzes/${quizId}`),
-          fetch('/api/sessions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'start', quizId })
-          })
-        ]);
-
-        if (!quizRes.ok) throw new Error('Quiz not found');
-        if (!sessRes.ok) throw new Error('Failed to start session');
-
-        const [quizData, sessData] = await Promise.all([
-          quizRes.json(),
-          sessRes.json()
-        ]);
-
-        setQuiz(quizData);
-        setQuestions(sessData.questions || []);
-        setSession(sessData.session || null);
-        setProgress(sessData.progress || []);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    initSession();
-  }, [quizId]);
-
-  if (loading) {
-    return (
-      <div className="max-w-xl mx-auto py-12 text-center text-xs text-muted-foreground animate-pulse">
-        Initializing practice session...
-      </div>
-    );
-  }
-
-  if (error || !quiz || !session) {
-    return (
-      <div className="max-w-md mx-auto py-12 text-center space-y-3">
-        <p className="text-sm font-bold text-destructive">{error || 'Session initialization failed'}</p>
-      </div>
-    );
-  }
+  const sessionData = await sessionController.getOrStartSession(quizId, 'initial', userId);
 
   return (
     <QuizRunner
       quiz={quiz}
-      initialQuestions={questions}
-      initialSession={session}
-      initialProgress={progress}
+      initialQuestions={sessionData.questions}
+      initialSession={sessionData.session}
+      initialProgress={sessionData.progress}
       mode={mode}
       shuffleQuestions={shuffleQuestions}
       shuffleOptions={shuffleOptions}

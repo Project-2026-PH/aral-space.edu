@@ -94,10 +94,12 @@ export class MemorySessionRepository implements ISessionRepository {
   }
 
   async batchSaveQuestionProgress(progressList: QuestionProgress[]): Promise<QuestionProgress[]> {
-    const saved: QuestionProgress[] = [];
-    for (const item of progressList) {
-      saved.push(await this.saveQuestionProgress(item));
-    }
-    return saved;
+    return progressList.map((p) => {
+      const key = `${p.session_id}_${p.question_id}`;
+      const id = p.id || `prog-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      const updated: QuestionProgress = { ...p, id };
+      this.progress.set(key, updated);
+      return updated;
+    });
   }
 }

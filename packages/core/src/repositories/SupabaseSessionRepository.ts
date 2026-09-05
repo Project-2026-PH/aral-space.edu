@@ -133,10 +133,36 @@ export class SupabaseSessionRepository implements ISessionRepository {
   }
 
   async batchSaveQuestionProgress(progressList: QuestionProgress[]): Promise<QuestionProgress[]> {
-    const results: QuestionProgress[] = [];
-    for (const p of progressList) {
-      results.push(await this.saveQuestionProgress(p));
+    if (progressList.length === 0) return [];
+
+    const existing = progressList.filter((p) => p.id);
+    const pending = progressList.filter((p) => !p.id);
+    const saved: QuestionProgress[] = [];
+
+    if (pending.length > 0) {
+      const { data, error } = await this.supabase
+        .from('quiz_question_progress')
+        .upsert(pending.map((p) => ({
+          session_id: p.session_id,
+          question_id: p.question_id,
+          streak_count: p.streak_count,
+          has_missed: p.has_missed,
+          locked: p.locked,
+          locked_at: p.locked_at || null
+        })), { onConflict: 'session_id,question_id' })
+        .select('*');
+      if (error) throw error;
+      saved.push(...(data || []));
     }
-    return results;
+
+    if (existing.length > 0) {
+      saved.push(...await Promise.all(existing.map((p) => this.saveQuestionProgress(p))));
+    }
+
+    const byId = new Map(saved.filter((p) => p.id).map((p) => [p.id, p]));
+    const byKey = new Map(saved.map((p) => [`${p.session_id}:${p.question_id}`, p]));
+    return progressList
+      .map((p) => p.id ? byId.get(p.id) : byKey.get(`${p.session_id}:${p.question_id}`))
+      .filter((p): p is QuestionProgress => Boolean(p));
   }
 }

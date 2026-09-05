@@ -5,6 +5,7 @@ import { Quiz, Subject } from '@quiz-creator/types';
 import { BookOpen, ExternalLink, Globe, Layers, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import ShareSubjectModal from './ShareSubjectModal';
+import Skeleton from '@/components/ui/Skeleton';
 
 interface SubjectLibraryProps {
   subjects: Subject[];
@@ -41,7 +42,7 @@ export default function SubjectLibrary({ subjects, quizzes, loading = false }: S
       {loading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((item) => (
-            <div key={item} className="h-44 animate-pulse rounded-3xl border border-border/40 bg-muted/40" />
+            <Skeleton key={item} className="h-44 rounded-3xl border border-border/40 bg-muted/40" />
           ))}
         </div>
       ) : subjects.length === 0 ? (

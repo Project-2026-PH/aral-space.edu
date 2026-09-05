@@ -12,7 +12,7 @@ export interface NormalizedQuestionFields {
 }
 
 function normalizeOptions(options: unknown): string[] {
-  return Array.isArray(options) ? options.map((option) => String(option)) : [];
+  return Array.isArray(options) ? options.map((option) => String(option).trim()) : [];
 }
 
 function normalizedText(value: unknown): string | null {
@@ -71,21 +71,34 @@ export function normalizeQuestionFields(
     ? suppliedCorrect
     : -1;
 
+  const questionType = input.question_type || existing?.question_type || (
+    options.length > 1 ? 'multiple_choice' : 'typed_answer'
+  );
+
   const suppliedAnswer = input.answer_text !== undefined
     ? normalizedText(input.answer_text)
     : normalizedText(existing?.answer_text) || normalizedText(options[candidateCorrect]);
   const answerIndex = suppliedAnswer
     ? options.findIndex((option) => option.trim().toLowerCase() === suppliedAnswer.toLowerCase())
     : -1;
-  const correctAnswer = candidateCorrect >= 0 && candidateCorrect < options.length
+  const candidateOption = candidateCorrect >= 0 && candidateCorrect < options.length
+    ? normalizedText(options[candidateCorrect])
+    : null;
+  const correctAnswer = candidateOption
     ? candidateCorrect
     : answerIndex >= 0
       ? answerIndex
       : 0;
+  const answerText = questionType === 'multiple_choice'
+    ? normalizedText(options[correctAnswer])
+    : suppliedAnswer || normalizedText(options[correctAnswer]);
 
-  const questionType = input.question_type || existing?.question_type || (
-    options.length > 1 ? 'multiple_choice' : 'typed_answer'
-  );
+  if (questionType === 'multiple_choice' && !answerText) {
+    throw new Error('A multiple-choice question must include a non-empty correct option.');
+  }
+  if (questionType === 'typed_answer' && !answerText) {
+    throw new Error('A question must include a correct answer.');
+  }
 
   const correctExplanation = input.correct_explanation !== undefined
     ? normalizedText(input.correct_explanation)
@@ -106,7 +119,7 @@ export function normalizeQuestionFields(
   return {
     options,
     correct_answer: correctAnswer,
-    answer_text: suppliedAnswer,
+    answer_text: answerText,
     question_type: questionType,
     correct_explanation: correctExplanation,
     distractor_explanations: distractorExplanations,

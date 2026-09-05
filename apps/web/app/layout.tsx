@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import Image from 'next/image';
 import Link from 'next/link';
-import { Sparkles, BookOpen, Layers } from 'lucide-react';
 import PwaRegister from '@/components/PwaRegister';
 import AnonymousSessionBadge from '@/components/AnonymousSessionBadge';
 
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'QuizMaster',
+    title: 'Aral Space',
   },
 };
 
@@ -35,11 +35,16 @@ export default function RootLayout({
         <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
           <div className="max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="flex items-center justify-center w-9 h-9 rounded-2xl bg-primary text-white shadow-md shadow-primary/20 group-hover:scale-105 transition-transform">
-                <Sparkles className="h-5 w-5" />
-              </div>
+              <Image
+                src="/ARAL_SPACE_LOGO.png"
+                alt="Aral Space"
+                width={44}
+                height={44}
+                priority
+                className="h-11 w-11 rounded-2xl object-cover shadow-md shadow-primary/20 group-hover:scale-105 transition-transform"
+              />
               <div>
-                <span className="text-sm font-extrabold tracking-tight text-foreground">QuizMaster</span>
+                <span className="text-sm font-extrabold tracking-tight text-foreground">Aral Space</span>
                 <span className="block text-[10px] font-semibold text-muted-foreground -mt-0.5">Spaced Mastery Studio</span>
               </div>
             </Link>

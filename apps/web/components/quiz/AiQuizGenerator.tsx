@@ -123,6 +123,13 @@ export default function AiQuizGenerator({
     const fileId = `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 7)}`;
     try {
       if (file.name.endsWith('.pdf') || file.type === 'application/pdf') {
+        const MAX_BYTES = 4.5 * 1024 * 1024;
+        if (file.size > MAX_BYTES) {
+          throw new Error(
+            `"${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds Vercel 4.5MB limit. Please upload a smaller PDF.`
+          );
+        }
+
         console.log(`[Frontend] Parsing PDF "${file.name}" (${file.size} bytes) via /api/parse-document...`);
         const formData = new FormData();
         formData.append('file', file);

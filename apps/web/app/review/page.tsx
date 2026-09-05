@@ -1,5 +1,5 @@
 import { Quiz } from '@quiz-creator/types';
-import { QuizCrudController } from '@quiz-creator/controllers';
+import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { getQuizRepository } from '@/lib/db';
 import QuizLibrary from '@/components/quiz/QuizLibrary';

@@ -44,6 +44,10 @@ quiz-creator/
   - 4 study modes: Multiple Choice, Flashcards, Direct Identification, and Reverse Questioning.
   - Continuous 7-item sliding-window mastery queue with streak-based progress locking and targeted struggle-pile review.
   - Ebbinghaus forgetting curve scheduling: Initial -> 24h -> 3d -> 7d -> 14d reviews.
+- **Smart Note Import & Question Shaping**:
+  - **Copy-Paste Import**: Paste notes directly from PDFs, slides, websites, or spreadsheets. The app automatically separates terms and definitions, even from messy bulleted lists.
+  - **Instant Study Modes**: Turns single definition-answer pairs into flashcards, 4-option multiple-choice quizzes, or reverse-prompt questions without extra typing.
+  - **Natural True or False Cards**: Rewrites definitions into natural statements, swapping in concepts from other cards to generate realistic False questions (see [CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md)).
 - **Flexible Multi-Backend Storage**:
   - **Neon Serverless Postgres**: Cloud PostgreSQL via `@neondatabase/serverless` with pooled HTTP queries and migration script.
   - **Supabase**: Direct Supabase client integration.
@@ -146,3 +150,9 @@ To apply database schema to Neon or PostgreSQL:
    DATABASE_URL="your-connection-string" pnpm --filter @quiz-creator/core exec ts-node src/schema/migrate.ts
    ```
 
+---
+
+## 📚 Technical Documentation
+
+- **[Clipboard Parser & Transformation Flow](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md)**: Comprehensive architectural flow and algorithms for clipboard parsing, definition-to-question conversion, and True/False paraphrasing with the Term Swap Rule.
+- **[Infisical Secrets Setup](INFISICAL.md)**: Secrets management, KMS encryption, and environment variables.

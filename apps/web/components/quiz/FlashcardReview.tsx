@@ -362,9 +362,9 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             <button type="button" onClick={shuffleCards} aria-label="Shuffle flashcards" className="rounded-full border border-border bg-card p-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <Expand className="h-4 w-4" />
             </button>
-            <button type="button" aria-label="Review settings" className="rounded-full border border-border bg-card p-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <Link href="/quizzes" aria-label="Review settings" className="rounded-full border border-border bg-card p-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <Settings className="h-4 w-4" />
-            </button>
+            </Link>
             <button type="button" onClick={toggleFullscreen} aria-label="Toggle fullscreen" className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <Maximize className="h-5 w-5" />
             </button>

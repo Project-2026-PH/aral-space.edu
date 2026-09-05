@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { notFound } from 'next/navigation';
 import { Quiz, QuizQuestion } from '@quiz-creator/types';
 import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
@@ -22,11 +23,15 @@ export default async function ReviewPage({
   if (!quiz && query.shareToken) {
     const sharedQuiz = await quizRepo.getQuizByShareToken(query.shareToken);
     if (sharedQuiz && sharedQuiz.id === quizId) {
+      if (sharedQuiz.allow_public_answer_key !== true) {
+        redirect(`/sets/share/${query.shareToken}`);
+      }
       quiz = {
         ...sharedQuiz,
         questions: sharedQuiz.questions.map((question): QuizQuestion => ({
           ...question,
-          quiz_id: sharedQuiz.id
+          quiz_id: sharedQuiz.id,
+          correct_answer: question.correct_answer ?? 0,
         }))
       } as Quiz;
     }

@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS subjects (
     user_id TEXT,
     share_token TEXT UNIQUE,
     is_public BOOLEAN NOT NULL DEFAULT TRUE,
+    share_expires_at TIMESTAMPTZ,
+    share_revoked_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -32,6 +34,9 @@ CREATE TABLE IF NOT EXISTS quizzes (
     share_token TEXT UNIQUE,
     is_public BOOLEAN NOT NULL DEFAULT TRUE,
     allow_cloning BOOLEAN NOT NULL DEFAULT TRUE,
+    allow_public_answer_key BOOLEAN NOT NULL DEFAULT FALSE,
+    share_expires_at TIMESTAMPTZ,
+    share_revoked_at TIMESTAMPTZ,
     generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -95,10 +100,15 @@ CREATE INDEX IF NOT EXISTS idx_quiz_question_progress_question ON quiz_question_
 -- Safe additions for databases created from an earlier schema version.
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_token TEXT;
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_expires_at TIMESTAMPTZ;
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_revoked_at TIMESTAMPTZ;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_token TEXT;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS allow_cloning BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS allow_public_answer_key BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_expires_at TIMESTAMPTZ;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_revoked_at TIMESTAMPTZ;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS answer_text TEXT;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type TEXT NOT NULL DEFAULT 'multiple_choice';
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS correct_explanation TEXT;
@@ -129,3 +139,13 @@ CREATE TABLE IF NOT EXISTS subject_collaborators (
 CREATE INDEX IF NOT EXISTS idx_subject_collaborator_links_subject ON subject_collaborator_links(subject_id);
 CREATE INDEX IF NOT EXISTS idx_subject_collaborators_user ON subject_collaborators(user_id);
 ALTER TABLE subject_collaborator_links ADD COLUMN IF NOT EXISTS used_by TEXT;
+
+
+-- Distributed request throttling for serverless API instances.
+CREATE TABLE IF NOT EXISTS security_rate_limits (
+    bucket_key TEXT PRIMARY KEY,
+    window_started_at TIMESTAMPTZ NOT NULL,
+    request_count INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_security_rate_limits_updated_at ON security_rate_limits(updated_at);

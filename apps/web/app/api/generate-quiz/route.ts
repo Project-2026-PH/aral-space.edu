@@ -1,9 +1,28 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { QuizGenerationController } from '@quiz-creator/controllers/QuizGenerationController';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { getQuizRepository } from '@/lib/db';
+import { assertAllowedOrigin, enforceRateLimit, readJsonBody, withTimeout, RequestSecurityError } from '@/lib/request-security';
+import { SECURITY_LIMITS } from '@/lib/security-config';
+import { parseGenerateQuizRequest } from '@/lib/request-validation';
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
+  let body: ReturnType<typeof parseGenerateQuizRequest>;
+  let userId: string;
+  try {
+    assertAllowedOrigin(req);
+    userId = await getAnonymousUserId(req);
+    const rateLimit = await enforceRateLimit(req, 'quiz-generation', userId, 5, 60 * 60 * 1000);
+    if (rateLimit) return rateLimit;
+    body = parseGenerateQuizRequest(await readJsonBody(req, SECURITY_LIMITS.generationBodyBytes));
+  } catch (error: any) {
+    const status = error instanceof RequestSecurityError ? error.status : 400;
+    return NextResponse.json({ error: error?.message || 'Invalid generation request' }, { status });
+  }
+
   const encoder = new TextEncoder();
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
@@ -12,48 +31,29 @@ export async function POST(req: NextRequest) {
   const sendProgress = async (data: any) => {
     if (isClosed) return;
     try {
-      const payload = `data: ${JSON.stringify(data)}\n\n`;
-      await writer.write(encoder.encode(payload));
+      await writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
     } catch {
       isClosed = true;
     }
   };
 
-  const userId = await getAnonymousUserId(req);
-
   (async () => {
     const startTime = Date.now();
     try {
-      const body = await req.json();
-      console.log(`\n[API /generate-quiz] === REQUEST RECEIVED ===`);
-      console.log(`[API /generate-quiz] Title: "${body.title || 'Untitled'}" | Pipeline: "${body.pipelineMode || 'auto'}"`);
-      console.log(`[API /generate-quiz] Pages received: ${body.pdfPages?.length || 0} | Files summary: ${JSON.stringify(body.filesSummary || [])}`);
-      if (body.pdfPages && body.pdfPages.length > 0) {
-        console.log(`[API /generate-quiz] Page 1 sample text length: ${body.pdfPages[0].text?.length || 0} chars | Preview: "${body.pdfPages[0].text?.slice(0, 120).replace(/\n/g, ' ')}..."`);
-      }
-
       const quizRepo = await getQuizRepository();
       const controller = new QuizGenerationController(quizRepo);
-
-      await controller.handleStreamingGeneration(body, (progressData) => {
-        sendProgress(progressData);
-      }, userId);
-      console.log(`[API /generate-quiz] === GENERATION COMPLETED SUCCESSFULLY in ${Date.now() - startTime}ms ===\n`);
+      await withTimeout(
+        controller.handleStreamingGeneration(body as any, sendProgress, userId),
+        SECURITY_LIMITS.generationTimeoutMs,
+        'Quiz generation timed out. Please reduce the source material and try again.'
+      );
     } catch (err: any) {
       console.error(`[API /generate-quiz ERROR after ${Date.now() - startTime}ms]:`, err);
-      await sendProgress({
-        progress: 0,
-        message: 'Error',
-        detail: err.message || 'Generation failed'
-      });
+      await sendProgress({ progress: 0, message: 'Error', detail: err.message || 'Generation failed' });
     } finally {
       if (!isClosed) {
         isClosed = true;
-        try {
-          await writer.close();
-        } catch {
-          // Stream already closed or aborted, ignore cleanly
-        }
+        try { await writer.close(); } catch { /* stream already closed */ }
       }
     }
   })();
@@ -61,8 +61,9 @@ export async function POST(req: NextRequest) {
   return new Response(stream.readable, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-store',
       'Connection': 'keep-alive',
-    },
+      'X-Content-Type-Options': 'nosniff'
+    }
   });
 }

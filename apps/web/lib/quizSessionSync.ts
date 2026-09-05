@@ -18,6 +18,9 @@ export class QuizSessionSync {
           sessionId: event.sessionId,
           questionId: event.questionId,
           isCorrect: event.isCorrect,
+          selectedOptionId: event.selectedOptionId,
+          answerText: event.answerText,
+          answerMode: event.answerMode,
           sessionType: event.sessionType,
           latencyMs: event.latencyMs,
           clientEventId: event.id

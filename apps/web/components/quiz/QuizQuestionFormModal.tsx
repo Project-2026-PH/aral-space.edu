@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import { QuizQuestion } from '@quiz-creator/types';
+import { QuizTransformService } from '@quiz-creator/core';
 import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered } from 'lucide-react';
 
 export type QuestionType = 'multiple_choice' | 'typed_answer' | 'identification' | 'true_false' | 'enumeration';
@@ -105,6 +106,13 @@ export default function QuizQuestionFormModal({
       newOptions = [];
       newCorrect = 0;
     } else if (newType === 'true_false') {
+      const termCandidate = (type === 'identification' || type === 'typed_answer')
+        ? (options[0] || answerText || '')
+        : (options[correctAnswer] || options[0] || answerText || '');
+
+      if (termCandidate.trim() && questionText.trim()) {
+        setQuestionText(QuizTransformService.paraphraseToStatement(questionText, termCandidate.trim()));
+      }
       newOptions = ['True', 'False'];
       newCorrect = newCorrect === 1 ? 1 : 0;
     } else if (newType === 'identification') {

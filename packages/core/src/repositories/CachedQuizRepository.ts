@@ -1,5 +1,5 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, UpdateSubjectShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink } from '@quiz-creator/types';
 import { LRUCache } from '../cache/LRUCache';
 
 export class CachedQuizRepository implements IQuizRepository {
@@ -24,8 +24,8 @@ export class CachedQuizRepository implements IQuizRepository {
     return `quiz:${id}:${userId || 'anon'}`;
   }
 
-  private questionsKey(quizId: string): string {
-    return `questions:${quizId}`;
+  private questionsKey(quizId: string, userId?: string): string {
+    return `questions:${quizId}:${userId || 'anon'}`;
   }
 
   async listSubjects(userId?: string): Promise<Subject[]> {
@@ -41,6 +41,7 @@ export class CachedQuizRepository implements IQuizRepository {
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {
     const subject = await this.underlying.createSubject(name, color, userId);
     this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('public_subject:');
     return subject;
   }
 
@@ -48,6 +49,8 @@ export class CachedQuizRepository implements IQuizRepository {
     const subject = await this.underlying.updateSubject(subjectId, dto, userId);
     this.cache.deleteByPrefix('subjects:');
     this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('public_subject:');
+    this.cache.deleteByPrefix('public_quiz:');
     return subject;
   }
 
@@ -156,6 +159,7 @@ export class CachedQuizRepository implements IQuizRepository {
     const created = await this.underlying.createQuiz(dto, userId);
     this.cache.delete(this.quizzesKey(userId));
     this.cache.delete(this.quizKey(created.id, userId));
+    this.cache.deleteByPrefix('public_subject:');
     return created;
   }
 
@@ -163,6 +167,8 @@ export class CachedQuizRepository implements IQuizRepository {
     const updated = await this.underlying.updateQuiz(id, dto, userId);
     this.cache.delete(this.quizzesKey(userId));
     this.cache.delete(this.quizKey(id, userId));
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('public_subject:');
     return updated;
   }
 
@@ -170,46 +176,57 @@ export class CachedQuizRepository implements IQuizRepository {
     const result = await this.underlying.deleteQuiz(id, userId);
     this.cache.delete(this.quizzesKey(userId));
     this.cache.delete(this.quizKey(id, userId));
-    this.cache.delete(this.questionsKey(id));
+    this.cache.deleteByPrefix(`questions:${id}:`);
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('public_subject:');
     return result;
   }
 
-  async getQuestionsByQuizId(quizId: string): Promise<QuizQuestion[]> {
-    const key = this.questionsKey(quizId);
+  async getQuestionsByQuizId(quizId: string, userId?: string): Promise<QuizQuestion[]> {
+    const key = this.questionsKey(quizId, userId);
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;
 
-    const questions = await this.underlying.getQuestionsByQuizId(quizId);
+    const questions = await this.underlying.getQuestionsByQuizId(quizId, userId);
     this.cache.set(key, questions);
     return questions;
   }
 
-  async addQuestion(quizId: string, dto: CreateQuestionDto): Promise<QuizQuestion> {
-    const question = await this.underlying.addQuestion(quizId, dto);
-    this.cache.delete(this.questionsKey(quizId));
+  async addQuestion(quizId: string, dto: CreateQuestionDto, userId?: string): Promise<QuizQuestion> {
+    const question = await this.underlying.addQuestion(quizId, dto, userId);
+    this.cache.deleteByPrefix(`questions:${quizId}:`);
     this.cache.deleteByPrefix(`quiz:${quizId}`);
     this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('public_subject:');
     return question;
   }
 
-  async updateQuestion(questionId: string, dto: UpdateQuestionDto): Promise<QuizQuestion> {
-    const question = await this.underlying.updateQuestion(questionId, dto);
-    // Invalidate questions cache across quizzes (or target quiz if known)
-    this.cache.deleteByPrefix('questions:');
+  async updateQuestion(quizId: string, questionId: string, dto: UpdateQuestionDto, userId?: string): Promise<QuizQuestion> {
+    const question = await this.underlying.updateQuestion(quizId, questionId, dto, userId);
+    this.cache.deleteByPrefix(`questions:${quizId}:`);
+    this.cache.deleteByPrefix(`quiz:${quizId}`);
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('public_subject:');
     return question;
   }
 
-  async deleteQuestion(questionId: string): Promise<boolean> {
-    const result = await this.underlying.deleteQuestion(questionId);
-    this.cache.deleteByPrefix('questions:');
-    this.cache.deleteByPrefix('quiz:');
+  async deleteQuestion(quizId: string, questionId: string, userId?: string): Promise<boolean> {
+    const result = await this.underlying.deleteQuestion(quizId, questionId, userId);
+    this.cache.deleteByPrefix(`questions:${quizId}:`);
+    this.cache.deleteByPrefix(`quiz:${quizId}`);
     this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('public_subject:');
     return result;
   }
 
-  async reorderQuestions(quizId: string, questionIds: string[]): Promise<boolean> {
-    const result = await this.underlying.reorderQuestions(quizId, questionIds);
-    this.cache.delete(this.questionsKey(quizId));
+  async reorderQuestions(quizId: string, questionIds: string[], userId?: string): Promise<boolean> {
+    const result = await this.underlying.reorderQuestions(quizId, questionIds, userId);
+    this.cache.deleteByPrefix(`questions:${quizId}:`);
+    this.cache.deleteByPrefix(`quiz:${quizId}`);
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('public_subject:');
     return result;
   }
 

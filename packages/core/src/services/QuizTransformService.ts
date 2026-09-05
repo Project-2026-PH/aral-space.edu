@@ -116,4 +116,174 @@ export class QuizTransformService {
       };
     });
   }
+
+  /**
+   * Paraphrases a question or definition into a declarative statement for a given term.
+   */
+  static paraphraseToStatement(questionText: string, term: string): string {
+    let cleanText = questionText.trim();
+    if (!cleanText) return term;
+
+    // Strip wrapping outer quotes if present
+    if (
+      (cleanText.startsWith('"') && cleanText.endsWith('"')) ||
+      (cleanText.startsWith("'") && cleanText.endsWith("'")) ||
+      (cleanText.startsWith('“') && cleanText.endsWith('”'))
+    ) {
+      cleanText = cleanText.slice(1, -1).trim();
+    }
+
+    const patterns: [RegExp, (t: string) => string][] = [
+      [/^It\s+is\s+defined\s+as\b/i, (t) => `${t} is defined as`],
+      [/^It\s+involves\b/i, (t) => `${t} involves`],
+      [/^It\s+refers\s+to\b/i, (t) => `${t} refers to`],
+      [/^It\s+describes\b/i, (t) => `${t} describes`],
+      [/^It\s+is\s+the\s+process\s+of\b/i, (t) => `${t} is the process of`],
+      [/^It\s+is\s+a\s+process\s+of\b/i, (t) => `${t} is a process of`],
+      [/^It\s+is\s+an?\b/i, (t) => `${t} is an`],
+      [/^It\s+is\b/i, (t) => `${t} is`],
+      [/^This\s+refers\s+to\b/i, (t) => `${t} refers to`],
+      [/^This\s+involves\b/i, (t) => `${t} involves`],
+      [/^This\s+is\b/i, (t) => `${t} is`],
+      [/^Refers\s+to\b/i, (t) => `${t} refers to`],
+      [/^Defined\s+as\b/i, (t) => `${t} is defined as`],
+      [/^The\s+process\s+of\b/i, (t) => `${t} is the process of`],
+      [/^A\s+process\s+of\b/i, (t) => `${t} is a process of`],
+      [/^Is\s+the\s+process\s+of\b/i, (t) => `${t} is the process of`],
+      [/^Is\s+defined\s+as\b/i, (t) => `${t} is defined as`],
+      [/^Is\s+an?\b/i, (t) => `${t} is an`],
+      [/^Means\b/i, (t) => `${t} means`],
+      [/^Which\s+[\w\s]+(matches|refers\s+to|describes|is)\s*:?\s*/i, (t) => `${t} describes `],
+      [/^What\s+is\s+defined\s+as\b/i, (t) => `${t} is defined as`],
+      [/^What\s+is\b/i, (t) => `${t} is`],
+    ];
+
+    let statement: string | null = null;
+    for (const [regex, replacer] of patterns) {
+      if (regex.test(cleanText)) {
+        statement = cleanText.replace(regex, replacer(term)).trim();
+        break;
+      }
+    }
+
+    if (!statement) {
+      if (/^[A-Z][a-z]+ing\b/.test(cleanText)) {
+        const lower = cleanText.charAt(0).toLowerCase() + cleanText.slice(1);
+        statement = `${term} involves ${lower}`.trim();
+      } else if (/^(is|are|was|were)\b/i.test(cleanText)) {
+        statement = `${term} ${cleanText}`.trim();
+      } else {
+        statement = `${term} is defined as: ${cleanText}`.trim();
+      }
+    }
+
+    if (statement.endsWith('?')) {
+      statement = statement.slice(0, -1) + '.';
+    }
+
+    return statement;
+  }
+
+  /**
+   * Converts a single question into a True/False question.
+   * If targetTruth is false, displayTerm is swapped with a distractor from the deck.
+   */
+  static convertToTrueFalse(
+    question: QuizQuestion,
+    targetTruth: boolean,
+    distractorTerms: string[] = []
+  ): QuizQuestion {
+    const correctAnswer = getCorrectAnswer(question);
+    const correctKey = normalizeForComparison(correctAnswer);
+
+    let displayTerm = correctAnswer;
+    let distractorTerm: string | null = null;
+
+    if (!targetTruth) {
+      const validDistractors = distractorTerms.filter(
+        (term) => normalizeForComparison(term) !== correctKey && term.trim().length > 0
+      );
+
+      if (validDistractors.length > 0) {
+        distractorTerm = validDistractors[0];
+        displayTerm = distractorTerm;
+      } else {
+        displayTerm = `Non-${correctAnswer}`;
+        distractorTerm = displayTerm;
+      }
+    }
+
+    const statement = QuizTransformService.paraphraseToStatement(question.question_text, displayTerm);
+
+    const explanation = targetTruth
+      ? (question.correct_explanation || question.explanation || `True. "${correctAnswer}" is accurately described by this statement.`)
+      : (distractorTerm
+          ? `False. This statement actually describes "${correctAnswer}", not "${distractorTerm}".`
+          : `False. This statement does not describe "${correctAnswer}".`);
+
+    return {
+      ...question,
+      id: `${question.id}-tf-${targetTruth ? 'true' : 'false'}`,
+      question_text: statement,
+      options: ['True', 'False'],
+      correct_answer: targetTruth ? 0 : 1,
+      answer_text: targetTruth ? 'True' : 'False',
+      explanation,
+      correct_explanation: targetTruth ? (question.correct_explanation || null) : null,
+      distractor_explanations: null
+    };
+  }
+
+  /**
+   * Generates True/False questions from a deck of questions using the Term Swap Rule.
+   * Alternates or balances between True (accurate term) and False (swapped distractor term from another card).
+   */
+  static generateTrueFalseQuestions(
+    questions: QuizQuestion[],
+    options: { truthRatio?: number } = {}
+  ): QuizQuestion[] {
+    const truthRatio = typeof options.truthRatio === 'number'
+      ? Math.max(0, Math.min(1, options.truthRatio))
+      : 0.5;
+
+    return questions.map((question, index) => {
+      const correctAnswer = getCorrectAnswer(question);
+      const correctKey = normalizeForComparison(correctAnswer);
+
+      const targetTruth = truthRatio === 0.5
+        ? index % 2 === 0
+        : (index / questions.length) < truthRatio;
+
+      const candidateDistractors: string[] = [];
+
+      for (let j = index + 1; j < questions.length; j++) {
+        const candidate = getCorrectAnswer(questions[j]);
+        if (candidate && normalizeForComparison(candidate) !== correctKey) {
+          candidateDistractors.push(candidate);
+        }
+      }
+      for (let j = index - 1; j >= 0; j--) {
+        const candidate = getCorrectAnswer(questions[j]);
+        if (candidate && normalizeForComparison(candidate) !== correctKey) {
+          candidateDistractors.push(candidate);
+        }
+      }
+
+      if (candidateDistractors.length === 0) {
+        for (const opt of question.options) {
+          const text = opt.trim();
+          const key = normalizeForComparison(text);
+          if (text && key !== correctKey && key !== 'true' && key !== 'false') {
+            candidateDistractors.push(text);
+          }
+        }
+      }
+
+      return QuizTransformService.convertToTrueFalse(
+        question,
+        targetTruth,
+        candidateDistractors
+      );
+    });
+  }
 }

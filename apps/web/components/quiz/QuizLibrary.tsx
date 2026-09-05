@@ -1,24 +1,55 @@
 'use client';
 
 import React from 'react';
-import { Quiz } from '@quiz-creator/types';
-import { BookOpen, Layers, Play } from 'lucide-react';
+import { Quiz, Subject } from '@quiz-creator/types';
+import { BookOpen, Filter, Layers, Play } from 'lucide-react';
 import Link from 'next/link';
 import Skeleton from '@/components/ui/Skeleton';
 
 interface QuizLibraryProps {
   quizzes: Quiz[];
   loading?: boolean;
+  subjects?: Subject[];
+  selectedSubjectId?: string;
+  onSubjectChange?: (subjectId: string) => void;
 }
 
-export default function QuizLibrary({ quizzes, loading = false }: QuizLibraryProps) {
+export default function QuizLibrary({
+  quizzes,
+  loading = false,
+  subjects,
+  selectedSubjectId = '',
+  onSubjectChange,
+}: QuizLibraryProps) {
   return (
     <section className="space-y-4" aria-labelledby="quiz-library-heading">
-      <div className="flex items-end justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <h2 id="quiz-library-heading" className="mt-1 text-lg font-extrabold tracking-tight text-foreground">
             Reviewers
           </h2>
+          {subjects !== undefined && (
+            <div className="relative flex items-center">
+              <label htmlFor="reviewer-subject-filter" className="sr-only">
+                Filter reviewers by subject
+              </label>
+              <Filter aria-hidden="true" className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-muted-foreground" />
+              <select
+                id="reviewer-subject-filter"
+                value={selectedSubjectId}
+                onChange={(event) => onSubjectChange?.(event.target.value)}
+                disabled={subjects.length === 0}
+                className="rounded-2xl border border-border bg-card py-2 pl-8 pr-8 text-xs font-semibold text-foreground outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="">All subjects</option>
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
           {quizzes.length} {quizzes.length === 1 ? 'reviewer' : 'reviewers'}

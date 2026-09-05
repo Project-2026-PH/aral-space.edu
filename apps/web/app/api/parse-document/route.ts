@@ -1,35 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PdfExtractionService } from '@quiz-creator/core/services';
+import { getAnonymousUserId } from '@/lib/anonymous';
+import { assertAllowedOrigin, enforceRateLimit, withTimeout, RequestSecurityError, boundedString } from '@/lib/request-security';
+import { SECURITY_LIMITS } from '@/lib/security-config';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
+    assertAllowedOrigin(req);
+    const userId = await getAnonymousUserId(req);
+    const rateLimit = await enforceRateLimit(req, 'document-parse', userId, 10, 60 * 60 * 1000);
+    if (rateLimit) return rateLimit;
+    const contentLength = Number(req.headers.get('content-length') || 0);
+    if (contentLength > SECURITY_LIMITS.documentBytes) throw new RequestSecurityError(413, 'File is too large');
+
     const formData = await req.formData();
     const file = formData.get('file');
+    if (!(file instanceof Blob)) throw new RequestSecurityError(400, 'Missing file in request form data');
+    if (file.size <= 0 || file.size > SECURITY_LIMITS.documentBytes) throw new RequestSecurityError(413, 'File is too large');
 
-    if (!file || !(file instanceof Blob)) {
-      return NextResponse.json(
-        { error: 'Missing file in request form data' },
-        { status: 400 }
-      );
+    const fileName = boundedString((file as File).name || 'document.pdf', 'file name', 500, true)!;
+    if (!/\.pdf$/i.test(fileName) || (file.type && file.type !== 'application/pdf')) {
+      throw new RequestSecurityError(415, 'Only PDF documents are accepted');
     }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const header = new TextDecoder('latin1').decode(bytes.subarray(0, 5));
+    if (header !== '%PDF-') throw new RequestSecurityError(415, 'The uploaded file is not a valid PDF');
 
-    const fileName = (file as any).name || 'document.pdf';
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8 = new Uint8Array(arrayBuffer);
-
-    const result = await PdfExtractionService.parsePdf(uint8, fileName);
-
-    return NextResponse.json({
-      pages: result.pages,
-      pageCount: result.pageCount,
-    });
+    const result = await withTimeout(
+      PdfExtractionService.parsePdf(bytes, fileName),
+      SECURITY_LIMITS.documentTimeoutMs,
+      'Document parsing timed out'
+    );
+    if (result.pageCount > SECURITY_LIMITS.maxPages || result.pages.length > SECURITY_LIMITS.maxPages) {
+      throw new RequestSecurityError(413, `Documents are limited to ${SECURITY_LIMITS.maxPages} pages`);
+    }
+    const totalText = result.pages.reduce((total, page) => total + page.text.length, 0);
+    if (result.pages.some((page) => page.text.length > SECURITY_LIMITS.maxPageTextLength) || totalText > SECURITY_LIMITS.maxTotalTextLength) {
+      throw new RequestSecurityError(413, 'Extracted document text is too large');
+    }
+    return NextResponse.json({ pages: result.pages, pageCount: result.pageCount });
   } catch (err: any) {
     console.error('[API /parse-document ERROR]:', err);
-    return NextResponse.json(
-      { error: err.message || 'Failed to parse document' },
-      { status: 500 }
-    );
+    const status = err instanceof RequestSecurityError ? err.status : typeof err?.status === 'number' ? err.status : 500;
+    return NextResponse.json({ error: err?.message || 'Failed to parse document' }, { status });
   }
 }

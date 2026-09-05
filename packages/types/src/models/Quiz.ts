@@ -16,6 +16,9 @@ export interface Quiz {
   share_token?: string | null;
   is_public?: boolean;
   allow_cloning?: boolean;
+  allow_public_answer_key?: boolean;
+  share_expires_at?: string | null;
+  share_revoked_at?: string | null;
   subject?: Subject | null;
   questions?: QuizQuestion[];
 }

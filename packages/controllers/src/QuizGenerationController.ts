@@ -70,8 +70,8 @@ export class QuizGenerationController {
       pageEnd: dto.pageEnd,
       pipelineMode: dto.pipelineMode || 'auto',
       authoringProfile,
-      apiKey: dto.apiKey,
-      groqApiKey: dto.groqApiKey,
+      apiKey: undefined,
+      groqApiKey: undefined,
       onStageChange: (stage, detail, model) => {
         const progressMap = {
           extracting: 40,

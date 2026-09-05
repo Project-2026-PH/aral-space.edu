@@ -18,15 +18,16 @@ export interface IQuizRepository {
   createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz>;
   updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz>;
   deleteQuiz(id: string, userId?: string): Promise<boolean>;
-  
-  getQuestionsByQuizId(quizId: string): Promise<QuizQuestion[]>;
-  addQuestion(quizId: string, dto: CreateQuestionDto): Promise<QuizQuestion>;
-  updateQuestion(questionId: string, dto: UpdateQuestionDto): Promise<QuizQuestion>;
-  deleteQuestion(questionId: string): Promise<boolean>;
-  reorderQuestions(quizId: string, questionIds: string[]): Promise<boolean>;
 
-  getShareConfig(quizId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }>;
-  updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }>;
+  /** When userId is supplied, the repository must enforce quiz access. */
+  getQuestionsByQuizId(quizId: string, userId?: string): Promise<QuizQuestion[]>;
+  addQuestion(quizId: string, dto: CreateQuestionDto, userId?: string): Promise<QuizQuestion>;
+  updateQuestion(quizId: string, questionId: string, dto: UpdateQuestionDto, userId?: string): Promise<QuizQuestion>;
+  deleteQuestion(quizId: string, questionId: string, userId?: string): Promise<boolean>;
+  reorderQuestions(quizId: string, questionIds: string[], userId?: string): Promise<boolean>;
+
+  getShareConfig(quizId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }>;
+  updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }>;
   getQuizByShareToken(shareToken: string): Promise<PublicQuizDto | null>;
   cloneQuizByShareToken(shareToken: string, userId?: string): Promise<Quiz>;
 }

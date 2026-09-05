@@ -1,45 +1,24 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { UserCheck, Shield, Copy, Check, RotateCcw, HelpCircle, X } from 'lucide-react';
+import { UserCheck, Shield, RotateCcw, X } from 'lucide-react';
 
 interface AnonSessionData {
-  anonId: string;
   isAnonymous: boolean;
   label: string;
-}
-
-function getClientAnonCookie(): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(/(?:^|;\s*)quizmaster_anon_id=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
 }
 
 export default function AnonymousSessionBadge() {
   const [session, setSession] = useState<AnonSessionData | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [resetting, setResetting] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const existingCookie = getClientAnonCookie();
-    if (existingCookie) {
-      setSession({
-        anonId: existingCookie,
-        isAnonymous: true,
-        label: `Guest-${existingCookie.replace('anon_', '').slice(0, 6)}`
-      });
-      return;
-    }
-
     async function fetchSession() {
       try {
         const res = await fetch('/api/anonymous');
-        if (res.ok) {
-          const data = await res.json();
-          setSession(data);
-        }
+        if (res.ok) setSession(await res.json());
       } catch (err) {
         console.error('Failed to load anonymous session:', err);
       }
@@ -60,17 +39,6 @@ export default function AnonymousSessionBadge() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
-
-  async function handleCopy() {
-    if (!session?.anonId) return;
-    try {
-      await navigator.clipboard.writeText(session.anonId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback
-    }
-  }
 
   async function handleReset() {
     if (!confirm('Start a new anonymous session? Your current guest quizzes will remain under previous session ID.')) {
@@ -131,24 +99,8 @@ export default function AnonymousSessionBadge() {
 
           <div className="py-3 space-y-2.5 text-xs text-muted-foreground">
             <p className="leading-relaxed text-[11px]">
-              No password or account required. All created quizzes, questions, and Leitner spaced-repetition progress are isolated to this guest device session.
+              No password or account required. Your guest identity is protected in an HttpOnly cookie and is never displayed or copied by this page.
             </p>
-
-            <div className="rounded-2xl border border-border/60 bg-muted/40 p-2.5 space-y-1">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Guest Device ID
-              </div>
-              <div className="flex items-center justify-between gap-2 font-mono text-[11px] text-foreground font-semibold">
-                <span className="truncate">{session?.anonId || 'Loading...'}</span>
-                <button
-                  onClick={handleCopy}
-                  className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                  title="Copy ID"
-                >
-                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                </button>
-              </div>
-            </div>
           </div>
 
           <div className="pt-2 border-t border-border/50 flex items-center justify-between gap-2">

@@ -50,11 +50,14 @@ export interface UpdateQuestionDto {
 export interface UpdateShareConfigDto {
   is_public?: boolean;
   allow_cloning?: boolean;
+  allow_public_answer_key?: boolean;
+  share_expires_at?: string | null;
   reset_token?: boolean;
 }
 
 export interface UpdateSubjectShareConfigDto {
   is_public?: boolean;
+  share_expires_at?: string | null;
   reset_token?: boolean;
 }
 
@@ -70,6 +73,8 @@ export interface CreateSubjectCollaboratorLinkDto {
 export interface SubjectShareConfig {
   share_token: string;
   is_public: boolean;
+  share_expires_at?: string | null;
+  share_revoked_at?: string | null;
 }
 
 export interface PublicSubjectQuizDto {
@@ -89,6 +94,8 @@ export interface PublicSubjectDto {
   color: string;
   share_token: string;
   is_public: boolean;
+  share_expires_at?: string | null;
+  share_revoked_at?: string | null;
   created_at?: string;
   quizzes: PublicSubjectQuizDto[];
 }
@@ -103,6 +110,7 @@ export interface PublicQuizDto {
   share_token: string;
   is_public: boolean;
   allow_cloning: boolean;
+  allow_public_answer_key?: boolean;
   created_at?: string;
   subject?: {
     id: string;
@@ -115,7 +123,7 @@ export interface PublicQuizDto {
     answer_text?: string | null;
     question_type?: QuizQuestionType | null;
     options: string[];
-    correct_answer: number;
+    correct_answer?: number;
     explanation?: string | null;
     correct_explanation?: string | null;
     distractor_explanations?: Record<number, string> | null;

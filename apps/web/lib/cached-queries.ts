@@ -21,6 +21,7 @@ export const CacheTags = {
   userSubjects: (userId: string) => `subjects-user-${userId || 'anon'}`,
   publicQuiz: (shareToken: string) => `public-quiz-${shareToken}`,
   publicSubject: (shareToken: string) => `public-subject-${shareToken}`,
+  allPublicSubjects: 'public-subjects-all',
 } as const;
 
 /**
@@ -105,7 +106,7 @@ export async function getCachedPublicSubject(
     ['public-subject-token', shareToken],
     {
       revalidate: CACHE_TTL.LONG,
-      tags: [CacheTags.publicSubject(shareToken)],
+      tags: [CacheTags.publicSubject(shareToken), CacheTags.allPublicSubjects],
     }
   );
 
@@ -141,5 +142,21 @@ export function revalidatePublicQuizTag(shareToken: string): void {
     revalidateTag(CacheTags.publicQuiz(shareToken));
   } catch (err) {
     // Graceful fallback
+  }
+}
+
+export function revalidatePublicSubjectTag(shareToken: string): void {
+  try {
+    revalidateTag(CacheTags.publicSubject(shareToken));
+  } catch (err) {
+    // Graceful fallback outside Next.js request context.
+  }
+}
+
+export function revalidatePublicSubjectCaches(): void {
+  try {
+    revalidateTag(CacheTags.allPublicSubjects);
+  } catch (err) {
+    // Graceful fallback outside Next.js request context.
   }
 }

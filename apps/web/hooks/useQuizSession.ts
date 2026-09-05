@@ -54,7 +54,10 @@ export interface PendingQueueTransition {
 }
 
 function getProgressSourceId(questionId: string): string {
-  return questionId.endsWith('-reverse') ? questionId.slice(0, -'-reverse'.length) : questionId;
+  if (questionId.endsWith('-reverse')) return questionId.slice(0, -'-reverse'.length);
+  const tfIndex = questionId.indexOf('-tf-');
+  if (tfIndex !== -1) return questionId.slice(0, tfIndex);
+  return questionId;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -425,7 +428,7 @@ export function useQuizSession({
     setQueueState(CognitiveMasteryQueue.initialize(ids));
   }
 
-  function answerQuestion(option: ShuffledOption | undefined): void {
+  function answerQuestion(option: ShuffledOption | undefined, typedAnswerMode?: 'learn' | 'identification'): void {
     if (!isProgressHydrated || !option || isEvaluating || !activeQuestion || !currentProg) return;
 
     setIsEvaluating(true);
@@ -485,11 +488,15 @@ export function useQuizSession({
       recapQuestionIds: transition.recapQuestionIds
     });
 
+    const isTypedAnswer = activeQuestion.question_type === 'typed_answer' || activeQuestion.options.length === 0;
     const event: PersistedAnswerEvent = {
       id: createAnswerEventId(),
       sessionId: session.id,
       questionId: getProgressSourceId(questionId),
       isCorrect: option.isCorrect,
+      selectedOptionId: isTypedAnswer ? undefined : option.optionId,
+      answerText: isTypedAnswer ? option.text : undefined,
+      answerMode: isTypedAnswer ? typedAnswerMode : undefined,
       sessionType: session.session_type,
       latencyMs,
       createdAt: new Date().toISOString()
@@ -569,7 +576,7 @@ export function useQuizSession({
       optionId: activeQuestion.correct_answer,
       text: identificationInput,
       isCorrect
-    });
+    }, answerMode);
   }
 
   async function complete(): Promise<void> {

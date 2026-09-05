@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import QuizOverviewClient from '@/components/quiz/QuizOverviewClient';
-import { QuizCrudController } from '@quiz-creator/controllers';
+import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { getQuizRepository } from '@/lib/db';
 

@@ -6,6 +6,8 @@ export interface Subject {
   created_at?: string;
   share_token?: string | null;
   is_public?: boolean;
+  share_expires_at?: string | null;
+  share_revoked_at?: string | null;
 }
 
 export type SubjectAccessRole = 'owner' | 'collaborator';

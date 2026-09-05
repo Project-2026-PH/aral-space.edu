@@ -24,6 +24,7 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
   const [loading] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [showAiModal, setShowAiModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [openingManualQuiz, setOpeningManualQuiz] = useState(false);
@@ -37,7 +38,9 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
   }, [initialSubjects]);
 
   const filtered = quizzes.filter((q) => {
-    return q.title.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = q.title.toLowerCase().includes(search.toLowerCase());
+    const matchesSubject = !selectedSubjectId || q.subject_id === selectedSubjectId;
+    return matchesSearch && matchesSubject;
   });
 
   return (
@@ -123,6 +126,7 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
         onSubjectDeleted={(subjectId) => {
           setSubjects((current) => current.filter((subject) => subject.id !== subjectId));
           setQuizzes((current) => current.filter((quiz) => quiz.subject_id !== subjectId));
+          setSelectedSubjectId((current) => current === subjectId ? '' : current);
         }}
         onSubjectUpdated={(subjectId, config) => {
           setSubjects((current) => current.map((subject) => (
@@ -133,7 +137,13 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
         }}
       />
 
-      <QuizLibrary quizzes={filtered} loading={loading} />
+      <QuizLibrary
+        quizzes={filtered}
+        loading={loading}
+        subjects={subjects}
+        selectedSubjectId={selectedSubjectId}
+        onSubjectChange={setSelectedSubjectId}
+      />
 
       <NewSubjectModal
         open={showSubjectModal}

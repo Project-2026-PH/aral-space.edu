@@ -7,6 +7,7 @@ import type {
 
 export const QUIZ_PROGRESS_SNAPSHOT_VERSION = 1;
 const QUIZ_PROGRESS_SNAPSHOT_PREFIX = 'quiz_creator_quiz_progress_v1';
+const QUIZ_PROGRESS_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 export interface PersistedPendingAdvance {
   nextQueue: PracticeSessionState;
@@ -18,7 +19,11 @@ export interface PersistedAnswerEvent {
   id: string;
   sessionId: string;
   questionId: string;
+  /** Legacy events may only contain isCorrect; new events carry the submitted answer. */
   isCorrect: boolean;
+  selectedOptionId?: number;
+  answerText?: string;
+  answerMode?: 'learn' | 'identification';
   sessionType: SessionType;
   latencyMs: number;
   createdAt: string;
@@ -118,6 +123,11 @@ export function readQuizProgressSnapshot(
     ) {
       return null;
     }
+    const savedAt = typeof parsed.savedAt === 'string' ? Date.parse(parsed.savedAt) : NaN;
+    if (!Number.isFinite(savedAt) || Date.now() - savedAt > QUIZ_PROGRESS_RETENTION_MS) {
+      window.localStorage.removeItem(getSnapshotStorageKey(quizId, sessionId));
+      return null;
+    }
 
     return {
       ...(parsed as Omit<QuizProgressSnapshot, 'progressEntries' | 'pendingAdvance'>),
@@ -138,9 +148,16 @@ export function writeQuizProgressSnapshot(snapshot: QuizProgressSnapshot): void 
   if (!isBrowserStorageAvailable()) return;
 
   try {
+    const safeSnapshot: QuizProgressSnapshot = {
+      ...snapshot,
+      // Do not retain a user's free-form answer after the session snapshot is written.
+      identificationInput: '',
+      pendingAnswerEvents: snapshot.pendingAnswerEvents.slice(-50).map(({ answerText: _answerText, ...event }) => event),
+      savedAt: new Date().toISOString()
+    };
     window.localStorage.setItem(
       getSnapshotStorageKey(snapshot.quizId, snapshot.sessionId),
-      JSON.stringify(snapshot)
+      JSON.stringify(safeSnapshot)
     );
   } catch (error) {
     console.warn('[QuizRunner] Failed to save local quiz progress:', error);

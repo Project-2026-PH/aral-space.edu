@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import NewSubjectModal from '../subject/NewSubjectModal';
 import { parseSmartClipboard, type ParsedClipboard } from '@/lib/clipboardParser';
+import { QuizTransformService } from '@quiz-creator/core';
 
 export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
 
@@ -121,6 +122,7 @@ export default function ManualQuizCreator({
     const current = next[index];
     let newOptions = current.options;
     let newCorrect = current.correct_answer;
+    let newQuestionText = current.question_text;
 
     if (type === 'multiple_choice') {
       if (newOptions.length < 4) {
@@ -130,6 +132,13 @@ export default function ManualQuizCreator({
       }
       newCorrect = Math.min(newCorrect, 3);
     } else if (type === 'true_false') {
+      const termCandidate = current.type === 'identification'
+        ? (current.options[0] || '')
+        : (current.options[current.correct_answer] || current.options[0] || '');
+
+      if (termCandidate.trim() && current.question_text.trim()) {
+        newQuestionText = QuizTransformService.paraphraseToStatement(current.question_text, termCandidate.trim());
+      }
       newOptions = ['True', 'False'];
       newCorrect = newCorrect === 1 ? 1 : 0;
     } else if (type === 'identification') {
@@ -144,6 +153,7 @@ export default function ManualQuizCreator({
     next[index] = {
       ...current,
       type,
+      question_text: newQuestionText,
       options: newOptions,
       correct_answer: newCorrect
     };

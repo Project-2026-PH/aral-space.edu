@@ -25,6 +25,14 @@ export interface RepositoryOptions {
   enableCache?: boolean;
 }
 
+function assertPersistentStoreInProduction(repoName: string): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      `[Serverless Guard] Production database configuration missing: Cannot initialize ${repoName} with ephemeral in-memory storage. Set DATABASE_URL (or NEON_DATABASE_URL) or configure Supabase credentials.`
+    );
+  }
+}
+
 export class RepositoryFactory {
   static createQuizRepository(
     source?: SupabaseClient | RepositoryOptions | null,
@@ -44,11 +52,13 @@ export class RepositoryFactory {
       } else if (opts.supabase) {
         repo = new SupabaseQuizRepository(opts.supabase, sharedMemoryQuizRepo);
       } else {
+        assertPersistentStoreInProduction('QuizRepository');
         repo = sharedMemoryQuizRepo;
       }
     } else if (source) {
       repo = new SupabaseQuizRepository(source as SupabaseClient, sharedMemoryQuizRepo);
     } else {
+      assertPersistentStoreInProduction('QuizRepository');
       repo = sharedMemoryQuizRepo;
     }
 
@@ -68,10 +78,12 @@ export class RepositoryFactory {
       } else if (opts.supabase) {
         return new SupabaseSessionRepository(opts.supabase);
       }
+      assertPersistentStoreInProduction('SessionRepository');
       return sharedMemorySessionRepo;
     } else if (source) {
       return new SupabaseSessionRepository(source as SupabaseClient);
     }
+    assertPersistentStoreInProduction('SessionRepository');
     return sharedMemorySessionRepo;
   }
 

@@ -231,7 +231,9 @@ export default function SharedStudySetPage() {
     }
 
     const currentCard = quiz.questions[studyCardIdx];
-    const correctOpt = currentCard.options[currentCard.correct_answer] || currentCard.options[0] || 'Correct';
+    const correctOpt = quiz.allow_public_answer_key === true
+      ? (currentCard.answer_text || (currentCard.correct_answer !== undefined ? currentCard.options[currentCard.correct_answer] : undefined) || 'Correct')
+      : 'The answer key is hidden by the author.';
 
     return (
       <div className="max-w-2xl mx-auto space-y-6 pb-20 animate-fade-in">
@@ -276,7 +278,7 @@ export default function SharedStudySetPage() {
             ) : (
               <div className="space-y-3">
                 <p className="text-lg font-extrabold text-primary">{correctOpt}</p>
-                {currentCard.explanation && (
+                {quiz.allow_public_answer_key === true && currentCard.explanation && (
                   <p className="text-xs text-muted-foreground italic max-w-md mx-auto">
                     💡 {currentCard.explanation}
                   </p>
@@ -309,7 +311,9 @@ export default function SharedStudySetPage() {
   }
 
   const currentPreviewCard = quiz.questions[cardIndex];
-  const correctText = currentPreviewCard?.options[currentPreviewCard.correct_answer] || currentPreviewCard?.options[0] || '';
+  const correctText = quiz.allow_public_answer_key === true
+    ? ((currentPreviewCard?.answer_text || (currentPreviewCard?.correct_answer !== undefined ? currentPreviewCard.options[currentPreviewCard.correct_answer] : undefined) || currentPreviewCard?.options[0]) || '')
+    : 'Answer key hidden by author';
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-24 animate-fade-in">
@@ -511,9 +515,11 @@ export default function SharedStudySetPage() {
                     {q.question_text}
                   </p>
                   <p className="text-xs font-semibold text-primary">
-                    Answer: {q.options[q.correct_answer] || q.options[0]}
+                    {quiz.allow_public_answer_key === true
+                      ? `Answer: ${(q.answer_text || (q.correct_answer !== undefined ? q.options[q.correct_answer] : undefined) || q.options[0] || 'Typed answer')}`
+                      : 'Answer key hidden by author'}
                   </p>
-                  {q.explanation && (
+                  {quiz.allow_public_answer_key === true && q.explanation && (
                     <p className="text-[11px] text-muted-foreground italic">
                       💡 {q.explanation}
                     </p>

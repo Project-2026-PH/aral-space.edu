@@ -1,15 +1,12 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, UpdateSubjectShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink } from '@quiz-creator/types';
 import { normalizeQuestionFields } from './questionFields';
 import { SAMPLE_SUBJECT, SAMPLE_QUIZ, SAMPLE_QUIZ_QUESTIONS } from '../services/SampleQuizService';
+import { generateSecureToken, isShareTokenActive } from '../security/shareTokens';
+import { toPublicQuizDto, toPublicSubjectDto } from '../security/publicDtos';
 
-function generateShareSlug(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let slug = '';
-  for (let i = 0; i < 10; i++) {
-    slug += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return slug;
+function generateShareToken(): string {
+  return generateSecureToken(32);
 }
 
 export class MemoryQuizRepository implements IQuizRepository {
@@ -127,6 +124,20 @@ export class MemoryQuizRepository implements IQuizRepository {
     });
   }
 
+  private async requireSubjectAssignment(subjectId: string | null | undefined, userId?: string): Promise<void> {
+    if (!subjectId) return;
+    if (!this.subjects.has(subjectId)) throw new Error('Subject not found or access is restricted');
+    if (userId && !(await this.getSubjectAccess(subjectId, userId))) {
+      throw new Error('Subject not found or access is restricted');
+    }
+  }
+
+  private async requireQuizAccess(quizId: string, userId?: string): Promise<Quiz> {
+    const quiz = await this.getQuizById(quizId, userId);
+    if (!quiz) throw new Error('Quiz not found or access is restricted');
+    return quiz;
+  }
+
   async listSubjects(userId?: string): Promise<Subject[]> {
     const list = Array.from(this.subjects.values());
     return userId ? list.filter(s => !s.user_id || s.user_id === userId || this.collaborators.get(s.id)?.has(userId)) : list;
@@ -139,7 +150,7 @@ export class MemoryQuizRepository implements IQuizRepository {
       name,
       color,
       user_id: userId,
-      share_token: generateShareSlug(),
+      share_token: generateShareToken(),
       is_public: true,
       created_at: new Date().toISOString()
     };
@@ -169,6 +180,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz> {
+    await this.requireSubjectAssignment(dto.subject_id, userId);
     const quizId = `quiz-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const newQuiz: Quiz = {
       id: quizId,
@@ -180,7 +192,7 @@ export class MemoryQuizRepository implements IQuizRepository {
       source_model: dto.source_model || 'manual',
       subject_id: dto.subject_id || null,
       user_id: userId || null,
-      share_token: generateShareSlug(),
+      share_token: generateShareToken(),
       is_public: true,
       allow_cloning: true,
       created_at: new Date().toISOString()
@@ -214,6 +226,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
     const quiz = await this.getQuizById(id, userId);
     if (!quiz) throw new Error(`Quiz ${id} not found`);
+    if (dto.subject_id !== undefined) await this.requireSubjectAssignment(dto.subject_id, userId);
     if (dto.title !== undefined) quiz.title = dto.title;
     if (dto.description !== undefined) quiz.description = dto.description;
     if (dto.subject_id !== undefined) quiz.subject_id = dto.subject_id;
@@ -231,7 +244,8 @@ export class MemoryQuizRepository implements IQuizRepository {
     return deleted;
   }
 
-  async getQuestionsByQuizId(quizId: string): Promise<QuizQuestion[]> {
+  async getQuestionsByQuizId(quizId: string, userId?: string): Promise<QuizQuestion[]> {
+    await this.requireQuizAccess(quizId, userId);
     const list: QuizQuestion[] = [];
     for (const q of this.questions.values()) {
       if (q.quiz_id === quizId) list.push(q);
@@ -239,15 +253,13 @@ export class MemoryQuizRepository implements IQuizRepository {
     return list.sort((a, b) => a.order_index - b.order_index);
   }
 
-  async addQuestion(quizId: string, dto: CreateQuestionDto): Promise<QuizQuestion> {
-    const quiz = this.quizzes.get(quizId);
-    if (!quiz) throw new Error(`Quiz ${quizId} not found`);
-    
-    const questions = await this.getQuestionsByQuizId(quizId);
+  async addQuestion(quizId: string, dto: CreateQuestionDto, userId?: string): Promise<QuizQuestion> {
+    const quiz = await this.requireQuizAccess(quizId, userId);
+    const questions = await this.getQuestionsByQuizId(quizId, userId);
     const orderIndex = dto.order_index !== undefined ? dto.order_index : questions.length;
     const qId = `q-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     const fields = normalizeQuestionFields(dto);
-    
+
     const newQuestion: QuizQuestion = {
       id: qId,
       quiz_id: quizId,
@@ -266,12 +278,14 @@ export class MemoryQuizRepository implements IQuizRepository {
     };
     this.questions.set(qId, newQuestion);
     quiz.question_count = questions.length + 1;
+    this.quizzes.set(quizId, quiz);
     return newQuestion;
   }
 
-  async updateQuestion(questionId: string, dto: UpdateQuestionDto): Promise<QuizQuestion> {
+  async updateQuestion(quizId: string, questionId: string, dto: UpdateQuestionDto, userId?: string): Promise<QuizQuestion> {
+    await this.requireQuizAccess(quizId, userId);
     const question = this.questions.get(questionId);
-    if (!question) throw new Error(`Question ${questionId} not found`);
+    if (!question || question.quiz_id !== quizId) throw new Error('Question not found');
     const fields = normalizeQuestionFields(dto, question);
     if (dto.question_text !== undefined) question.question_text = dto.question_text;
     question.answer_text = fields.answer_text;
@@ -287,67 +301,79 @@ export class MemoryQuizRepository implements IQuizRepository {
     return question;
   }
 
-  async deleteQuestion(questionId: string): Promise<boolean> {
+  async deleteQuestion(quizId: string, questionId: string, userId?: string): Promise<boolean> {
+    await this.requireQuizAccess(quizId, userId);
     const question = this.questions.get(questionId);
-    if (!question) return false;
+    if (!question || question.quiz_id !== quizId) return false;
     this.questions.delete(questionId);
-    const quiz = this.quizzes.get(question.quiz_id);
+    const quiz = this.quizzes.get(quizId);
     if (quiz) {
-      const remaining = await this.getQuestionsByQuizId(quiz.id);
+      const remaining = await this.getQuestionsByQuizId(quizId, userId);
       quiz.question_count = remaining.length;
+      this.quizzes.set(quizId, quiz);
     }
     return true;
   }
 
-  async reorderQuestions(quizId: string, questionIds: string[]): Promise<boolean> {
+  async reorderQuestions(quizId: string, questionIds: string[], userId?: string): Promise<boolean> {
+    await this.requireQuizAccess(quizId, userId);
+    const questions = await this.getQuestionsByQuizId(quizId, userId);
+    const expectedIds = new Set(questions.map((question) => question.id));
+    if (questionIds.length !== questions.length || questionIds.some((id) => !expectedIds.has(id))) {
+      throw new Error('Question order must contain every question in this quiz exactly once');
+    }
     questionIds.forEach((id, index) => {
-      const q = this.questions.get(id);
-      if (q && q.quiz_id === quizId) {
-        q.order_index = index;
-        this.questions.set(id, q);
-      }
+      const q = this.questions.get(id)!;
+      q.order_index = index;
+      this.questions.set(id, q);
     });
     return true;
   }
 
-  async getShareConfig(quizId: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
-    const quiz = this.quizzes.get(quizId);
-    if (!quiz) throw new Error(`Quiz ${quizId} not found`);
-
+  async getShareConfig(quizId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
+    const quiz = await this.requireQuizAccess(quizId, userId);
     if (!quiz.share_token) {
-      quiz.share_token = generateShareSlug();
-      if (quiz.is_public === undefined) quiz.is_public = true;
-      if (quiz.allow_cloning === undefined) quiz.allow_cloning = true;
+      quiz.share_token = generateShareToken();
+      quiz.is_public = quiz.is_public ?? true;
+      quiz.allow_cloning = quiz.allow_cloning ?? true;
+      quiz.share_revoked_at = null;
       this.quizzes.set(quizId, quiz);
     }
 
     return {
       share_token: quiz.share_token,
       is_public: quiz.is_public ?? true,
-      allow_cloning: quiz.allow_cloning ?? true
+      allow_cloning: quiz.allow_cloning ?? true,
+      allow_public_answer_key: quiz.allow_public_answer_key ?? false,
+      share_expires_at: quiz.share_expires_at ?? null,
+      share_revoked_at: quiz.share_revoked_at ?? null
     };
   }
 
-  async updateShareConfig(quizId: string, dto: UpdateShareConfigDto): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
-    const quiz = this.quizzes.get(quizId);
-    if (!quiz) throw new Error(`Quiz ${quizId} not found`);
-
-    if (dto.reset_token || !quiz.share_token) {
-      quiz.share_token = generateShareSlug();
+  async updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
+    const quiz = await this.requireQuizAccess(quizId, userId);
+    const wasRevoked = Boolean(quiz.share_revoked_at) || quiz.is_public === false;
+    const enablingPublic = dto.is_public === true;
+    if (dto.reset_token || !quiz.share_token || (enablingPublic && wasRevoked)) {
+      quiz.share_token = generateShareToken();
+      quiz.share_revoked_at = null;
     }
     if (dto.is_public !== undefined) {
       quiz.is_public = dto.is_public;
+      if (!dto.is_public) quiz.share_revoked_at = new Date().toISOString();
     }
-    if (dto.allow_cloning !== undefined) {
-      quiz.allow_cloning = dto.allow_cloning;
-    }
+    if (dto.allow_cloning !== undefined) quiz.allow_cloning = dto.allow_cloning;
+    if (dto.allow_public_answer_key !== undefined) quiz.allow_public_answer_key = dto.allow_public_answer_key;
+    if (dto.share_expires_at !== undefined) quiz.share_expires_at = dto.share_expires_at;
 
     this.quizzes.set(quizId, quiz);
-
     return {
       share_token: quiz.share_token,
       is_public: quiz.is_public ?? true,
-      allow_cloning: quiz.allow_cloning ?? true
+      allow_cloning: quiz.allow_cloning ?? true,
+      allow_public_answer_key: quiz.allow_public_answer_key ?? false,
+      share_expires_at: quiz.share_expires_at ?? null,
+      share_revoked_at: quiz.share_revoked_at ?? null
     };
   }
 
@@ -382,7 +408,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string): Promise<SubjectCollaboratorLink> {
     const access = await this.getSubjectAccess(subjectId, userId);
     if (!access?.can_manage) throw new Error('Only the subject owner can create collaborator links');
-    const token = generateShareSlug() + generateShareSlug();
+    const token = generateShareToken() + generateShareToken();
     this.collaboratorLinks.set(token, { subject_id: subjectId, expires_at: expiresAt, used_at: null, user_id: null });
     return { token, expires_at: expiresAt, used_at: null };
   }
@@ -418,133 +444,97 @@ export class MemoryQuizRepository implements IQuizRepository {
     return this.subjects.delete(subjectId);
   }
 
-  async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean }> {
+  async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
     const subject = this.subjects.get(subjectId);
-    const isPublicRead = Boolean(subject && (subject.user_id === undefined || subject.user_id === null) && subject.is_public !== false);
-    const isCollaborator = Boolean(userId && this.collaborators.get(subjectId)?.has(userId));
-    if (!subject || (userId && subject.user_id !== userId && !isPublicRead && !isCollaborator)) {
+    if (!subject) throw new Error(`Subject ${subjectId} not found`);
+    if (userId && subject.user_id !== userId && !(await this.getSubjectAccess(subjectId, userId))) {
       throw new Error(`Subject ${subjectId} not found`);
     }
 
     if (!subject.share_token) {
-      subject.share_token = generateShareSlug();
+      subject.share_token = generateShareToken();
       subject.is_public = subject.is_public ?? true;
+      subject.share_revoked_at = null;
       this.subjects.set(subjectId, subject);
     }
 
     return {
       share_token: subject.share_token,
-      is_public: subject.is_public ?? true
+      is_public: subject.is_public ?? true,
+      share_expires_at: subject.share_expires_at ?? null,
+      share_revoked_at: subject.share_revoked_at ?? null
     };
   }
 
-  async updateSubjectShareConfig(
-    subjectId: string,
-    dto: { is_public?: boolean; reset_token?: boolean },
-    userId?: string
-  ): Promise<{ share_token: string; is_public: boolean }> {
+  async updateSubjectShareConfig(subjectId: string, dto: UpdateSubjectShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
     const subject = this.subjects.get(subjectId);
-    if (!subject || (userId && subject.user_id !== userId)) {
-      throw new Error(`Subject ${subjectId} not found`);
-    }
+    if (!subject || (userId && subject.user_id !== userId)) throw new Error(`Subject ${subjectId} not found`);
 
-    if (dto.reset_token || !subject.share_token) {
-      subject.share_token = generateShareSlug();
+    const wasRevoked = Boolean(subject.share_revoked_at) || subject.is_public === false;
+    if (dto.reset_token || !subject.share_token || (dto.is_public === true && wasRevoked)) {
+      subject.share_token = generateShareToken();
+      subject.share_revoked_at = null;
     }
     if (dto.is_public !== undefined) {
       subject.is_public = dto.is_public;
+      if (!dto.is_public) subject.share_revoked_at = new Date().toISOString();
     }
+    if (dto.share_expires_at !== undefined) subject.share_expires_at = dto.share_expires_at;
     this.subjects.set(subjectId, subject);
 
     return {
       share_token: subject.share_token,
-      is_public: subject.is_public ?? true
+      is_public: subject.is_public ?? true,
+      share_expires_at: subject.share_expires_at ?? null,
+      share_revoked_at: subject.share_revoked_at ?? null
     };
   }
 
   async getSubjectByShareToken(shareToken: string) {
     const subject = Array.from(this.subjects.values()).find((candidate) => candidate.share_token === shareToken);
-    if (!subject || subject.is_public === false) return null;
+    if (!subject || !isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)) return null;
 
-    return {
-      id: subject.id,
-      name: subject.name,
-      color: subject.color,
-      share_token: subject.share_token!,
-      is_public: subject.is_public ?? true,
-      created_at: subject.created_at,
-      quizzes: Array.from(this.quizzes.values())
-        .filter((quiz) => quiz.subject_id === subject.id && quiz.is_public !== false && Boolean(quiz.share_token))
-        .map((quiz) => ({
-          id: quiz.id,
-          title: quiz.title,
-          description: quiz.description || null,
-          question_count: quiz.question_count,
-          generated_at: quiz.generated_at,
-          share_token: quiz.share_token!,
-          is_public: quiz.is_public ?? true,
-          created_at: quiz.created_at
-        }))
-    };
+    const quizzes = Array.from(this.quizzes.values()).filter((quiz) =>
+      quiz.subject_id === subject.id &&
+      Boolean(quiz.share_token) &&
+      isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)
+    );
+    return toPublicSubjectDto(subject, quizzes);
   }
 
   async getQuizByShareToken(shareToken: string): Promise<PublicQuizDto | null> {
-    let matchedQuiz: Quiz | null = null;
-    for (const q of this.quizzes.values()) {
-      if (q.share_token === shareToken) {
-        matchedQuiz = q;
-        break;
-      }
-    }
-
-    if (!matchedQuiz) return null;
-    if (matchedQuiz.is_public === false) return null;
+    const matchedQuiz = Array.from(this.quizzes.values()).find((quiz) => quiz.share_token === shareToken);
+    if (!matchedQuiz || !isShareTokenActive(matchedQuiz.is_public, matchedQuiz.share_expires_at, matchedQuiz.share_revoked_at)) return null;
 
     const questions = await this.getQuestionsByQuizId(matchedQuiz.id);
     const subject = matchedQuiz.subject_id ? this.subjects.get(matchedQuiz.subject_id) : null;
-
-    return {
-      id: matchedQuiz.id,
-      title: matchedQuiz.title,
-      description: matchedQuiz.description || null,
-      question_count: matchedQuiz.question_count || questions.length,
-      generated_at: matchedQuiz.generated_at,
-      source_model: matchedQuiz.source_model,
-      share_token: matchedQuiz.share_token || shareToken,
-      is_public: matchedQuiz.is_public ?? true,
-      allow_cloning: matchedQuiz.allow_cloning ?? true,
-      created_at: matchedQuiz.created_at,
-      subject: subject ? { id: subject.id, name: subject.name, color: subject.color } : null,
-      questions: questions.map(q => ({
-        id: q.id,
-        question_text: q.question_text,
-        answer_text: q.answer_text || q.options[q.correct_answer] || null,
-        question_type: q.question_type || (q.options.length > 1 ? 'multiple_choice' : 'typed_answer'),
-        options: q.options,
-        correct_answer: q.correct_answer,
-        explanation: q.explanation || null,
-        order_index: q.order_index
-      }))
-    };
+    return toPublicQuizDto(matchedQuiz, questions, subject);
   }
 
   async cloneQuizByShareToken(shareToken: string, userId?: string): Promise<Quiz> {
-    const publicQuiz = await this.getQuizByShareToken(shareToken);
-    if (!publicQuiz) throw new Error('Shared set not found or access is restricted.');
-    if (!publicQuiz.allow_cloning) throw new Error('Creator has disabled cloning for this study set.');
+    const matchedQuiz = Array.from(this.quizzes.values()).find((quiz) => quiz.share_token === shareToken);
+    if (!matchedQuiz || !isShareTokenActive(matchedQuiz.is_public, matchedQuiz.share_expires_at, matchedQuiz.share_revoked_at)) {
+      throw new Error('Shared set not found or access is restricted.');
+    }
+    if (!matchedQuiz.allow_cloning) throw new Error('Creator has disabled cloning for this study set.');
 
-    return await this.createQuiz({
-      title: `${publicQuiz.title} (Copy)`,
-      description: publicQuiz.description || null,
-      subject_id: publicQuiz.subject?.id || null,
+    const questions = await this.getQuestionsByQuizId(matchedQuiz.id);
+    return this.createQuiz({
+      title: `${matchedQuiz.title} (Copy)`,
+      description: matchedQuiz.description || null,
+      subject_id: null,
       source_model: 'cloned',
-      questions: publicQuiz.questions.map(q => ({
-        question_text: q.question_text,
-        answer_text: q.answer_text || null,
-        question_type: q.question_type || null,
-        options: q.options,
-        correct_answer: q.correct_answer,
-        explanation: q.explanation || null
+      questions: questions.map((question) => ({
+        question_text: question.question_text,
+        answer_text: question.answer_text || null,
+        question_type: question.question_type || null,
+        options: question.options,
+        correct_answer: question.correct_answer,
+        explanation: question.explanation || null,
+        correct_explanation: question.correct_explanation || null,
+        distractor_explanations: question.distractor_explanations || null,
+        discriminatory_keywords: question.discriminatory_keywords || null,
+        source_pages: question.source_pages || null
       }))
     }, userId);
   }

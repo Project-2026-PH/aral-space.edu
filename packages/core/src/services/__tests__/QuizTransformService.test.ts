@@ -61,3 +61,87 @@ describe('QuizTransformService.prepareQuestionsForOptions', () => {
     expect(result[0].options).toEqual(['Answer 1', 'Custom 2', 'Custom 3', 'Custom 4']);
   });
 });
+
+describe('QuizTransformService.paraphraseToStatement', () => {
+  it('paraphrases "It involves..." definition with user example accurately', () => {
+    const definition = 'It involves envisioning physical operations more effectively with information such as PLDT employing “paperless billing” to their customers and moving the process from a manual paper-based filing system to a central computerized database. It is an essential step to utilize the benefits of the marketspace fully.';
+    const term = 'Stage 1:New Processes';
+
+    const statement = QuizTransformService.paraphraseToStatement(definition, term);
+
+    expect(statement).toBe(
+      'Stage 1:New Processes involves envisioning physical operations more effectively with information such as PLDT employing “paperless billing” to their customers and moving the process from a manual paper-based filing system to a central computerized database. It is an essential step to utilize the benefits of the marketspace fully.'
+    );
+  });
+
+  it('handles various linguistic definition patterns cleanly', () => {
+    expect(QuizTransformService.paraphraseToStatement('Refers to the process of data parsing.', 'Tokenization')).toBe(
+      'Tokenization refers to the process of data parsing.'
+    );
+    expect(QuizTransformService.paraphraseToStatement('It is defined as state preservation.', 'Snapshotting')).toBe(
+      'Snapshotting is defined as state preservation.'
+    );
+    expect(QuizTransformService.paraphraseToStatement('The process of converting code to AST.', 'Parsing')).toBe(
+      'Parsing is the process of converting code to AST.'
+    );
+    expect(QuizTransformService.paraphraseToStatement('What is spaced repetition?', 'Spaced Repetition')).toBe(
+      'Spaced Repetition is spaced repetition.'
+    );
+  });
+
+  it('strips enclosing quotes from question text if present', () => {
+    const quoted = '"It involves envisioning physical operations more effectively."';
+    expect(QuizTransformService.paraphraseToStatement(quoted, 'Stage 1')).toBe(
+      'Stage 1 involves envisioning physical operations more effectively.'
+    );
+  });
+});
+
+describe('QuizTransformService.convertToTrueFalse & generateTrueFalseQuestions', () => {
+  const exampleDef = 'It involves envisioning physical operations more effectively with information such as PLDT employing “paperless billing” to their customers and moving the process from a manual paper-based filing system to a central computerized database. It is an essential step to utilize the benefits of the marketspace fully.';
+
+  it('creates a TRUE question using the exact term', () => {
+    const q = makeMockQuestion('q1', exampleDef, 'Stage 1:New Processes');
+    const result = QuizTransformService.convertToTrueFalse(q, true, ['Stage 2:New Marketplace']);
+
+    expect(result.options).toEqual(['True', 'False']);
+    expect(result.correct_answer).toBe(0);
+    expect(result.answer_text).toBe('True');
+    expect(result.question_text).toContain('Stage 1:New Processes involves');
+  });
+
+  it('creates a FALSE question by swapping with a distractor term', () => {
+    const q = makeMockQuestion('q1', exampleDef, 'Stage 1:New Processes');
+    const result = QuizTransformService.convertToTrueFalse(q, false, ['Stage 2:New Marketplace']);
+
+    expect(result.options).toEqual(['True', 'False']);
+    expect(result.correct_answer).toBe(1);
+    expect(result.answer_text).toBe('False');
+    expect(result.question_text).toContain('Stage 2:New Marketplace involves');
+    expect(result.explanation).toContain('Stage 1:New Processes');
+  });
+
+  it('generates a balanced True/False deck across multiple questions', () => {
+    const questions: QuizQuestion[] = [
+      makeMockQuestion('q1', exampleDef, 'Stage 1:New Processes'),
+      makeMockQuestion('q2', 'Refers to the electronic marketplace.', 'Stage 2:New Marketplace'),
+      makeMockQuestion('q3', 'Defined as the final synthesis stage.', 'Stage 3:New Synthesis')
+    ];
+
+    const result = QuizTransformService.generateTrueFalseQuestions(questions);
+
+    expect(result).toHaveLength(3);
+    // Index 0 is True
+    expect(result[0].correct_answer).toBe(0);
+    expect(result[0].question_text).toContain('Stage 1:New Processes involves');
+
+    // Index 1 is False (swapped with Stage 3 or Stage 1)
+    expect(result[1].correct_answer).toBe(1);
+    expect(result[1].question_text).not.toContain('Stage 2:New Marketplace refers to');
+    expect(result[1].explanation).toContain('Stage 2:New Marketplace');
+
+    // Index 2 is True
+    expect(result[2].correct_answer).toBe(0);
+    expect(result[2].question_text).toContain('Stage 3:New Synthesis is defined as');
+  });
+});

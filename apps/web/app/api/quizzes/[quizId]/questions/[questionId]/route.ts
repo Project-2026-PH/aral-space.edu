@@ -1,36 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { QuizCrudController } from '@quiz-creator/controllers';
+import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
 import { getQuizRepository } from '@/lib/db';
 import { getAnonymousUserId } from '@/lib/anonymous';
-import { revalidateQuizTag } from '@/lib/cached-queries';
+import {
+  assertAllowedOrigin,
+  readJsonBody,
+  enforceRateLimit,
+  RequestSecurityError
+} from '@/lib/request-security';
+import { SECURITY_LIMITS } from '@/lib/security-config';
+import { revalidatePublicQuizTag, revalidateQuizTag } from '@/lib/cached-queries';
+
+function errorResponse(error: any): NextResponse {
+  const status = error instanceof RequestSecurityError ? error.status : typeof error?.status === 'number' ? error.status : 400;
+  return NextResponse.json({ error: error?.message || 'Request failed' }, { status });
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ quizId: string; questionId: string }> }) {
   try {
+    assertAllowedOrigin(req);
     const { quizId, questionId } = await params;
     const userId = await getAnonymousUserId(req);
-    const body = await req.json();
-    const quizRepo = await getQuizRepository(false);
+    const rateLimit = await enforceRateLimit(req, 'quiz-question-write', userId, 60);
+    if (rateLimit) return rateLimit;
+    const body = await readJsonBody(req, SECURITY_LIMITS.jsonBodyBytes);
+    const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
-    if (!(await controller.getQuiz(quizId, userId))) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
-    const updated = await controller.updateQuestion(questionId, body);
+    const accessibleQuiz = await controller.getQuiz(quizId, userId);
+    if (!accessibleQuiz) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
+    const updated = await controller.updateQuestion(quizId, questionId, body as any, userId);
+    if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);
     return NextResponse.json(updated);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    return errorResponse(err);
   }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ quizId: string; questionId: string }> }) {
   try {
+    assertAllowedOrigin(req);
     const { quizId, questionId } = await params;
     const userId = await getAnonymousUserId(req);
-    const quizRepo = await getQuizRepository(false);
+    const rateLimit = await enforceRateLimit(req, 'quiz-question-write', userId, 60);
+    if (rateLimit) return rateLimit;
+    const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
-    if (!(await controller.getQuiz(quizId, userId))) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
-    const success = await controller.deleteQuestion(questionId);
+    const accessibleQuiz = await controller.getQuiz(quizId, userId);
+    if (!accessibleQuiz) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
+    const success = await controller.deleteQuestion(quizId, questionId, userId);
+    if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);
     return NextResponse.json({ success });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return errorResponse(err);
   }
 }

@@ -43,7 +43,8 @@ export default async function PracticePage({
         ...sharedQuiz,
         questions: sharedQuiz.questions.map((question): QuizQuestion => ({
           ...question,
-          quiz_id: sharedQuiz.id
+          quiz_id: sharedQuiz.id,
+          correct_answer: question.correct_answer ?? 0,
         }))
       } as Quiz;
     }

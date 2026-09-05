@@ -44,6 +44,15 @@ export class CachedQuizRepository implements IQuizRepository {
     return subject;
   }
 
+  async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
+    const result = await this.underlying.deleteSubject(subjectId, userId);
+    this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix(`quiz:`);
+    this.cache.deleteByPrefix('questions:');
+    return result;
+  }
+
   async getSubjectShareConfig(subjectId: string, userId?: string) {
     return this.underlying.getSubjectShareConfig(subjectId, userId);
   }

@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import NewSubjectModal from '@/components/subject/NewSubjectModal';
 import SubjectLibrary from '@/components/subject/SubjectLibrary';
 import QuizLibrary from '@/components/quiz/QuizLibrary';
-import { Sparkles, Plus, Search } from 'lucide-react';
+import { Sparkles, Plus, Search, LoaderCircle } from 'lucide-react';
 import Link from 'next/link';
 
 const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizModal'), {
@@ -16,14 +16,17 @@ const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizMo
 export interface HomeClientProps {
   initialQuizzes: Quiz[];
   initialSubjects: Subject[];
+  viewerId: string;
 }
 
-export default function HomeClient({ initialQuizzes, initialSubjects }: HomeClientProps) {
+export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }: HomeClientProps) {
   const [quizzes, setQuizzes] = useState<Quiz[]>(initialQuizzes);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
+  const [loading] = useState(false);
   const [search, setSearch] = useState('');
   const [showAiModal, setShowAiModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [openingManualQuiz, setOpeningManualQuiz] = useState(false);
 
   useEffect(() => {
     setQuizzes(initialQuizzes);
@@ -64,10 +67,28 @@ export default function HomeClient({ initialQuizzes, initialSubjects }: HomeClie
           </button>
           <Link
             href="/new?mode=manual"
+            onClick={(event) => {
+              if (
+                event.defaultPrevented ||
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              ) {
+                return;
+              }
+              setOpeningManualQuiz(true);
+            }}
+            aria-busy={openingManualQuiz}
             className="flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 text-xs font-bold text-foreground transition-all hover:bg-muted active:scale-95"
           >
-            <Plus className="h-4 w-4" />
-            <span>Create Manually</span>
+            {openingManualQuiz ? (
+              <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus aria-hidden="true" className="h-4 w-4" />
+            )}
+            <span>{openingManualQuiz ? 'Opening editor...' : 'Create Manually'}</span>
           </Link>
         </div>
       </div>
@@ -94,9 +115,25 @@ export default function HomeClient({ initialQuizzes, initialSubjects }: HomeClie
         </button>
       </div>
 
-      <SubjectLibrary subjects={subjects} quizzes={quizzes} loading={false} />
+      <SubjectLibrary
+        subjects={subjects}
+        quizzes={quizzes}
+        viewerId={viewerId}
+        loading={loading}
+        onSubjectDeleted={(subjectId) => {
+          setSubjects((current) => current.filter((subject) => subject.id !== subjectId));
+          setQuizzes((current) => current.filter((quiz) => quiz.subject_id !== subjectId));
+        }}
+        onSubjectUpdated={(subjectId, config) => {
+          setSubjects((current) => current.map((subject) => (
+            subject.id === subjectId
+              ? { ...subject, ...config }
+              : subject
+          )));
+        }}
+      />
 
-      <QuizLibrary quizzes={filtered} loading={false} />
+      <QuizLibrary quizzes={filtered} loading={loading} />
 
       <NewSubjectModal
         open={showSubjectModal}

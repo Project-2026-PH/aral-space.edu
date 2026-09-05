@@ -48,6 +48,30 @@ export class NeonQuizRepository implements IQuizRepository {
     return rows[0] as Subject;
   }
 
+  async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
+    const rows = userId
+      ? await this.sql`
+          WITH target_subject AS (
+            SELECT id FROM subjects WHERE id = ${subjectId} AND user_id = ${userId}
+          ), deleted_quizzes AS (
+            DELETE FROM quizzes
+            WHERE subject_id IN (SELECT id FROM target_subject)
+            RETURNING id
+          )
+          DELETE FROM subjects
+          WHERE id IN (SELECT id FROM target_subject)
+          RETURNING id
+        `
+      : await this.sql`
+          WITH deleted_quizzes AS (
+            DELETE FROM quizzes WHERE subject_id = ${subjectId} RETURNING id
+          )
+          DELETE FROM subjects WHERE id = ${subjectId} RETURNING id
+        `;
+
+    return Boolean(rows && rows.length > 0);
+  }
+
   async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean }> {
     const rows = userId
       ? await this.sql`SELECT share_token, is_public FROM subjects WHERE id = ${subjectId} AND user_id = ${userId} LIMIT 1`

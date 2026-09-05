@@ -347,9 +347,24 @@ export class MemoryQuizRepository implements IQuizRepository {
     };
   }
 
+  async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
+    const subject = this.subjects.get(subjectId);
+    if (!subject || (userId && (!subject.user_id || subject.user_id !== userId))) return false;
+
+    for (const [quizId, quiz] of this.quizzes.entries()) {
+      if (quiz.subject_id !== subjectId) continue;
+      this.quizzes.delete(quizId);
+      for (const [questionId, question] of this.questions.entries()) {
+        if (question.quiz_id === quizId) this.questions.delete(questionId);
+      }
+    }
+
+    return this.subjects.delete(subjectId);
+  }
+
   async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean }> {
     const subject = this.subjects.get(subjectId);
-    if (!subject || (userId && subject.user_id && subject.user_id !== userId)) {
+    if (!subject || (userId && subject.user_id !== userId)) {
       throw new Error(`Subject ${subjectId} not found`);
     }
 
@@ -371,7 +386,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     userId?: string
   ): Promise<{ share_token: string; is_public: boolean }> {
     const subject = this.subjects.get(subjectId);
-    if (!subject || (userId && subject.user_id && subject.user_id !== userId)) {
+    if (!subject || (userId && subject.user_id !== userId)) {
       throw new Error(`Subject ${subjectId} not found`);
     }
 

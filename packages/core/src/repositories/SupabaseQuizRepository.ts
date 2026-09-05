@@ -50,6 +50,32 @@ export class SupabaseQuizRepository implements IQuizRepository {
     return this.fallback.createSubject(name, color, userId);
   }
 
+  async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
+    try {
+      let subjectQuery = this.supabase
+        .from('subjects')
+        .select('id, user_id')
+        .eq('id', subjectId);
+      if (userId) subjectQuery = subjectQuery.eq('user_id', userId);
+      const { data: subject, error: subjectError } = await subjectQuery.maybeSingle();
+      if (subjectError || !subject) return false;
+
+      const { error: quizzesError } = await this.supabase
+        .from('quizzes')
+        .delete()
+        .eq('subject_id', subjectId);
+      if (quizzesError) return false;
+
+      const { data: deletedSubject, error: deleteError } = await this.supabase
+        .from('subjects')
+        .delete()
+        .eq('id', subjectId)
+        .select('id');
+      if (!deleteError) return Boolean(deletedSubject && deletedSubject.length > 0);
+    } catch (e) {}
+    return false;
+  }
+
   async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean }> {
     try {
       let query = this.supabase

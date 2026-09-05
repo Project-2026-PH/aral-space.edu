@@ -45,7 +45,7 @@ export default function RootLayout({
               />
               <div>
                 <span className="text-sm font-extrabold tracking-tight text-foreground">Aral Space</span>
-                <span className="block text-[10px] font-semibold text-muted-foreground -mt-0.5">Spaced Mastery Studio</span>
+                <span className="block text-[10px] font-semibold text-muted-foreground -mt-0.5">Your Space to Study</span>
               </div>
             </Link>
 

@@ -10,9 +10,10 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage() {
   let quizzes: Quiz[] = [];
   let subjects: Subject[] = [];
+  let userId = '';
 
   try {
-    const userId = await getAnonymousUserId();
+    userId = await getAnonymousUserId();
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const data = await controller.listQuizzesAndSubjects(userId);
@@ -26,6 +27,7 @@ export default async function HomePage() {
     <HomeClient
       initialQuizzes={quizzes}
       initialSubjects={subjects}
+      viewerId={userId}
     />
   );
 }

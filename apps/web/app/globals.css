@@ -63,6 +63,21 @@ body {
   transform: rotateY(180deg);
 }
 
+@keyframes subject-card-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.subject-card-enter {
+  animation: subject-card-enter 360ms ease-out both;
+}
+
 @keyframes quiz-question-card-enter {
   from {
     opacity: 0;
@@ -95,6 +110,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .subject-card-enter,
   .quiz-question-card-enter,
   .quiz-question-card-exit {
     animation-duration: 1ms;

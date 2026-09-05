@@ -3,6 +3,7 @@ import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, Up
 export interface IQuizRepository {
   listSubjects(userId?: string): Promise<Subject[]>;
   createSubject(name: string, color: string, userId?: string): Promise<Subject>;
+  deleteSubject(subjectId: string, userId?: string): Promise<boolean>;
   getSubjectShareConfig(subjectId: string, userId?: string): Promise<SubjectShareConfig>;
   updateSubjectShareConfig(subjectId: string, dto: UpdateSubjectShareConfigDto, userId?: string): Promise<SubjectShareConfig>;
   getSubjectByShareToken(shareToken: string): Promise<PublicSubjectDto | null>;

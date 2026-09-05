@@ -36,6 +36,7 @@ export default function ManualQuizCreator({
   const [description, setDescription] = useState('');
   const [subjectList, setSubjectList] = useState<Array<{ id: string; name: string; color?: string }>>(subjects || []);
   const [subjectId, setSubjectId] = useState(subjects?.[0]?.id || '');
+  const [subjectsLoading, setSubjectsLoading] = useState(!subjects || subjects.length === 0);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [pendingImport, setPendingImport] = useState<ParsedClipboard | null>(null);
   const [questions, setQuestions] = useState<QuestionDraft[]>([
@@ -55,6 +56,7 @@ export default function ManualQuizCreator({
   useEffect(() => {
     if (subjects && subjects.length > 0) {
       setSubjectList(subjects);
+      setSubjectsLoading(false);
       if (!subjectId) setSubjectId(subjects[0].id);
       return;
     }
@@ -73,6 +75,8 @@ export default function ManualQuizCreator({
         }
       } catch {
         // Fallback gracefully
+      } finally {
+        if (!cancelled) setSubjectsLoading(false);
       }
     }
     loadSubjects();
@@ -529,6 +533,7 @@ export default function ManualQuizCreator({
               <select
                 value={subjectId}
                 onChange={(e) => setSubjectId(e.target.value)}
+                aria-busy={subjectsLoading}
                 className="w-full rounded-2xl border border-border bg-background pl-4 pr-8 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none cursor-pointer"
               >
                 <option value="">General (No Subject)</option>
@@ -539,6 +544,15 @@ export default function ManualQuizCreator({
                 ))}
               </select>
             </div>
+            {subjectsLoading && (
+              <p role="status" className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                <span
+                  aria-hidden="true"
+                  className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                />
+                Loading subjects...
+              </p>
+            )}
             {/* Active subject color tag */}
             {subjectId && (
               <div className="mt-2 flex items-center gap-1.5">

@@ -35,6 +35,7 @@ describe('CachedQuizRepository', () => {
     mockRepo = {
       listSubjects: vi.fn().mockResolvedValue([sampleSubject]),
       createSubject: vi.fn().mockResolvedValue(sampleSubject),
+      deleteSubject: vi.fn().mockResolvedValue(true),
       getSubjectShareConfig: vi.fn().mockResolvedValue({ share_token: 'subject-tok-1', is_public: true }),
       updateSubjectShareConfig: vi.fn().mockResolvedValue({ share_token: 'subject-tok-1', is_public: true }),
       getSubjectByShareToken: vi.fn().mockResolvedValue(null),

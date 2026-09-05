@@ -45,6 +45,10 @@ export class QuizCrudController {
     return await this.quizRepo.createSubject(name, color, userId);
   }
 
+  async deleteSubject(subjectId: string, userId?: string) {
+    return await this.quizRepo.deleteSubject(subjectId, userId);
+  }
+
   async getSubjectShareConfig(subjectId: string, userId?: string) {
     return await this.quizRepo.getSubjectShareConfig(subjectId, userId);
   }

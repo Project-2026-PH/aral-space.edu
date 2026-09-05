@@ -9,12 +9,14 @@ interface ShareSubjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   subject: Subject | null;
+  onUpdated?: (config: { share_token: string; is_public: boolean }) => void;
 }
 
 export default function ShareSubjectModal({
   open,
   onOpenChange,
-  subject
+  subject,
+  onUpdated
 }: ShareSubjectModalProps) {
   const [shareToken, setShareToken] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -71,6 +73,10 @@ export default function ShareSubjectModal({
       if (!response.ok) throw new Error(data.error || 'Failed to update subject sharing settings');
       setShareToken(data.share_token || '');
       setIsPublic(data.is_public ?? true);
+      onUpdated?.({
+        share_token: data.share_token || '',
+        is_public: data.is_public ?? true
+      });
       if (updates.reset_token) setCopied(false);
     } catch (err: any) {
       setError(err.message || 'Failed to update subject sharing settings');

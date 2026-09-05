@@ -6,11 +6,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Expand,
+  Layers,
   Lightbulb,
   Maximize,
   Pencil,
+  PenTool,
   Play,
-  RotateCw,
   Settings,
   Star,
   Volume2,
@@ -134,7 +135,7 @@ export default function FlashcardReview({ quiz, questions }: FlashcardReviewProp
         <div className="mb-4 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <Link
-              href="/"
+              href="/review/"
               className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
@@ -156,26 +157,20 @@ export default function FlashcardReview({ quiz, questions }: FlashcardReviewProp
             </span>
             Flashcards
           </button>
-          <button
-            type="button"
-            disabled
-            className="flex min-h-20 cursor-not-allowed flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-xs font-bold text-muted-foreground opacity-90"
-            title="Learn mode is not available in reviewer preview"
+          <Link
+            href={`/practice/${quiz.id}?mode=identification`}
+            className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <RotateCw className="h-6 w-6 text-primary" />
-            Learn
-          </button>
-          <button
-            type="button"
-            disabled
-            className="flex min-h-20 cursor-not-allowed flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-xs font-bold text-muted-foreground opacity-90"
-            title="Test mode is not available in reviewer preview"
+            <PenTool className="h-6 w-6 text-primary" />
+            Identification
+          </Link>
+          <Link
+            href={`/practice/${quiz.id}?mode=multiple_choice`}
+            className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded bg-primary text-white" aria-hidden="true">
-              <span className="text-[10px] leading-none">☷</span>
-            </span>
-            Test
-          </button>
+            <Layers className="h-6 w-6 text-primary" />
+            Multiple Choice
+          </Link>
         </div>
 
         <div

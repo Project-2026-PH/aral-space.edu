@@ -13,6 +13,7 @@ import { useQuizSession } from '@/hooks/useQuizSession';
 import QuizCompletion from '@/components/quiz/QuizCompletion';
 import QuizRecap from '@/components/quiz/QuizRecap';
 import { QuestionRenderer } from '@/components/quiz/QuizQuestionRenderer';
+import WindFlameBadge from '@/components/quiz/WindFlameBadge';
 
 interface QuizRunnerProps {
   quiz: Quiz;
@@ -47,6 +48,8 @@ export default function QuizRunner(props: QuizRunnerProps) {
     typedAnswerCorrect,
     answerResult,
     correctAnswerIds,
+    currentStreak,
+    bestStreak,
     feedbackMessage,
     isHintVisible,
     isExplanationVisible,
@@ -86,12 +89,33 @@ export default function QuizRunner(props: QuizRunnerProps) {
     );
   }
 
+  const activeProgressMap = pendingAdvance?.progressMap || progressMap;
+  const totalLockedCount = questions.filter((question) => activeProgressMap.get(question.id)?.locked).length;
+  const correctAnswerCount = correctAnswerIds.size;
+  const overallPercent = Math.round((totalLockedCount / questions.length) * 100);
+  const questionsPerReviewRound = 7;
+  const reviewRoundCount = Math.max(1, Math.ceil(questions.length / questionsPerReviewRound));
+  const progressSegments = Array.from({ length: reviewRoundCount }, (_, index) => {
+    const segmentStart = index * questionsPerReviewRound;
+    const segmentSize = Math.min(questionsPerReviewRound, questions.length - segmentStart);
+    const completedInSegment = Math.min(Math.max(totalLockedCount - segmentStart, 0), segmentSize);
+    return { id: index, fillPercent: segmentSize > 0 ? (completedInSegment / segmentSize) * 100 : 0 };
+  });
+  const progressPercent = progressSegments.reduce((sum, segment) => sum + segment.fillPercent, 0) / reviewRoundCount;
+
   if (isRecapVisible && pendingAdvance) {
     return (
       <QuizRecap
         questions={questions}
         recapQuestionIds={pendingAdvance.recapQuestionIds}
-        correctAnswerCount={correctAnswerIds.size}
+        totalLockedCount={totalLockedCount}
+        correctAnswerCount={correctAnswerCount}
+        overallPercent={overallPercent}
+        progressSegments={progressSegments}
+        progressPercent={progressPercent}
+        mode={mode}
+        currentStreak={currentStreak}
+        bestStreak={bestStreak}
         onAdvance={advance}
         onSurfaceClick={handleSurfaceClick}
         onSurfaceKeyDown={handleSurfaceKeyDown}
@@ -103,37 +127,37 @@ export default function QuizRunner(props: QuizRunnerProps) {
     return <div className="max-w-md mx-auto py-12 text-center text-xs text-muted-foreground">Loading mastery session...</div>;
   }
 
-  const totalLockedCount = questions.filter((question) => progressMap.get(question.id)?.locked).length;
-  const correctAnswerCount = correctAnswerIds.size;
-  const overallPercent = Math.round((totalLockedCount / questions.length) * 100);
-  const questionsPerReviewRound = 7;
-  const reviewRoundCount = Math.max(1, Math.ceil(questions.length / questionsPerReviewRound));
-  const progressSegments = Array.from({ length: reviewRoundCount }, (_, index) => {
-    const segmentStart = index * questionsPerReviewRound;
-    const segmentSize = Math.min(questionsPerReviewRound, questions.length - segmentStart);
-    const completedInSegment = Math.min(Math.max(totalLockedCount - segmentStart, 0), segmentSize);
-    return { id: index, fillPercent: segmentSize > 0 ? (completedInSegment / segmentSize) * 100 : 0 };
-  });
-  const completedRoundCount = Math.min(Math.floor(totalLockedCount / questionsPerReviewRound), reviewRoundCount);
-  const completedRoundPercent = (completedRoundCount / reviewRoundCount) * 100;
-
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-20" onClick={handleSurfaceClick} onKeyDown={handleSurfaceKeyDown}>
+    <div className="max-w-5xl mx-auto space-y-6 pb-20" onClick={handleSurfaceClick} onKeyDown={handleSurfaceKeyDown}>
       <div className="flex items-center justify-between">
         <Link href={`/review/${quiz.id}`} className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />Return to Reviewer</Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <WindFlameBadge
+            streak={currentStreak}
+            totalQuestions={questions.length}
+            bestStreak={bestStreak}
+            size="md"
+          />
           <button type="button" onClick={toggleMute} className="p-1.5 rounded-full border border-border/80 bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title={isMuted ? 'Unmute Sound' : 'Mute Sound'} aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}>{isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
           {isStruggleReviewMode && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-bold text-amber-500">Struggle Pile Review</span>}
           {accumulatedStruggleIds.length > 0 && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /><span>{accumulatedStruggleIds.length} in Struggle Pile</span></span>}
         </div>
       </div>
 
-      <div className="space-y-2" aria-label={`Quiz progress: ${correctAnswerCount} of ${questions.length} answers correct`}>
-        <div className="flex items-center justify-between text-xs font-bold text-muted-foreground"><span>Progress</span><span className="text-emerald-600 dark:text-emerald-400">Correct: {correctAnswerCount} / {questions.length}</span></div>
+      <div className="space-y-2" aria-label={`Quiz progress: ${totalLockedCount} of ${questions.length} questions mastered (${correctAnswerCount} answers correct)`}>
+        <div className="flex items-center justify-between text-xs font-bold text-muted-foreground"><span>Progress</span></div>
         {mode === 'multiple_choice' || mode === 'reverse' ? (
           <div className="relative pt-1">
             <div className="flex h-2 w-full gap-1" aria-hidden="true">{progressSegments.map((segment) => <div key={segment.id} className="min-w-0 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${segment.fillPercent}%` }} /></div>)}</div>
-            {totalLockedCount > 0 && totalLockedCount < questions.length && <div className="absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-emerald-600 text-sm font-black text-white shadow-sm ring-2 ring-background" style={{ left: `${completedRoundPercent}%` }} aria-hidden="true">{completedRoundCount * questionsPerReviewRound}</div>}
+            {totalLockedCount > 0 && totalLockedCount < questions.length && (
+              <div
+                className="absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-emerald-600 text-sm font-black text-white shadow-sm ring-2 ring-background transition-[left] duration-300"
+                style={{ left: `${progressPercent}%` }}
+                aria-hidden="true"
+              >
+                {totalLockedCount}
+              </div>
+            )}
             <div className="absolute right-0 top-1/2 flex h-7 w-7 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-muted-foreground text-sm font-black text-background shadow-sm ring-2 ring-background" aria-hidden="true">{questions.length}</div>
           </div>
         ) : <div className="h-2 w-full overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all duration-300" style={{ width: `${overallPercent}%` }} /></div>}
@@ -145,6 +169,8 @@ export default function QuizRunner(props: QuizRunnerProps) {
             mode={mode}
             question={activeQuestion}
             currentProg={currentProg}
+            currentStreak={currentStreak}
+            totalQuestions={questions.length}
             isEvaluating={isEvaluating}
             identificationInput={identificationInput}
             identificationSubmitted={identificationSubmitted}

@@ -20,19 +20,7 @@ export class QuizTransformService {
     questions: QuizQuestion[],
     optionCount: number = DEFAULT_OPTION_COUNT
   ): QuizQuestion[] {
-    const answerPool: string[] = [];
-    const poolKeys = new Set<string>();
-
-    for (const question of questions) {
-      const answer = getCorrectAnswer(question);
-      const key = normalizeForComparison(answer);
-      if (key && !poolKeys.has(key)) {
-        poolKeys.add(key);
-        answerPool.push(answer);
-      }
-    }
-
-    return questions.map((question) => {
+    return questions.map((question, index) => {
       const correctAnswer = getCorrectAnswer(question);
       if (!correctAnswer) return question;
 
@@ -53,12 +41,38 @@ export class QuizTransformService {
         optionKeys.add(correctKey);
       }
 
-      for (const answer of answerPool) {
+      // Moving threshold: upcoming questions first, then preceding questions for end items
+      const candidateIndices: number[] = [];
+      for (let j = index + 1; j < questions.length; j++) {
+        candidateIndices.push(j);
+      }
+      for (let j = index - 1; j >= 0; j--) {
+        candidateIndices.push(j);
+      }
+
+      for (const candidateIndex of candidateIndices) {
         if (entries.length >= optionCount) break;
+        const answer = getCorrectAnswer(questions[candidateIndex]);
+        if (!answer) continue;
         const key = normalizeForComparison(answer);
         if (key === correctKey || optionKeys.has(key)) continue;
         optionKeys.add(key);
         entries.push({ text: answer, originalIndex: -1 });
+      }
+
+      if (entries.length < optionCount) {
+        for (const candidateIndex of candidateIndices) {
+          if (entries.length >= optionCount) break;
+          for (const opt of questions[candidateIndex].options) {
+            if (entries.length >= optionCount) break;
+            const text = opt.trim();
+            if (!text) continue;
+            const key = normalizeForComparison(text);
+            if (key === correctKey || optionKeys.has(key)) continue;
+            optionKeys.add(key);
+            entries.push({ text, originalIndex: -1 });
+          }
+        }
       }
 
       const correctIndex = entries.findIndex(

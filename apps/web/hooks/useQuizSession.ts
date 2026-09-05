@@ -35,6 +35,7 @@ import {
 } from '@/lib/quizSessionTransitions';
 import { QuizSessionSync } from '@/lib/quizSessionSync';
 import { useQuizTelemetry } from '@/hooks/useQuizTelemetry';
+import { getQuizStreakRecord, recordSessionCompletion } from '@/lib/streakTracker';
 
 interface UseQuizSessionProps {
   quiz: Quiz;
@@ -168,6 +169,8 @@ export function useQuizSession({
   const [currentOptions, setCurrentOptions] = useState<ShuffledOption[]>([]);
   const [sessionSummary, setSessionSummary] = useState<SessionMasterySummary | null>(null);
   const [correctAnswerIds, setCorrectAnswerIds] = useState<Set<string>>(new Set());
+  const [currentStreak, setCurrentStreak] = useState<number>(0);
+  const [bestStreak, setBestStreak] = useState<number>(0);
 
   const telemetry = useQuizTelemetry();
   const questionStartTimeRef = useRef(Date.now());
@@ -232,6 +235,11 @@ export function useQuizSession({
       } else {
         removeQuizProgressSnapshot(quiz.id, session.id);
       }
+    }
+
+    const streakRecord = getQuizStreakRecord(quiz.id);
+    if (streakRecord.allTimeBestStreak > 0) {
+      setBestStreak(streakRecord.allTimeBestStreak);
     }
 
     setIsProgressHydrated(true);
@@ -436,6 +444,21 @@ export function useQuizSession({
         next.add(questionId);
         return next;
       });
+      setCurrentStreak((previousStreak) => {
+        const nextStreak = previousStreak + 1;
+        setBestStreak((currentBest) => {
+          const updatedBest = Math.max(currentBest, nextStreak);
+          recordSessionCompletion(quiz.id, mode, updatedBest, nextStreak, questions.length);
+          return updatedBest;
+        });
+        return nextStreak;
+      });
+    } else {
+      setCurrentStreak(0);
+      setBestStreak((currentBest) => {
+        recordSessionCompletion(quiz.id, mode, currentBest, 0, questions.length);
+        return currentBest;
+      });
     }
 
     telemetry.recordAnswer(activeQuestion, option.isCorrect, latencyMs);
@@ -591,7 +614,7 @@ export function useQuizSession({
         return;
       }
 
-      if (isEvaluating || (mode !== 'multiple_choice' && mode !== 'reverse')) return;
+      if (isEvaluating) return;
       if (event.key.toLowerCase() === 'h') {
         if (isEvaluating || answerResult !== null) return;
         event.preventDefault();
@@ -599,6 +622,7 @@ export function useQuizSession({
         return;
       }
 
+      if (mode !== 'multiple_choice' && mode !== 'reverse') return;
       const choiceIndex = Number.parseInt(event.key, 10) - 1;
       if (choiceIndex < 0 || choiceIndex >= currentOptions.length) return;
       event.preventDefault();
@@ -638,6 +662,8 @@ export function useQuizSession({
     typedAnswerCorrect,
     answerResult,
     correctAnswerIds,
+    currentStreak,
+    bestStreak,
     feedbackMessage,
     isHintVisible,
     isExplanationVisible,

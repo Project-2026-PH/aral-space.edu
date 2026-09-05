@@ -107,7 +107,7 @@ export default function QuizCompletion({
 
       <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
         {accumulatedStruggleIds.length > 0 && <button type="button" onClick={onStartStruggleReview} className="inline-flex items-center gap-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-6 py-3 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all active:scale-95 shadow-sm"><RotateCw className="h-3.5 w-3.5" /><span>Review Struggle Pile ({accumulatedStruggleIds.length})</span></button>}
-        <Link href={`/quizzes/${quiz.id}`} className="rounded-2xl bg-primary px-6 py-3 text-xs font-bold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all active:scale-95">Back to Overview</Link>
+        <Link href={`/quizzes/${quiz.id}`} className="rounded-2xl bg-primary px-6 py-3 text-xs font-bold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all active:scale-95">Back to Subject</Link>
         <Link href="/quizzes" className="rounded-2xl border border-border bg-card px-6 py-3 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all active:scale-95">Back to Library</Link>
       </div>
     </div>

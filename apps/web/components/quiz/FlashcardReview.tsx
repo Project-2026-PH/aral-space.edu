@@ -18,6 +18,9 @@ import {
   X
 } from 'lucide-react';
 import Link from 'next/link';
+import { getQuestionHint } from '@/lib/quizAnswerEvaluation';
+import WindFlameBadge from '@/components/quiz/WindFlameBadge';
+import { getQuizStreakRecord, recordSessionCompletion } from '@/lib/streakTracker';
 
 interface FlashcardReviewProps {
   quiz: Quiz;
@@ -29,7 +32,8 @@ interface FlashcardReviewProps {
 interface CardToolbarProps {
   quizId: string;
   isStarred: boolean;
-  onHint: () => void;
+  isHintVisible?: boolean;
+  onHint?: () => void;
   onSpeak: () => void;
   onToggleStar: () => void;
   canEdit: boolean;
@@ -39,17 +43,19 @@ function getAnswer(question: QuizQuestion): string {
   return question.answer_text?.trim() || question.options[question.correct_answer]?.trim() || question.options[0]?.trim() || 'No answer provided.';
 }
 
-function CardToolbar({ quizId, isStarred, onHint, onSpeak, onToggleStar, canEdit }: CardToolbarProps) {
+function CardToolbar({ quizId, isStarred, isHintVisible, onHint, onSpeak, onToggleStar, canEdit }: CardToolbarProps) {
   return (
     <div className="flex items-center justify-between gap-4 text-xs font-semibold text-muted-foreground" onClick={(event) => event.stopPropagation()}>
-      <button
-        type="button"
-        className="inline-flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-muted hover:text-foreground"
-        onClick={onHint}
-      >
-        <Lightbulb className="h-4 w-4 text-primary" />
-        Get a hint
-      </button>
+      {onHint ? (
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-muted hover:text-foreground"
+          onClick={onHint}
+        >
+          <Lightbulb className={`h-4 w-4 ${isHintVisible ? 'text-amber-500 fill-amber-500/20' : 'text-primary'}`} />
+          {isHintVisible ? 'Hide hint' : 'Get a hint'}
+        </button>
+      ) : <div />}
       <div className="flex items-center gap-4">
         {canEdit && (
           <Link href={`/quizzes/${quizId}`} aria-label="Edit reviewer" className="text-muted-foreground transition-colors hover:text-foreground">
@@ -72,15 +78,26 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const exitHref = subjectShareToken ? `/subjects/share/${encodeURIComponent(subjectShareToken)}` : '/review/';
   const [cardIndex, setCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isHintVisible, setIsHintVisible] = useState(false);
   const [trackProgress, setTrackProgress] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [cards, setCards] = useState(questions);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+
+  useEffect(() => {
+    const record = getQuizStreakRecord(quiz.id);
+    if (record.allTimeBestStreak > 0) {
+      setBestStreak(record.allTimeBestStreak);
+    }
+  }, [quiz.id]);
 
   useEffect(() => {
     setCards(questions);
     setCardIndex(0);
     setIsFlipped(false);
+    setIsHintVisible(false);
   }, [questions]);
 
   useEffect(() => {
@@ -89,6 +106,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     const timer = window.setInterval(() => {
       setCardIndex((current) => (current + 1) % cards.length);
       setIsFlipped(false);
+      setIsHintVisible(false);
     }, 4000);
 
     return () => window.clearInterval(timer);
@@ -103,12 +121,34 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   function goToCard(nextIndex: number) {
     setCardIndex(nextIndex);
     setIsFlipped(false);
+    setIsHintVisible(false);
+  }
+
+  function recordCardResult(known: boolean) {
+    if (known) {
+      setStreak((prev) => {
+        const nextStreak = prev + 1;
+        setBestStreak((currentBest) => {
+          const updated = Math.max(currentBest, nextStreak);
+          recordSessionCompletion(quiz.id, 'flashcard', updated, nextStreak, cards.length);
+          return updated;
+        });
+        return nextStreak;
+      });
+    } else {
+      setStreak(0);
+      setBestStreak((currentBest) => {
+        recordSessionCompletion(quiz.id, 'flashcard', currentBest, 0, cards.length);
+        return currentBest;
+      });
+    }
   }
 
   function shuffleCards() {
     setCards((current) => [...current].sort(() => Math.random() - 0.5));
     setCardIndex(0);
     setIsFlipped(false);
+    setIsHintVisible(false);
   }
 
   function speakCard() {
@@ -151,6 +191,12 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             <h1 className="truncate text-lg font-bold text-foreground">In-class review</h1>
             <p className="truncate text-xs text-muted-foreground">{quiz.title}</p>
           </div>
+          <WindFlameBadge
+            streak={streak}
+            totalQuestions={cards.length}
+            bestStreak={bestStreak}
+            size="md"
+          />
         </div>
 
         <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
@@ -186,6 +232,11 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           role="button"
           tabIndex={0}
           onKeyDown={(event) => {
+            if (event.key.toLowerCase() === 'h') {
+              event.preventDefault();
+              setIsHintVisible((current) => !current);
+              return;
+            }
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
               setIsFlipped((current) => !current);
@@ -198,13 +249,25 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
               <CardToolbar
                 quizId={quiz.id}
                 isStarred={isStarred}
-                onHint={() => setIsFlipped(true)}
+                isHintVisible={isHintVisible}
+                onHint={() => setIsHintVisible((current) => !current)}
                 onSpeak={speakCard}
                 onToggleStar={() => setIsStarred((current) => !current)}
                 canEdit={!shareToken}
               />
               <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden [overflow-wrap:anywhere] px-4 py-10 text-center">
-                <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-foreground [overflow-wrap:anywhere] line-clamp-10 sm:text-2xl">{currentCard.question_text}</p>
+                <div className="max-w-3xl space-y-4">
+                  <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-foreground [overflow-wrap:anywhere] line-clamp-10 sm:text-2xl">{currentCard.question_text}</p>
+                  {isHintVisible && (
+                    <div
+                      className="inline-flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-xs font-mono font-medium text-amber-700 dark:text-amber-300"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <Lightbulb className="h-4 w-4 shrink-0 text-amber-500" />
+                      <span>Hint: {getQuestionHint(currentCard)}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="text-center text-xs font-semibold text-muted-foreground">
                 Click the card to reveal the answer
@@ -215,7 +278,6 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
               <CardToolbar
                 quizId={quiz.id}
                 isStarred={isStarred}
-                onHint={() => setIsFlipped(true)}
                 onSpeak={speakCard}
                 onToggleStar={() => setIsStarred((current) => !current)}
                 canEdit={!shareToken}
@@ -231,6 +293,28 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
               </div>
               <div className="text-center text-xs font-semibold text-muted-foreground">
                 Click the card to see the prompt
+              </div>
+              <div className="mt-3 flex items-center justify-center gap-3" onClick={(event) => event.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    recordCardResult(false);
+                    goToCard(Math.min(cards.length - 1, cardIndex + 1));
+                  }}
+                  className="rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  Still learning
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    recordCardResult(true);
+                    goToCard(Math.min(cards.length - 1, cardIndex + 1));
+                  }}
+                  className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors shadow-sm"
+                >
+                  Got it right ✓
+                </button>
               </div>
             </div>
           </div>

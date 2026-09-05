@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import PwaRegister from '@/components/PwaRegister';
 import AnonymousSessionBadge from '@/components/AnonymousSessionBadge';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export const viewport: Viewport = {
   themeColor: '#4f46e5',
@@ -29,7 +30,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var saved = localStorage.getItem('theme');
+                  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  if (saved === 'dark' || (!saved && prefersDark)) {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20">
         <PwaRegister />
         <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
@@ -49,7 +69,8 @@ export default function RootLayout({
               </div>
             </Link>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <ThemeToggle />
               <AnonymousSessionBadge />
             </div>
           </div>

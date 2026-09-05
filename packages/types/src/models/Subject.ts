@@ -7,3 +7,18 @@ export interface Subject {
   share_token?: string | null;
   is_public?: boolean;
 }
+
+export type SubjectAccessRole = 'owner' | 'collaborator';
+
+export interface SubjectAccess {
+  subject_id: string;
+  role: SubjectAccessRole;
+  can_edit: boolean;
+  can_manage: boolean;
+}
+
+export interface SubjectCollaboratorLink {
+  token: string;
+  expires_at: string | null;
+  used_at?: string | null;
+}

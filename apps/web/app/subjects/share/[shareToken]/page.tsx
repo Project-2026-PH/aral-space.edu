@@ -69,6 +69,8 @@ export default function SharedSubjectPage() {
     );
   }
 
+  const quizzes = Array.isArray(subject.quizzes) ? subject.quizzes : [];
+
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-4 pb-20">
       <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
@@ -86,7 +88,7 @@ export default function SharedSubjectPage() {
               </p>
               <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">{subject.name}</h1>
               <p className="mt-1 text-xs text-muted-foreground">
-                {subject.quizzes.length} {subject.quizzes.length === 1 ? 'public study set' : 'public study sets'}
+                {quizzes.length} {quizzes.length === 1 ? 'public study set' : 'public study sets'}
               </p>
             </div>
           </div>
@@ -100,7 +102,7 @@ export default function SharedSubjectPage() {
         </div>
       </div>
 
-      {subject.quizzes.length === 0 ? (
+      {quizzes.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center">
           <BookOpen className="mx-auto h-8 w-8 text-muted-foreground" />
           <h2 className="mt-4 text-sm font-bold text-foreground">No public study sets yet</h2>
@@ -116,11 +118,11 @@ export default function SharedSubjectPage() {
               <h2 id="shared-study-sets-heading" className="mt-1 text-lg font-extrabold text-foreground">Study Sets</h2>
             </div>
             <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
-              {subject.quizzes.length} available
+              {quizzes.length} available
             </span>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {subject.quizzes.map((quiz) => (
+            {quizzes.map((quiz) => (
               <article key={quiz.id} className="flex flex-col justify-between rounded-3xl border border-border/80 bg-card p-5 shadow-2xs transition-all hover:border-primary/40 hover:shadow-md">
                 <div>
                   <div className="flex items-center justify-between gap-3">
@@ -134,7 +136,7 @@ export default function SharedSubjectPage() {
                 </div>
                 <div className="mt-5 border-t border-border/40 pt-4">
                   <Link
-                    href={`/sets/share/${quiz.share_token}`}
+                    href={`/review/${quiz.id}?shareToken=${encodeURIComponent(quiz.share_token)}&subjectShareToken=${encodeURIComponent(subject.share_token)}`}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-all hover:bg-primary hover:text-white active:scale-95"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />

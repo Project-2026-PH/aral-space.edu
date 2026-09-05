@@ -22,6 +22,8 @@ import Link from 'next/link';
 interface FlashcardReviewProps {
   quiz: Quiz;
   questions: QuizQuestion[];
+  shareToken?: string;
+  subjectShareToken?: string;
 }
 
 interface CardToolbarProps {
@@ -30,13 +32,14 @@ interface CardToolbarProps {
   onHint: () => void;
   onSpeak: () => void;
   onToggleStar: () => void;
+  canEdit: boolean;
 }
 
 function getAnswer(question: QuizQuestion): string {
   return question.answer_text?.trim() || question.options[question.correct_answer]?.trim() || question.options[0]?.trim() || 'No answer provided.';
 }
 
-function CardToolbar({ quizId, isStarred, onHint, onSpeak, onToggleStar }: CardToolbarProps) {
+function CardToolbar({ quizId, isStarred, onHint, onSpeak, onToggleStar, canEdit }: CardToolbarProps) {
   return (
     <div className="flex items-center justify-between gap-4 text-xs font-semibold text-muted-foreground" onClick={(event) => event.stopPropagation()}>
       <button
@@ -48,9 +51,11 @@ function CardToolbar({ quizId, isStarred, onHint, onSpeak, onToggleStar }: CardT
         Get a hint
       </button>
       <div className="flex items-center gap-4">
-        <Link href={`/quizzes/${quizId}`} aria-label="Edit reviewer" className="text-muted-foreground transition-colors hover:text-foreground">
-          <Pencil className="h-4 w-4" />
-        </Link>
+        {canEdit && (
+          <Link href={`/quizzes/${quizId}`} aria-label="Edit reviewer" className="text-muted-foreground transition-colors hover:text-foreground">
+            <Pencil className="h-4 w-4" />
+          </Link>
+        )}
         <button type="button" onClick={onSpeak} aria-label="Read card aloud" className="text-muted-foreground transition-colors hover:text-foreground">
           <Volume2 className="h-4 w-4" />
         </button>
@@ -62,7 +67,9 @@ function CardToolbar({ quizId, isStarred, onHint, onSpeak, onToggleStar }: CardT
   );
 }
 
-export default function FlashcardReview({ quiz, questions }: FlashcardReviewProps) {
+export default function FlashcardReview({ quiz, questions, shareToken, subjectShareToken }: FlashcardReviewProps) {
+  const sharedQuery = shareToken ? `&shareToken=${encodeURIComponent(shareToken)}` : '';
+  const exitHref = subjectShareToken ? `/subjects/share/${encodeURIComponent(subjectShareToken)}` : '/review/';
   const [cardIndex, setCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [trackProgress, setTrackProgress] = useState(false);
@@ -135,7 +142,7 @@ export default function FlashcardReview({ quiz, questions }: FlashcardReviewProp
         <div className="mb-4 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <Link
-              href="/review/"
+              href={exitHref}
               className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
@@ -158,14 +165,14 @@ export default function FlashcardReview({ quiz, questions }: FlashcardReviewProp
             Flashcards
           </button>
           <Link
-            href={`/practice/${quiz.id}?mode=identification`}
+            href={`/practice/${quiz.id}?mode=identification${sharedQuery}`}
             className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <PenTool className="h-6 w-6 text-primary" />
             Identification
           </Link>
           <Link
-            href={`/practice/${quiz.id}?mode=multiple_choice`}
+            href={`/practice/${quiz.id}?mode=multiple_choice${sharedQuery}`}
             className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Layers className="h-6 w-6 text-primary" />
@@ -194,6 +201,7 @@ export default function FlashcardReview({ quiz, questions }: FlashcardReviewProp
                 onHint={() => setIsFlipped(true)}
                 onSpeak={speakCard}
                 onToggleStar={() => setIsStarred((current) => !current)}
+                canEdit={!shareToken}
               />
               <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden [overflow-wrap:anywhere] px-4 py-10 text-center">
                 <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-foreground [overflow-wrap:anywhere] line-clamp-10 sm:text-2xl">{currentCard.question_text}</p>
@@ -210,6 +218,7 @@ export default function FlashcardReview({ quiz, questions }: FlashcardReviewProp
                 onHint={() => setIsFlipped(true)}
                 onSpeak={speakCard}
                 onToggleStar={() => setIsStarred((current) => !current)}
+                canEdit={!shareToken}
               />
               <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden [overflow-wrap:anywhere] px-4 py-10 text-center">
                 <div className="max-w-3xl space-y-4">

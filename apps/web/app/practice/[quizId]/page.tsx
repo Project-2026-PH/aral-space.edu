@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
+import { Quiz, QuizQuestion, QuizMode } from '@quiz-creator/types';
 import QuizRunner from '@/components/quiz/QuizRunner';
 import { MasterySessionController } from '@quiz-creator/controllers';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { getQuizRepository, getSessionRepository } from '@/lib/db';
-import { QuizMode } from '@quiz-creator/types';
 
 export default async function PracticePage({
   params,
@@ -14,6 +14,7 @@ export default async function PracticePage({
     mode?: string;
     shuffleQuestions?: string;
     shuffleOptions?: string;
+    shareToken?: string;
   }>;
 }) {
   const { quizId } = await params;
@@ -29,8 +30,20 @@ export default async function PracticePage({
   ]);
   const sessionController = new MasterySessionController(sessionRepo, quizRepo);
 
-  // Verify ownership before creating or reusing a session.
-  const quiz = await quizRepo.getQuizById(quizId, userId);
+  let quiz: Quiz | null = await quizRepo.getQuizById(quizId, userId);
+  if (!quiz && query.shareToken) {
+    const sharedQuiz = await quizRepo.getQuizByShareToken(query.shareToken);
+    if (sharedQuiz && sharedQuiz.id === quizId) {
+      quiz = {
+        ...sharedQuiz,
+        questions: sharedQuiz.questions.map((question): QuizQuestion => ({
+          ...question,
+          quiz_id: sharedQuiz.id
+        }))
+      } as Quiz;
+    }
+  }
+
   if (!quiz) notFound();
 
   const sessionData = await sessionController.getOrStartSession(quizId, 'initial', userId);

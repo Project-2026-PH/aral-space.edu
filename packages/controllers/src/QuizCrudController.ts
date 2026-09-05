@@ -1,6 +1,6 @@
 import type { IQuizRepository } from '@quiz-creator/core';
 import { SAMPLE_QUIZ, SAMPLE_SUBJECT, SAMPLE_QUIZ_ID, SAMPLE_SUBJECT_ID, SAMPLE_QUIZ_QUESTIONS } from '@quiz-creator/core';
-import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto, UpdateSubjectShareConfigDto } from '@quiz-creator/types';
+import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto, UpdateSubjectShareConfigDto, UpdateSubjectDto } from '@quiz-creator/types';
 
 export class QuizCrudController {
   constructor(private quizRepo: IQuizRepository) {}
@@ -45,8 +45,28 @@ export class QuizCrudController {
     return await this.quizRepo.createSubject(name, color, userId);
   }
 
+  async updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string) {
+    return await this.quizRepo.updateSubject(subjectId, dto, userId);
+  }
+
   async deleteSubject(subjectId: string, userId?: string) {
     return await this.quizRepo.deleteSubject(subjectId, userId);
+  }
+
+  async getSubjectAccess(subjectId: string, userId?: string) {
+    return await this.quizRepo.getSubjectAccess(subjectId, userId);
+  }
+
+  async listQuizzesBySubject(subjectId: string, userId?: string) {
+    return await this.quizRepo.listQuizzesBySubject(subjectId, userId);
+  }
+
+  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string) {
+    return await this.quizRepo.createSubjectCollaboratorLink(subjectId, expiresAt, userId);
+  }
+
+  async redeemSubjectCollaboratorLink(token: string, userId: string) {
+    return await this.quizRepo.redeemSubjectCollaboratorLink(token, userId);
   }
 
   async getSubjectShareConfig(subjectId: string, userId?: string) {
@@ -60,7 +80,7 @@ export class QuizCrudController {
   async getSubjectByShareToken(shareToken: string) {
     if (shareToken === SAMPLE_SUBJECT.share_token) {
       const found = await this.quizRepo.getSubjectByShareToken(shareToken);
-      return found || SAMPLE_SUBJECT;
+      return found || { ...SAMPLE_SUBJECT, quizzes: [] };
     }
     return await this.quizRepo.getSubjectByShareToken(shareToken);
   }

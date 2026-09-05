@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { QuizCrudController } from '@quiz-creator/controllers';
 import { getQuizRepository } from '@/lib/db';
+import { getAnonymousUserId } from '@/lib/anonymous';
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ quizId: string; questionId: string }> }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ quizId: string; questionId: string }> }) {
   try {
-    const { questionId } = await params;
+    const { quizId, questionId } = await params;
+    const userId = await getAnonymousUserId(req);
     const body = await req.json();
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
+    if (!(await controller.getQuiz(quizId, userId))) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     const updated = await controller.updateQuestion(questionId, body);
     return NextResponse.json(updated);
   } catch (err: any) {
@@ -18,14 +18,13 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ quizId: string; questionId: string }> }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ quizId: string; questionId: string }> }) {
   try {
-    const { questionId } = await params;
+    const { quizId, questionId } = await params;
+    const userId = await getAnonymousUserId(req);
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
+    if (!(await controller.getQuiz(quizId, userId))) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     const success = await controller.deleteQuestion(questionId);
     return NextResponse.json({ success });
   } catch (err: any) {

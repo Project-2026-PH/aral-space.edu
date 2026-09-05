@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { Subject } from '@quiz-creator/types';
-import { Copy, CopyCheck, Globe, Link2, Lock } from 'lucide-react';
+import { Copy, CopyCheck, Globe, Link2, Lock, UserPlus } from 'lucide-react';
 import Modal from '../ui/Modal';
 
 interface ShareSubjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   subject: Subject | null;
+  readOnly?: boolean;
   onUpdated?: (config: { share_token: string; is_public: boolean }) => void;
 }
 
@@ -16,6 +17,7 @@ export default function ShareSubjectModal({
   open,
   onOpenChange,
   subject,
+  readOnly = false,
   onUpdated
 }: ShareSubjectModalProps) {
   const [shareToken, setShareToken] = useState('');
@@ -23,6 +25,10 @@ export default function ShareSubjectModal({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [collaboratorExpiry, setCollaboratorExpiry] = useState('7d');
+  const [collaboratorUrl, setCollaboratorUrl] = useState('');
+  const [collaboratorCopied, setCollaboratorCopied] = useState(false);
+  const [creatingCollaborator, setCreatingCollaborator] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
@@ -36,6 +42,8 @@ export default function ShareSubjectModal({
     setLoading(true);
     setError(null);
     setCopied(false);
+    setCollaboratorUrl('');
+    setCollaboratorCopied(false);
 
     async function loadShareConfig() {
       try {
@@ -45,6 +53,10 @@ export default function ShareSubjectModal({
         if (!cancelled) {
           setShareToken(data.share_token || '');
           setIsPublic(data.is_public ?? true);
+          onUpdated?.({
+            share_token: data.share_token || '',
+            is_public: data.is_public ?? true
+          });
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to load subject sharing settings');
@@ -82,6 +94,41 @@ export default function ShareSubjectModal({
       setError(err.message || 'Failed to update subject sharing settings');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function createCollaboratorLink() {
+    if (!subject) return;
+    setCreatingCollaborator(true);
+    setError(null);
+    try {
+      const expiresAt = collaboratorExpiry === 'never'
+        ? null
+        : new Date(Date.now() + Number(collaboratorExpiry) * 24 * 60 * 60 * 1000).toISOString();
+      const response = await fetch(`/api/subjects/${subject.id}/collaborator-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expires_at: expiresAt })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to create collaborator link');
+      setCollaboratorUrl(`${origin}/subjects/collaborate/${data.token}`);
+      setCollaboratorCopied(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create collaborator link');
+    } finally {
+      setCreatingCollaborator(false);
+    }
+  }
+
+  async function copyCollaboratorLink() {
+    if (!collaboratorUrl) return;
+    try {
+      await navigator.clipboard.writeText(collaboratorUrl);
+      setCollaboratorCopied(true);
+      window.setTimeout(() => setCollaboratorCopied(false), 2500);
+    } catch {
+      setError('Could not copy the collaborator link. Select it and copy it manually.');
     }
   }
 
@@ -145,7 +192,8 @@ export default function ShareSubjectModal({
               </div>
             </div>
 
-            <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
+            {!readOnly && (
+              <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
               <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Access Permissions</h4>
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5">
@@ -169,17 +217,49 @@ export default function ShareSubjectModal({
                 </button>
               </div>
             </div>
+            )}
+
+            {!readOnly && (
+              <div className="space-y-4 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4 text-primary" />
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-primary">Collaborator link</h4>
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">Create a single-use edit link. It becomes invalid as soon as someone accepts it.</p>
+              <div className="flex flex-wrap gap-2">
+                <select value={collaboratorExpiry} onChange={(event) => setCollaboratorExpiry(event.target.value)} className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-primary">
+                  <option value="1">Expires in 1 day</option>
+                  <option value="7">Expires in 7 days</option>
+                  <option value="30">Expires in 30 days</option>
+                  <option value="never">No expiry until accessed</option>
+                </select>
+                <button type="button" onClick={createCollaboratorLink} disabled={creatingCollaborator} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  <UserPlus className="h-3.5 w-3.5" /> {creatingCollaborator ? 'Creating...' : 'Create link'}
+                </button>
+              </div>
+              {collaboratorUrl && (
+                <div className="flex items-center gap-2">
+                  <input readOnly value={collaboratorUrl} onFocus={(event) => event.target.select()} className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 font-mono text-[11px] text-foreground outline-none" />
+                  <button type="button" onClick={copyCollaboratorLink} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-primary/30 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/10">
+                    {collaboratorCopied ? <CopyCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {collaboratorCopied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              )}
+            </div>
+            )}
 
             <div className="flex items-center justify-between gap-3 pt-1">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => updateConfig({ reset_token: true })}
-                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-              >
-                <Link2 className="h-3.5 w-3.5" />
-                Regenerate link
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => updateConfig({ reset_token: true })}
+                  className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Regenerate link
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}

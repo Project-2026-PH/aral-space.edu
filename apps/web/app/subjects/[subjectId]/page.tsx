@@ -15,17 +15,18 @@ export default async function SubjectDetailPage({
   const userId = await getAnonymousUserId();
   const repository = await getQuizRepository();
   const controller = new QuizCrudController(repository);
-  const { subjects, quizzes } = await controller.listQuizzesAndSubjects(userId);
+  const access = await controller.getSubjectAccess(subjectId, userId);
+  if (!access) notFound();
+  const subjects = await controller.listSubjects(userId);
   const subject = subjects.find((candidate) => candidate.id === subjectId);
-
-  if (!subject || (subject.user_id && subject.user_id !== userId)) {
-    notFound();
-  }
+  if (!subject) notFound();
+  const quizzes = await controller.listQuizzesBySubject(subjectId, userId);
 
   return (
     <SubjectOverviewClient
       subject={subject}
-      quizzes={quizzes.filter((quiz) => quiz.subject_id === subjectId)}
+      quizzes={quizzes}
+      access={access}
     />
   );
 }

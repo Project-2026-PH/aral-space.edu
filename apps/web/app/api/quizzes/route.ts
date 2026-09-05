@@ -14,6 +14,12 @@ export const POST = createApiRoute(async ({ req, userId }) => {
   const body = await req.json();
   const quizRepo = await getQuizRepository();
   const controller = new QuizCrudController(quizRepo);
+  if (body.subject_id) {
+    const access = await controller.getSubjectAccess(body.subject_id, userId);
+    if (!access?.can_edit) {
+      return NextResponse.json({ error: 'You do not have edit access to this subject.' }, { status: 403 });
+    }
+  }
   const created = await controller.createQuiz(body, userId);
   return NextResponse.json(created, { status: 201 });
 });

@@ -1,5 +1,5 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink } from '@quiz-creator/types';
 import { LRUCache } from '../cache/LRUCache';
 
 export class CachedQuizRepository implements IQuizRepository {
@@ -44,6 +44,13 @@ export class CachedQuizRepository implements IQuizRepository {
     return subject;
   }
 
+  async updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string): Promise<Subject> {
+    const subject = await this.underlying.updateSubject(subjectId, dto, userId);
+    this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('quizzes:');
+    return subject;
+  }
+
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
     const result = await this.underlying.deleteSubject(subjectId, userId);
     this.cache.deleteByPrefix('subjects:');
@@ -51,6 +58,25 @@ export class CachedQuizRepository implements IQuizRepository {
     this.cache.deleteByPrefix(`quiz:`);
     this.cache.deleteByPrefix('questions:');
     return result;
+  }
+
+  async getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null> {
+    return this.underlying.getSubjectAccess(subjectId, userId);
+  }
+
+  async listQuizzesBySubject(subjectId: string, userId?: string): Promise<Quiz[]> {
+    return this.underlying.listQuizzesBySubject(subjectId, userId);
+  }
+
+  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string): Promise<SubjectCollaboratorLink> {
+    return this.underlying.createSubjectCollaboratorLink(subjectId, expiresAt, userId);
+  }
+
+  async redeemSubjectCollaboratorLink(token: string, userId: string): Promise<SubjectAccess | null> {
+    const access = await this.underlying.redeemSubjectCollaboratorLink(token, userId);
+    this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('quizzes:');
+    return access;
   }
 
   async getSubjectShareConfig(subjectId: string, userId?: string) {

@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS quiz_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_quiz_sessions_lookup ON quiz_sessions (quiz_id, user_id, status);
-CREATE INDEX IF NOT EXISTS idx_quiz_sessions_active_lookup ON quiz_sessions (quiz_id, user_id, status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_quiz_sessions_active_lookup ON quiz_sessions (quiz_id, user_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quiz_sessions_quiz_id ON quiz_sessions (quiz_id);
 
 -- 5. Quiz Question Progress Table
@@ -107,3 +107,25 @@ ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS discriminatory_keywords JSON
 CREATE UNIQUE INDEX IF NOT EXISTS idx_subjects_share_token_unique ON subjects (share_token) WHERE share_token IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_quizzes_share_token_unique ON quizzes (share_token) WHERE share_token IS NOT NULL;
 
+
+-- Subject collaboration links are single-use invitations. Redemption is atomic on used_at.
+CREATE TABLE IF NOT EXISTS subject_collaborator_links (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ,
+    used_at TIMESTAMPTZ,
+    used_by TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS subject_collaborators (
+    subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (subject_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_subject_collaborator_links_subject ON subject_collaborator_links(subject_id);
+CREATE INDEX IF NOT EXISTS idx_subject_collaborators_user ON subject_collaborators(user_id);
+ALTER TABLE subject_collaborator_links ADD COLUMN IF NOT EXISTS used_by TEXT;

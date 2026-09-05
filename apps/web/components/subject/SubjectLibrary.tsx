@@ -74,25 +74,34 @@ export default function SubjectLibrary({
           {subjects.map((subject, index) => {
             const isPublic = subject.is_public !== false;
             const canManage = Boolean(viewerId && subject.user_id === viewerId);
+            const canGeneratePublicLink = isPublic && !subject.share_token;
+            const canOpen = canManage || Boolean(isPublic && subject.share_token) || canGeneratePublicLink;
+            const subjectHref = canManage
+              ? `/subjects/${subject.id}`
+              : subject.share_token
+                ? `/subjects/share/${subject.share_token}`
+                : '';
             const quizCount = quizCounts.get(subject.id) || 0;
 
             return (
               <article
                 key={subject.id}
-                role={canManage ? 'button' : undefined}
-                tabIndex={canManage ? 0 : undefined}
-                aria-label={`${canManage ? 'Configure' : 'Open'} subject ${subject.name}`}
+                role={canOpen ? 'link' : undefined}
+                tabIndex={canOpen ? 0 : undefined}
+                aria-label={`Open subject ${subject.name}`}
                 onClick={() => {
-                  if (canManage) router.push(`/subjects/${subject.id}`);
+                  if (canManage || subject.share_token) router.push(subjectHref);
+                  else if (canGeneratePublicLink) setSelectedSubject(subject);
                 }}
                 onKeyDown={(event) => {
-                  if (canManage && (event.key === 'Enter' || event.key === ' ')) {
+                  if (canOpen && (event.key === 'Enter' || event.key === ' ')) {
                     event.preventDefault();
-                    router.push(`/subjects/${subject.id}`);
+                    if (canManage || subject.share_token) router.push(subjectHref);
+                    else if (canGeneratePublicLink) setSelectedSubject(subject);
                   }
                 }}
                 style={{ animationDelay: `${index * 70}ms` }}
-                className={`subject-card-enter group flex min-h-44 flex-col justify-between overflow-hidden rounded-3xl border border-border/80 bg-card shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-primary/30 ${canManage ? 'cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md' : ''}`}
+                className={`subject-card-enter group flex min-h-44 flex-col justify-between overflow-hidden rounded-3xl border border-border/80 bg-card shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-primary/30 ${canOpen ? 'cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md' : ''}`}
               >
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-3">
@@ -115,9 +124,9 @@ export default function SubjectLibrary({
                       {isPublic ? 'Public' : 'Private'}
                     </span>
                   </div>
-                  {canManage && (
+                  {canOpen && (
                     <p className="mt-5 text-[11px] font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100">
-                      Click to open subject
+                      {canManage ? 'Click to manage subject' : canGeneratePublicLink ? 'Click to create a public link' : 'Click to view public reviewers'}
                     </p>
                   )}
                 </div>
@@ -134,8 +143,19 @@ export default function SubjectLibrary({
                       <ExternalLink className="h-3.5 w-3.5" />
                       Open public page
                     </Link>
+                  ) : isPublic ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedSubject(subject);
+                      }}
+                      className="text-[11px] font-semibold text-primary transition-colors hover:text-foreground"
+                    >
+                      Create public link
+                    </button>
                   ) : (
-                    <span className="text-[11px] font-medium text-muted-foreground">{isPublic ? 'Share when ready' : 'Public page disabled'}</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">Public page disabled</span>
                   )}
                   {canManage ? (
                     <div className="flex items-center gap-1.5">
@@ -178,6 +198,7 @@ export default function SubjectLibrary({
           if (!open) setSelectedSubject(null);
         }}
         subject={selectedSubject}
+        readOnly={Boolean(selectedSubject && selectedSubject.user_id !== viewerId)}
         onUpdated={(config) => {
           if (selectedSubject) onSubjectUpdated?.(selectedSubject.id, config);
         }}

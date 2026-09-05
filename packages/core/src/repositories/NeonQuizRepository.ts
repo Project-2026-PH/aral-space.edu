@@ -1,5 +1,5 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink } from '@quiz-creator/types';
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 import { normalizeQuestionFields } from './questionFields';
 
@@ -27,7 +27,12 @@ export class NeonQuizRepository implements IQuizRepository {
     if (userId) {
       const rows = await this.sql`
         SELECT * FROM subjects 
-        WHERE user_id = ${userId} OR user_id IS NULL
+        WHERE user_id = ${userId}
+           OR user_id IS NULL
+           OR EXISTS (
+             SELECT 1 FROM subject_collaborators sc
+             WHERE sc.subject_id = subjects.id AND sc.user_id = ${userId}
+           )
         ORDER BY name ASC
       `;
       return rows as Subject[];
@@ -46,6 +51,89 @@ export class NeonQuizRepository implements IQuizRepository {
       RETURNING *
     `;
     return rows[0] as Subject;
+  }
+
+  async updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string): Promise<Subject> {
+    const access = await this.getSubjectAccess(subjectId, userId);
+    if (!access?.can_edit) throw new Error('Subject not found or access is restricted');
+    const rows = dto.name !== undefined && dto.color !== undefined
+      ? await this.sql`
+          UPDATE subjects SET name = ${dto.name}, color = ${dto.color}
+          WHERE id = ${subjectId} AND (user_id = ${userId || null} OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = subjects.id AND sc.user_id = ${userId || null}))
+          RETURNING *
+        `
+      : dto.name !== undefined
+        ? await this.sql`
+            UPDATE subjects SET name = ${dto.name}
+            WHERE id = ${subjectId} AND (user_id = ${userId || null} OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = subjects.id AND sc.user_id = ${userId || null}))
+            RETURNING *
+          `
+        : await this.sql`
+            UPDATE subjects SET color = ${dto.color || '#86EFAC'}
+            WHERE id = ${subjectId} AND (user_id = ${userId || null} OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = subjects.id AND sc.user_id = ${userId || null}))
+            RETURNING *
+          `;
+    if (!rows || rows.length === 0) throw new Error('Subject not found or update failed');
+    return rows[0] as Subject;
+  }
+
+  async getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null> {
+    if (!userId) return null;
+    const rows = await this.sql`
+      SELECT s.id, s.user_id,
+        EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = s.id AND sc.user_id = ${userId}) AS is_collaborator
+      FROM subjects s
+      WHERE s.id = ${subjectId}
+        AND (s.user_id = ${userId} OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = s.id AND sc.user_id = ${userId}))
+      LIMIT 1
+    `;
+    if (!rows || rows.length === 0) return null;
+    const row = rows[0] as any;
+    const role = row.user_id === userId ? 'owner' : 'collaborator';
+    return { subject_id: subjectId, role, can_edit: true, can_manage: role === 'owner' };
+  }
+
+  async listQuizzesBySubject(subjectId: string, userId?: string): Promise<Quiz[]> {
+    if (!(await this.getSubjectAccess(subjectId, userId))) throw new Error('Subject not found or access is restricted');
+    const rows = await this.sql`
+      SELECT q.*, json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id) AS subject
+      FROM quizzes q
+      JOIN subjects s ON s.id = q.subject_id
+      WHERE q.subject_id = ${subjectId}
+      ORDER BY q.generated_at DESC
+    `;
+    return rows as Quiz[];
+  }
+
+  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string): Promise<SubjectCollaboratorLink> {
+    const access = await this.getSubjectAccess(subjectId, userId);
+    if (!access?.can_manage) throw new Error('Only the subject owner can create collaborator links');
+    const token = generateShareSlug() + generateShareSlug();
+    const rows = await this.sql`
+      INSERT INTO subject_collaborator_links (subject_id, token, expires_at)
+      VALUES (${subjectId}, ${token}, ${expiresAt})
+      RETURNING token, expires_at, used_at
+    `;
+    return rows[0] as SubjectCollaboratorLink;
+  }
+
+  async redeemSubjectCollaboratorLink(token: string, userId: string): Promise<SubjectAccess | null> {
+    const rows = await this.sql`
+      UPDATE subject_collaborator_links
+      SET used_at = now(), used_by = ${userId}
+      WHERE token = ${token}
+        AND used_at IS NULL
+        AND (expires_at IS NULL OR expires_at > now())
+      RETURNING subject_id
+    `;
+    if (!rows || rows.length === 0) return null;
+    const subjectId = rows[0].subject_id as string;
+    await this.sql`
+      INSERT INTO subject_collaborators (subject_id, user_id)
+      VALUES (${subjectId}, ${userId})
+      ON CONFLICT (subject_id, user_id) DO NOTHING
+    `;
+    return { subject_id: subjectId, role: 'collaborator', can_edit: true, can_manage: false };
   }
 
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
@@ -74,7 +162,17 @@ export class NeonQuizRepository implements IQuizRepository {
 
   async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean }> {
     const rows = userId
-      ? await this.sql`SELECT share_token, is_public FROM subjects WHERE id = ${subjectId} AND user_id = ${userId} LIMIT 1`
+      ? await this.sql`
+          SELECT share_token, is_public
+          FROM subjects
+          WHERE id = ${subjectId}
+            AND (
+              user_id = ${userId}
+              OR (user_id IS NULL AND COALESCE(is_public, TRUE) = TRUE)
+              OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = subjects.id AND sc.user_id = ${userId})
+            )
+          LIMIT 1
+        `
       : await this.sql`SELECT share_token, is_public FROM subjects WHERE id = ${subjectId} LIMIT 1`;
 
     if (!rows || rows.length === 0) throw new Error(`Subject ${subjectId} not found`);
@@ -92,7 +190,12 @@ export class NeonQuizRepository implements IQuizRepository {
       ? await this.sql`
           UPDATE subjects
           SET share_token = ${share_token}, is_public = true
-          WHERE id = ${subjectId} AND user_id = ${userId}
+          WHERE id = ${subjectId}
+            AND (
+              user_id = ${userId}
+              OR (user_id IS NULL AND COALESCE(is_public, TRUE) = TRUE)
+              OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = subjects.id AND sc.user_id = ${userId})
+            )
           RETURNING share_token, is_public
         `
       : await this.sql`
@@ -191,6 +294,7 @@ export class NeonQuizRepository implements IQuizRepository {
           FROM quizzes q
           LEFT JOIN subjects s ON q.subject_id = s.id
           WHERE q.user_id = ${userId}
+             OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId})
           ORDER BY q.generated_at DESC
         `
       : await this.sql`
@@ -226,7 +330,8 @@ export class NeonQuizRepository implements IQuizRepository {
             END AS subject
           FROM quizzes q
           LEFT JOIN subjects s ON q.subject_id = s.id
-          WHERE q.id = ${id} AND q.user_id = ${userId}
+          WHERE q.id = ${id}
+            AND (q.user_id = ${userId} OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId}))
           LIMIT 1
         `
       : await this.sql`
@@ -330,7 +435,8 @@ export class NeonQuizRepository implements IQuizRepository {
           SET title = ${dto.title !== undefined ? dto.title : existing.title},
               description = ${dto.description !== undefined ? dto.description : existing.description || null},
               subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null}
-          WHERE id = ${id} AND user_id = ${userId}
+          WHERE id = ${id}
+            AND (user_id = ${userId} OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = quizzes.subject_id AND sc.user_id = ${userId}))
           RETURNING *
         `
       : await this.sql`

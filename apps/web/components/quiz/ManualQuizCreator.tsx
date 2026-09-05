@@ -54,10 +54,13 @@ export default function ManualQuizCreator({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const requestedSubjectId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('subjectId') : null;
     if (subjects && subjects.length > 0) {
       setSubjectList(subjects);
       setSubjectsLoading(false);
-      if (!subjectId) setSubjectId(subjects[0].id);
+      const requestedSubject = requestedSubjectId && subjects.some((subject) => subject.id === requestedSubjectId) ? requestedSubjectId : null;
+      if (requestedSubject) setSubjectId(requestedSubject);
+      else if (!subjectId) setSubjectId(subjects[0].id);
       return;
     }
 
@@ -69,7 +72,9 @@ export default function ManualQuizCreator({
         const data = await res.json();
         if (!cancelled && data.subjects) {
           setSubjectList(data.subjects);
-          if (!subjectId && data.subjects.length > 0) {
+          const requestedSubject = requestedSubjectId && data.subjects.some((subject: { id: string }) => subject.id === requestedSubjectId) ? requestedSubjectId : null;
+          if (requestedSubject) setSubjectId(requestedSubject);
+          else if (!subjectId && data.subjects.length > 0) {
             setSubjectId(data.subjects[0].id);
           }
         }

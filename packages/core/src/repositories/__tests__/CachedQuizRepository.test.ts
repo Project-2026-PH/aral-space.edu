@@ -35,6 +35,11 @@ describe('CachedQuizRepository', () => {
     mockRepo = {
       listSubjects: vi.fn().mockResolvedValue([sampleSubject]),
       createSubject: vi.fn().mockResolvedValue(sampleSubject),
+      updateSubject: vi.fn().mockResolvedValue(sampleSubject),
+      getSubjectAccess: vi.fn().mockResolvedValue(null),
+      listQuizzesBySubject: vi.fn().mockResolvedValue([sampleQuiz]),
+      createSubjectCollaboratorLink: vi.fn().mockResolvedValue({ token: 'collab-token', expires_at: null }),
+      redeemSubjectCollaboratorLink: vi.fn().mockResolvedValue(null),
       deleteSubject: vi.fn().mockResolvedValue(true),
       getSubjectShareConfig: vi.fn().mockResolvedValue({ share_token: 'subject-tok-1', is_public: true }),
       updateSubjectShareConfig: vi.fn().mockResolvedValue({ share_token: 'subject-tok-1', is_public: true }),

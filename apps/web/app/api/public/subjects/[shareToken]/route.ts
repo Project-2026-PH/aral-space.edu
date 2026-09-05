@@ -12,5 +12,8 @@ export const GET = createApiRoute<{ shareToken: string }>(async ({ params }) => 
     return NextResponse.json({ error: 'Subject not found or access is restricted' }, { status: 404 });
   }
 
-  return subject;
+  return {
+    ...subject,
+    quizzes: Array.isArray(subject.quizzes) ? subject.quizzes : []
+  };
 }, { cache: 'public', skipAuth: true });

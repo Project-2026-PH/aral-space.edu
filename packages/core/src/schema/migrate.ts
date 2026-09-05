@@ -16,11 +16,13 @@ export async function runMigration(databaseUrl?: string): Promise<void> {
   const schemaPath = path.join(__dirname, 'neon_schema.sql');
   const ddl = fs.readFileSync(schemaPath, 'utf-8');
 
-  // Split DDL into non-empty statements
+  // Remove line comments before splitting so a comment immediately before a DDL
+  // statement cannot cause that statement to be filtered out.
   const statements = ddl
+    .replace(/^\s*--.*$/gm, '')
     .split(';')
     .map(s => s.trim())
-    .filter(s => s.length > 0 && !s.startsWith('--'));
+    .filter(s => s.length > 0);
 
   console.log(`[Neon Migration] Running ${statements.length} SQL statements...`);
 

@@ -1,5 +1,5 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink } from '@quiz-creator/types';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { MemoryQuizRepository } from './MemoryQuizRepository';
 import { normalizeQuestionFields } from './questionFields';
@@ -27,7 +27,18 @@ export class SupabaseQuizRepository implements IQuizRepository {
       let query = this.supabase.from('subjects').select('*').order('name');
       if (userId) query = query.or(`user_id.eq.${userId},user_id.is.null`);
       const { data, error } = await query;
-      if (!error && data && data.length > 0) return data;
+      if (!error && data && data.length > 0) {
+        if (userId) {
+          const { data: memberships } = await this.supabase.from('subject_collaborators').select('subject_id').eq('user_id', userId);
+          const memberIds = new Set((memberships || []).map((membership: any) => membership.subject_id));
+          const missingIds = Array.from(memberIds).filter((id) => !data.some((subject: any) => subject.id === id));
+          if (missingIds.length > 0) {
+            const { data: memberSubjects } = await this.supabase.from('subjects').select('*').in('id', missingIds).order('name');
+            return [...data, ...(memberSubjects || [])] as Subject[];
+          }
+        }
+        return data as Subject[];
+      }
     } catch (e) {}
     return this.fallback.listSubjects(userId);
   }
@@ -48,6 +59,59 @@ export class SupabaseQuizRepository implements IQuizRepository {
       if (!error && data) return data;
     } catch (e) {}
     return this.fallback.createSubject(name, color, userId);
+  }
+
+  async updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string): Promise<Subject> {
+    try {
+      let query = this.supabase.from('subjects').update(dto).eq('id', subjectId);
+      if (userId) query = query.eq('user_id', userId);
+      const { data, error } = await query.select('*').single();
+      if (!error && data) return data as Subject;
+    } catch (e) {}
+    return this.fallback.updateSubject(subjectId, dto, userId);
+  }
+
+  async getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null> {
+    if (!userId) return null;
+    try {
+      const { data: owner } = await this.supabase.from('subjects').select('id').eq('id', subjectId).eq('user_id', userId).maybeSingle();
+      if (owner) return { subject_id: subjectId, role: 'owner', can_edit: true, can_manage: true };
+      const { data: member } = await this.supabase.from('subject_collaborators').select('subject_id').eq('subject_id', subjectId).eq('user_id', userId).maybeSingle();
+      if (member) return { subject_id: subjectId, role: 'collaborator', can_edit: true, can_manage: false };
+    } catch (e) {}
+    return this.fallback.getSubjectAccess(subjectId, userId);
+  }
+
+  async listQuizzesBySubject(subjectId: string, userId?: string): Promise<Quiz[]> {
+    if (!(await this.getSubjectAccess(subjectId, userId))) throw new Error('Subject not found or access is restricted');
+    try {
+      const { data, error } = await this.supabase.from('quizzes').select('*, subject:subjects(*)').eq('subject_id', subjectId).order('generated_at', { ascending: false });
+      if (!error && data) return data as Quiz[];
+    } catch (e) {}
+    return this.fallback.listQuizzesBySubject(subjectId, userId);
+  }
+
+  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string): Promise<SubjectCollaboratorLink> {
+    try {
+      const access = await this.getSubjectAccess(subjectId, userId);
+      if (!access?.can_manage) throw new Error('Only the subject owner can create collaborator links');
+      const token = generateShareSlug() + generateShareSlug();
+      const { data, error } = await this.supabase.from('subject_collaborator_links').insert({ subject_id: subjectId, token, expires_at: expiresAt }).select('token, expires_at, used_at').single();
+      if (!error && data) return data as SubjectCollaboratorLink;
+    } catch (e) {}
+    return this.fallback.createSubjectCollaboratorLink(subjectId, expiresAt, userId);
+  }
+
+  async redeemSubjectCollaboratorLink(token: string, userId: string): Promise<SubjectAccess | null> {
+    try {
+      const { data: link } = await this.supabase.from('subject_collaborator_links').select('subject_id, expires_at, used_at').eq('token', token).maybeSingle();
+      if (!link || link.used_at || (link.expires_at && new Date(link.expires_at).getTime() <= Date.now())) return null;
+      const { data: consumed, error } = await this.supabase.from('subject_collaborator_links').update({ used_at: new Date().toISOString(), used_by: userId }).eq('token', token).is('used_at', null).select('subject_id').maybeSingle();
+      if (error || !consumed) return null;
+      await this.supabase.from('subject_collaborators').upsert({ subject_id: consumed.subject_id, user_id: userId });
+      return { subject_id: consumed.subject_id, role: 'collaborator', can_edit: true, can_manage: false };
+    } catch (e) {}
+    return this.fallback.redeemSubjectCollaboratorLink(token, userId);
   }
 
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
@@ -202,8 +266,16 @@ export class SupabaseQuizRepository implements IQuizRepository {
       if (userId) query = query.eq('user_id', userId);
       const { data, error } = await query.maybeSingle();
       if (!error && data) return data;
+      if (userId) {
+        const access = await this.supabase.from('subject_collaborators').select('subject_id').eq('user_id', userId);
+        const subjectIds = (access.data || []).map((row: any) => row.subject_id);
+        if (subjectIds.length > 0) {
+          const { data: sharedQuiz } = await this.supabase.from('quizzes').select('*, subject:subjects(*)').eq('id', id).in('subject_id', subjectIds).maybeSingle();
+          if (sharedQuiz) return sharedQuiz;
+        }
+      }
     } catch (e) {}
-    return this.fallback.getQuizById(id);
+    return this.fallback.getQuizById(id, userId);
   }
 
   async createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz> {
@@ -256,11 +328,20 @@ export class SupabaseQuizRepository implements IQuizRepository {
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
     try {
       let query = this.supabase.from('quizzes').update(dto).eq('id', id);
-      if (userId) query = query.eq('user_id', userId);
+      if (userId) {
+        const existing = await this.getQuizById(id, userId);
+        if (!existing) throw new Error('Quiz not found');
+        if (existing.user_id !== userId) {
+          const access = await this.getSubjectAccess(existing.subject_id || '', userId);
+          if (!access?.can_edit) throw new Error('Quiz not found');
+        } else {
+          query = query.eq('user_id', userId);
+        }
+      }
       const { data, error } = await query.select('*').single();
       if (!error && data) return data;
     } catch (e) {}
-    return this.fallback.updateQuiz(id, dto);
+    return this.fallback.updateQuiz(id, dto, userId);
   }
 
   async deleteQuiz(id: string, userId?: string): Promise<boolean> {

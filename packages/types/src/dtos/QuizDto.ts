@@ -58,6 +58,15 @@ export interface UpdateSubjectShareConfigDto {
   reset_token?: boolean;
 }
 
+export interface UpdateSubjectDto {
+  name?: string;
+  color?: string;
+}
+
+export interface CreateSubjectCollaboratorLinkDto {
+  expires_at?: string | null;
+}
+
 export interface SubjectShareConfig {
   share_token: string;
   is_public: boolean;

@@ -21,7 +21,7 @@ export default function QuizLibrary({ quizzes, loading = false }: QuizLibraryPro
           </h2>
         </div>
         <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
-          {quizzes.length} {quizzes.length === 1 ? 'quiz' : 'quizzes'}
+          {quizzes.length} {quizzes.length === 1 ? 'reviewer' : 'reviewers'}
         </span>
       </div>
 

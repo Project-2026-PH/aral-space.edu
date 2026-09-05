@@ -90,11 +90,20 @@ export class CachedQuizRepository implements IQuizRepository {
   ) {
     const config = await this.underlying.updateSubjectShareConfig(subjectId, dto, userId);
     this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('public_subject:');
     return config;
   }
 
   async getSubjectByShareToken(shareToken: string) {
-    return this.underlying.getSubjectByShareToken(shareToken);
+    const key = `public_subject:${shareToken}`;
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached;
+
+    const subject = await this.underlying.getSubjectByShareToken(shareToken);
+    if (subject) {
+      this.cache.set(key, subject);
+    }
+    return subject;
   }
 
   async listQuizzes(userId?: string): Promise<Quiz[]> {
@@ -211,11 +220,21 @@ export class CachedQuizRepository implements IQuizRepository {
   async updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
     const res = await this.underlying.updateShareConfig(quizId, dto, userId);
     this.cache.delete(this.quizKey(quizId, userId));
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('public_subject:');
     return res;
   }
 
   async getQuizByShareToken(shareToken: string): Promise<PublicQuizDto | null> {
-    return this.underlying.getQuizByShareToken(shareToken);
+    const key = `public_quiz:${shareToken}`;
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached;
+
+    const quiz = await this.underlying.getQuizByShareToken(shareToken);
+    if (quiz) {
+      this.cache.set(key, quiz);
+    }
+    return quiz;
   }
 
   async cloneQuizByShareToken(shareToken: string, userId?: string): Promise<Quiz> {

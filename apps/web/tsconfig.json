@@ -9,11 +9,20 @@
       "@quiz-creator/types": [
         "../../packages/types/src/index.ts"
       ],
+      "@quiz-creator/types/*": [
+        "../../packages/types/src/*"
+      ],
       "@quiz-creator/core": [
         "../../packages/core/src/index.ts"
       ],
+      "@quiz-creator/core/*": [
+        "../../packages/core/src/*"
+      ],
       "@quiz-creator/controllers": [
         "../../packages/controllers/src/index.ts"
+      ],
+      "@quiz-creator/controllers/*": [
+        "../../packages/controllers/src/*"
       ]
     },
     "plugins": [

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Quiz, QuizQuestion, QuizMode } from '@quiz-creator/types';
 import QuizRunner from '@/components/quiz/QuizRunner';
-import { MasterySessionController } from '@quiz-creator/controllers';
+import { MasterySessionController } from '@quiz-creator/controllers/MasterySessionController';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { getQuizRepository, getSessionRepository } from '@/lib/db';
 
@@ -30,7 +30,12 @@ export default async function PracticePage({
   ]);
   const sessionController = new MasterySessionController(sessionRepo, quizRepo);
 
-  let quiz: Quiz | null = await quizRepo.getQuizById(quizId, userId);
+  const [initialQuiz, sessionData] = await Promise.all([
+    quizRepo.getQuizById(quizId, userId),
+    sessionController.getOrStartSession(quizId, 'initial', userId)
+  ]);
+
+  let quiz: Quiz | null = initialQuiz;
   if (!quiz && query.shareToken) {
     const sharedQuiz = await quizRepo.getQuizByShareToken(query.shareToken);
     if (sharedQuiz && sharedQuiz.id === quizId) {
@@ -45,8 +50,6 @@ export default async function PracticePage({
   }
 
   if (!quiz) notFound();
-
-  const sessionData = await sessionController.getOrStartSession(quizId, 'initial', userId);
 
   return (
     <QuizRunner

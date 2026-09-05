@@ -28,6 +28,7 @@ import {
 import Link from 'next/link';
 import { quizAudio } from '@/lib/audio';
 import { triggerCelebrationConfetti } from '@/lib/confetti';
+import Skeleton from '@/components/ui/Skeleton';
 
 export default function SharedStudySetPage() {
   const params = useParams();
@@ -120,11 +121,36 @@ export default function SharedStudySetPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto py-20 px-4 text-center space-y-4">
-        <div className="inline-flex p-4 rounded-full bg-primary/10 text-primary animate-pulse">
-          <Sparkles className="h-8 w-8" />
+      <div className="max-w-4xl mx-auto space-y-8 pb-24">
+        {/* Banner Skeleton */}
+        <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="space-y-3 flex-1">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-6 w-32 rounded-full" />
+                <Skeleton className="h-6 w-24 rounded-full" />
+              </div>
+              <Skeleton className="h-8 w-3/4 max-w-md rounded-xl" />
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-4 w-36 rounded-full" />
+                <Skeleton className="h-4 w-28 rounded-full" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-28 rounded-2xl" />
+              <Skeleton className="h-10 w-36 rounded-2xl" />
+            </div>
+          </div>
         </div>
-        <p className="text-sm font-bold text-foreground">Loading shared study set...</p>
+
+        {/* Flashcard / Card Preview Skeleton */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-5 w-40 rounded-xl" />
+            <Skeleton className="h-8 w-24 rounded-2xl" />
+          </div>
+          <Skeleton className="h-72 w-full rounded-3xl border border-border/60 bg-muted/30" />
+        </div>
       </div>
     );
   }

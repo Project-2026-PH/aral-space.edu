@@ -5,6 +5,7 @@ import { PublicSubjectDto } from '@quiz-creator/types';
 import { BookOpen, ExternalLink, Home, Layers, ShieldAlert, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import Skeleton from '@/components/ui/Skeleton';
 
 export default function SharedSubjectPage() {
   const params = useParams();
@@ -37,11 +38,36 @@ export default function SharedSubjectPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 px-4 py-20 text-center">
-        <div className="inline-flex animate-pulse rounded-full bg-primary/10 p-4 text-primary">
-          <Sparkles className="h-8 w-8" />
+      <div className="mx-auto max-w-4xl space-y-8 px-4 pb-20">
+        <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-16 w-16 rounded-3xl" />
+              <div className="space-y-2">
+                <Skeleton className="h-3.5 w-32 rounded-full" />
+                <Skeleton className="h-7 w-56 rounded-xl" />
+                <Skeleton className="h-3 w-28 rounded-full" />
+              </div>
+            </div>
+            <Skeleton className="h-10 w-24 rounded-2xl" />
+          </div>
         </div>
-        <p className="text-sm font-bold text-foreground">Loading shared subject...</p>
+
+        <div className="space-y-4">
+          <div className="flex items-end justify-between gap-3">
+            <div className="space-y-1.5">
+              <Skeleton className="h-3 w-24 rounded-full" />
+              <Skeleton className="h-5 w-36 rounded-xl" />
+            </div>
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {[0, 1, 2, 3].map((item) => (
+              <Skeleton key={item} className="h-44 rounded-3xl border border-border/40 bg-muted/40" />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -97,7 +123,7 @@ export default function SharedSubjectPage() {
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-2.5 text-xs font-bold text-foreground transition-all hover:bg-muted active:scale-95"
           >
             <Home className="h-3.5 w-3.5" />
-            Quiz Hub
+            Home
           </Link>
         </div>
       </div>

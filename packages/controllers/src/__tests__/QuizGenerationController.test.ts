@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QuizGenerationController } from '../QuizGenerationController';
-import { IQuizRepository, QuizGenerationService } from '@quiz-creator/core';
+import type { IQuizRepository } from '@quiz-creator/core/repositories';
+import { QuizGenerationService } from '@quiz-creator/core/services';
 import { GenerateQuizRequestDto, QuizGenerationProgressDto } from '@quiz-creator/types';
 
 describe('QuizGenerationController - pipelineMode', () => {

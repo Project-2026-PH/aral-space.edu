@@ -1,5 +1,5 @@
-import { RepositoryFactory } from '@quiz-creator/core';
-import type { IQuizRepository, ISessionRepository } from '@quiz-creator/core';
+import { RepositoryFactory } from '@quiz-creator/core/repositories';
+import type { IQuizRepository, ISessionRepository } from '@quiz-creator/core/repositories';
 import { createServerSupabaseClient } from './supabase/server';
 import { cache } from 'react';
 
@@ -53,3 +53,4 @@ export const getSessionRepository = cache(async (): Promise<ISessionRepository> 
   const supabase = await createServerSupabaseClient();
   return RepositoryFactory.createSessionRepository({ supabase });
 });
+

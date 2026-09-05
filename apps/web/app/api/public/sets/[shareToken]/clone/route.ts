@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RepositoryFactory } from '@quiz-creator/core';
 import { QuizCrudController } from '@quiz-creator/controllers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getQuizRepository } from '@/lib/db';
+import { getAnonymousUserId } from '@/lib/anonymous';
+import { revalidateUserLists } from '@/lib/cached-queries';
 
 export async function POST(
   req: NextRequest,
@@ -9,10 +10,11 @@ export async function POST(
 ) {
   try {
     const { shareToken } = await params;
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    const userId = await getAnonymousUserId(req);
+    const quizRepo = await getQuizRepository(false);
     const controller = new QuizCrudController(quizRepo);
-    const clonedQuiz = await controller.cloneQuizByShareToken(shareToken);
+    const clonedQuiz = await controller.cloneQuizByShareToken(shareToken, userId);
+    revalidateUserLists(userId);
 
     return NextResponse.json(clonedQuiz, { status: 201 });
   } catch (err: any) {

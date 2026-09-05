@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RepositoryFactory } from '@quiz-creator/core';
 import { QuizCrudController } from '@quiz-creator/controllers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { getQuizRepository } from '@/lib/db';
+import { revalidateQuizTag } from '@/lib/cached-queries';
+import { getAnonymousUserId } from '@/lib/anonymous';
 
 export async function GET(
   req: NextRequest,
@@ -9,10 +10,10 @@ export async function GET(
 ) {
   try {
     const { setId } = await params;
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    const userId = await getAnonymousUserId(req);
+    const quizRepo = await getQuizRepository(true);
     const controller = new QuizCrudController(quizRepo);
-    const config = await controller.getShareConfig(setId);
+    const config = await controller.getShareConfig(setId, userId);
     return NextResponse.json(config);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 400 });
@@ -25,11 +26,12 @@ export async function POST(
 ) {
   try {
     const { setId } = await params;
+    const userId = await getAnonymousUserId(req);
     const body = await req.json();
-    const supabase = await createServerSupabaseClient();
-    const quizRepo = RepositoryFactory.createQuizRepository(supabase);
+    const quizRepo = await getQuizRepository(false);
     const controller = new QuizCrudController(quizRepo);
-    const updated = await controller.updateShareConfig(setId, body);
+    const updated = await controller.updateShareConfig(setId, body, userId);
+    revalidateQuizTag(setId);
     return NextResponse.json(updated);
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 400 });

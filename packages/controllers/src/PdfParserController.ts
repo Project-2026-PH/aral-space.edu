@@ -1,4 +1,4 @@
-import { PdfExtractionService } from '@quiz-creator/core';
+import { PdfExtractionService } from '@quiz-creator/core/services';
 
 export class PdfParserController {
   static parsePlainText(text: string) {

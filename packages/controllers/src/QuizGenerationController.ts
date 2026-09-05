@@ -1,4 +1,5 @@
-import { IQuizRepository, QuizGenerationService, PdfExtractionService, UserAuthoringProfileService } from '@quiz-creator/core';
+import type { IQuizRepository } from '@quiz-creator/core/repositories';
+import { QuizGenerationService, PdfExtractionService, UserAuthoringProfileService } from '@quiz-creator/core/services';
 import { GenerateQuizRequestDto, QuizGenerationProgressDto } from '@quiz-creator/types';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

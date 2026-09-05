@@ -3,6 +3,24 @@
   "version": "1.0.0",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./repositories": {
+      "types": "./src/repositories/index.ts",
+      "default": "./src/repositories/index.ts"
+    },
+    "./services": {
+      "types": "./src/services/index.ts",
+      "default": "./src/services/index.ts"
+    },
+    "./cache": {
+      "types": "./src/cache/LRUCache.ts",
+      "default": "./src/cache/LRUCache.ts"
+    }
+  },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },

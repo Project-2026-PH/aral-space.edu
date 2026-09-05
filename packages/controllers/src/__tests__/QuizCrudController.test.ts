@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { QuizCrudController } from '../QuizCrudController';
 import { MasterySessionController } from '../MasterySessionController';
-import { SAMPLE_QUIZ_ID, SAMPLE_SUBJECT_ID, MemorySessionRepository } from '@quiz-creator/core';
+import { MemorySessionRepository } from '@quiz-creator/core/repositories';
+import { SAMPLE_QUIZ_ID, SAMPLE_SUBJECT_ID } from '@quiz-creator/core/services';
 
 describe('QuizCrudController & MasterySessionController Sample Defaults', () => {
   it('QuizCrudController prepends sample quiz and subject when repository is empty', async () => {

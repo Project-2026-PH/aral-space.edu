@@ -1,5 +1,5 @@
-import type { IQuizRepository } from '@quiz-creator/core';
-import { SAMPLE_QUIZ, SAMPLE_SUBJECT, SAMPLE_QUIZ_ID, SAMPLE_SUBJECT_ID, SAMPLE_QUIZ_QUESTIONS } from '@quiz-creator/core';
+import type { IQuizRepository } from '@quiz-creator/core/repositories';
+import { SAMPLE_QUIZ, SAMPLE_SUBJECT, SAMPLE_QUIZ_ID, SAMPLE_SUBJECT_ID, SAMPLE_QUIZ_QUESTIONS } from '@quiz-creator/core/services';
 import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto, UpdateSubjectShareConfigDto, UpdateSubjectDto } from '@quiz-creator/types';
 
 export class QuizCrudController {

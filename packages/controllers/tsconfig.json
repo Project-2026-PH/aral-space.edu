@@ -5,11 +5,20 @@
       "@quiz-creator/controllers": [
         "./src/index.ts"
       ],
+      "@quiz-creator/controllers/*": [
+        "./src/*"
+      ],
       "@quiz-creator/core": [
         "../core/src/index.ts"
       ],
+      "@quiz-creator/core/*": [
+        "../core/src/*"
+      ],
       "@quiz-creator/types": [
         "../types/src/index.ts"
+      ],
+      "@quiz-creator/types/*": [
+        "../types/src/*"
       ]
     }
   },

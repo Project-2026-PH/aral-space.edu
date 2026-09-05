@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { QuizGenerationController } from '@quiz-creator/controllers';
+import { QuizGenerationController } from '@quiz-creator/controllers/QuizGenerationController';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { getQuizRepository } from '@/lib/db';
 

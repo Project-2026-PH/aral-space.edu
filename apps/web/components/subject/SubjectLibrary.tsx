@@ -126,7 +126,7 @@ export default function SubjectLibrary({
                   </div>
                   {canOpen && (
                     <p className="mt-5 text-[11px] font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100">
-                      {canManage ? 'Click to manage subject' : canGeneratePublicLink ? 'Click to create a public link' : 'Click to view public reviewers'}
+                      {canManage ? 'Click to manage subject' : canGeneratePublicLink ? 'Click to create a public link' : 'Click to view your public reviewers'}
                     </p>
                   )}
                 </div>

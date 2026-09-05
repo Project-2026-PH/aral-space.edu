@@ -14,7 +14,6 @@ import {
   RotateCw,
   Tag
 } from 'lucide-react';
-import { SessionTelemetryService } from '@quiz-creator/core';
 import type {
   CardTelemetryRecord,
   Quiz,
@@ -82,7 +81,12 @@ export default function QuizCompletion({
               const record = cardTelemetry[question.id];
               const bucket = summary.buckets.green.includes(question.id) ? 'green' : summary.buckets.yellow.includes(question.id) ? 'yellow' : 'red';
               const latencySec = record?.timeToCorrectMs ? `${(record.timeToCorrectMs / 1000).toFixed(1)}s` : record?.latenciesMs?.[0] ? `${(record.latenciesMs[0] / 1000).toFixed(1)}s` : '—';
-              const isHesitant = Boolean(record && record.firstPassCorrect && SessionTelemetryService.isHesitant(record.latenciesMs?.[0] || record.timeToCorrectMs || 0, summary.deckMedianLatencyMs));
+              const isHesitant = Boolean(
+                record &&
+                record.firstPassCorrect &&
+                summary.deckMedianLatencyMs > 0 &&
+                (record.latenciesMs?.[0] || record.timeToCorrectMs || 0) > summary.deckMedianLatencyMs * 1.5
+              );
               return (
                 <div key={question.id} className="rounded-2xl border border-border/60 bg-muted/20 p-3 text-left space-y-1.5">
                   <div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-foreground line-clamp-2">{question.question_text}</p><div className="shrink-0">{bucket === 'green' && <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600">✓ Got it ({latencySec})</span>}{bucket === 'yellow' && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-600">🟡 {isHesitant ? `Hesitant (${latencySec})` : 'Recovered'}</span>}{bucket === 'red' && <span className="rounded-full bg-destructive/10 border border-destructive/20 px-2 py-0.5 text-[10px] font-bold text-destructive">🔴 At-Risk ({record?.totalMisses || 0} misses)</span>}</div></div>

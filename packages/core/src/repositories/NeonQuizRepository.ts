@@ -243,42 +243,47 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async getSubjectByShareToken(shareToken: string) {
-    const subjectRows = await this.sql`
-      SELECT id, name, color, share_token, is_public, created_at
-      FROM subjects
-      WHERE share_token = ${shareToken}
-        AND COALESCE(is_public, TRUE) = TRUE
+    const rows = await this.sql`
+      SELECT 
+        s.id, s.name, s.color, s.share_token, s.is_public, s.created_at,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id', q.id,
+                'title', q.title,
+                'description', q.description,
+                'question_count', COALESCE(q.question_count, 0),
+                'generated_at', q.generated_at,
+                'share_token', q.share_token,
+                'is_public', COALESCE(q.is_public, TRUE),
+                'created_at', q.created_at
+              ) ORDER BY q.generated_at DESC
+            )
+            FROM quizzes q
+            WHERE q.subject_id = s.id
+              AND COALESCE(q.is_public, TRUE) = TRUE
+              AND q.share_token IS NOT NULL
+          ),
+          '[]'::json
+        ) as quizzes
+      FROM subjects s
+      WHERE s.share_token = ${shareToken}
+        AND COALESCE(s.is_public, TRUE) = TRUE
       LIMIT 1
     `;
 
-    if (!subjectRows || subjectRows.length === 0) return null;
-    const subject = subjectRows[0] as any;
-    const quizRows = await this.sql`
-      SELECT id, title, description, question_count, generated_at, share_token, is_public, created_at
-      FROM quizzes
-      WHERE subject_id = ${subject.id}
-        AND COALESCE(is_public, TRUE) = TRUE
-        AND share_token IS NOT NULL
-      ORDER BY generated_at DESC
-    `;
+    if (!rows || rows.length === 0) return null;
+    const row = rows[0] as any;
 
     return {
-      id: subject.id,
-      name: subject.name,
-      color: subject.color,
-      share_token: subject.share_token,
-      is_public: subject.is_public ?? true,
-      created_at: subject.created_at,
-      quizzes: (quizRows as any[]).map((quiz) => ({
-        id: quiz.id,
-        title: quiz.title,
-        description: quiz.description || null,
-        question_count: quiz.question_count || 0,
-        generated_at: quiz.generated_at,
-        share_token: quiz.share_token,
-        is_public: quiz.is_public ?? true,
-        created_at: quiz.created_at
-      }))
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      share_token: row.share_token,
+      is_public: row.is_public ?? true,
+      created_at: row.created_at,
+      quizzes: Array.isArray(row.quizzes) ? row.quizzes : []
     };
   }
 

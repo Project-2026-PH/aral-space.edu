@@ -1,6 +1,6 @@
 import React from 'react';
 import { Quiz, Subject } from '@quiz-creator/types';
-import { QuizCrudController } from '@quiz-creator/controllers';
+import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
 import { getQuizRepository } from '@/lib/db';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import HomeClient from '@/components/home/HomeClient';

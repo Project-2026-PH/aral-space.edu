@@ -1,5 +1,7 @@
-import { ISessionRepository, IQuizRepository, MasteryEngineService, SAMPLE_QUIZ_ID, SAMPLE_QUIZ_QUESTIONS, MemorySessionRepository } from '@quiz-creator/core';
-import { SessionType, QuestionProgress, SessionMasterySummary } from '@quiz-creator/types';
+import type { ISessionRepository, IQuizRepository } from '@quiz-creator/core/repositories';
+import { MemorySessionRepository } from '@quiz-creator/core/repositories';
+import { MasteryEngineService, SAMPLE_QUIZ_ID, SAMPLE_QUIZ_QUESTIONS } from '@quiz-creator/core/services';
+import { SessionType, QuestionProgress, SessionMasterySummary, QuizQuestion } from '@quiz-creator/types';
 
 function isUuid(str?: string | null): boolean {
   if (!str || typeof str !== 'string') return false;
@@ -19,21 +21,33 @@ export class MasterySessionController {
     }
   }
 
-  async getOrStartSession(quizId: string, sessionType: SessionType = 'initial', userId?: string) {
+  async getOrStartSession(
+    quizId: string,
+    sessionType: SessionType = 'initial',
+    userId?: string,
+    providedQuestions?: QuizQuestion[]
+  ) {
     if (!isUuid(quizId)) {
       // In-memory quiz (e.g. SAMPLE_QUIZ_ID). Never send non-UUID to Postgres.
-      let session = await MasterySessionController.sampleSessionRepo.getActiveSession(quizId, userId);
+      const sessionPromise = MasterySessionController.sampleSessionRepo.getActiveSession(quizId, userId);
+      const questionsPromise = providedQuestions
+        ? Promise.resolve(providedQuestions)
+        : quizId === SAMPLE_QUIZ_ID
+          ? Promise.resolve(SAMPLE_QUIZ_QUESTIONS)
+          : this.quizRepo
+            ? this.quizRepo.getQuestionsByQuizId(quizId)
+            : Promise.reject(new Error('Quiz repository is required to start this session'));
+
+      const [existingSession, questions] = await Promise.all([sessionPromise, questionsPromise]);
+      let session = existingSession;
+      let progressList: QuestionProgress[] = [];
+
       if (!session) {
         session = await MasterySessionController.sampleSessionRepo.createSession(quizId, sessionType, new Date().toISOString(), userId);
+      } else {
+        progressList = await MasterySessionController.sampleSessionRepo.getProgressForSession(session.id);
       }
 
-      const questions = quizId === SAMPLE_QUIZ_ID
-        ? SAMPLE_QUIZ_QUESTIONS
-        : this.quizRepo
-          ? await this.quizRepo.getQuestionsByQuizId(quizId)
-          : (() => { throw new Error('Quiz repository is required to start this session'); })();
-
-      let progressList = await MasterySessionController.sampleSessionRepo.getProgressForSession(session.id);
       const existingMap = new Map(progressList.map(p => [p.question_id, p]));
       const missing = questions.filter(q => !existingMap.has(q.id));
 
@@ -52,16 +66,24 @@ export class MasterySessionController {
       return { session, questions, progress: progressList };
     }
 
-    let session = await this.sessionRepo.getActiveSession(quizId, userId);
-    if (!session) {
-      session = await this.sessionRepo.createSession(quizId, sessionType, new Date().toISOString(), userId);
-    }
-
-    if (!this.quizRepo) {
+    if (!this.quizRepo && !providedQuestions) {
       throw new Error('Quiz repository is required to start this session');
     }
-    const questions = await this.quizRepo.getQuestionsByQuizId(quizId);
-    let progressList = await this.sessionRepo.getProgressForSession(session.id);
+
+    const sessionPromise = this.sessionRepo.getActiveSession(quizId, userId);
+    const questionsPromise = providedQuestions
+      ? Promise.resolve(providedQuestions)
+      : this.quizRepo!.getQuestionsByQuizId(quizId);
+
+    const [existingSession, questions] = await Promise.all([sessionPromise, questionsPromise]);
+    let session = existingSession;
+    let progressList: QuestionProgress[] = [];
+
+    if (!session) {
+      session = await this.sessionRepo.createSession(quizId, sessionType, new Date().toISOString(), userId);
+    } else {
+      progressList = await this.sessionRepo.getProgressForSession(session.id);
+    }
 
     const existingMap = new Map(progressList.map(p => [p.question_id, p]));
     const missing = questions.filter(q => !existingMap.has(q.id));

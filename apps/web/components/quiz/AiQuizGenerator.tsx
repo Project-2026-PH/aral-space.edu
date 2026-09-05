@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AiPipelineMode, HandoutPage, IngestedFileInfo } from '@quiz-creator/types';
-import { PdfExtractionService } from '@quiz-creator/core';
 import NewSubjectModal from '../subject/NewSubjectModal';
 
 export interface IngestedFileState {
@@ -124,10 +123,21 @@ export default function AiQuizGenerator({
     const fileId = `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 7)}`;
     try {
       if (file.name.endsWith('.pdf') || file.type === 'application/pdf') {
-        console.log(`[Frontend] Parsing PDF "${file.name}" (${file.size} bytes)...`);
-        const arrayBuffer = await file.arrayBuffer();
-        const { pages, pageCount } = await PdfExtractionService.parsePdf(arrayBuffer, file.name);
-        console.log(`[Frontend] PDF "${file.name}" parsed: detected ${pageCount} pages, extracted ${pages.length} chunks (sample text length: ${pages[0]?.text?.length || 0} chars).`);
+        console.log(`[Frontend] Parsing PDF "${file.name}" (${file.size} bytes) via /api/parse-document...`);
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/parse-document', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server returned ${res.status}`);
+        }
+        const data = await res.json();
+        const pages: HandoutPage[] = data.pages || [];
+        const pageCount: number = data.pageCount || pages.length || 1;
+        console.log(`[Frontend] PDF "${file.name}" parsed: detected ${pageCount} pages, extracted ${pages.length} chunks.`);
         return {
           id: fileId,
           name: file.name,
@@ -139,13 +149,38 @@ export default function AiQuizGenerator({
       } else {
         // Plain text / Markdown notes
         const textContent = await file.text();
-        const pages = PdfExtractionService.extractTextFromMockOrPlain(textContent, file.name);
+        const lines = textContent.split('\n');
+        const pages: HandoutPage[] = [];
+        let curBuf: string[] = [];
+        let curPage = 1;
+
+        const flush = () => {
+          if (curBuf.length > 0) {
+            pages.push({
+              pageNumber: curPage++,
+              text: curBuf.join('\n'),
+              chapterTitle: file.name
+            });
+            curBuf = [];
+          }
+        };
+
+        for (const line of lines) {
+          if (curBuf.length >= 50) {
+            flush();
+          }
+          curBuf.push(line);
+        }
+        flush();
+
+        const finalPages = pages.length > 0 ? pages : [{ pageNumber: 1, text: textContent, chapterTitle: file.name }];
+
         return {
           id: fileId,
           name: file.name,
           size: file.size,
-          pageCount: pages.length,
-          pages,
+          pageCount: finalPages.length,
+          pages: finalPages,
           status: 'ready'
         };
       }
@@ -305,9 +340,16 @@ export default function AiQuizGenerator({
       let filesSummary: IngestedFileInfo[] | undefined;
 
       if (hasFiles) {
-        aggregatedPages = PdfExtractionService.aggregateMultiFilePages(
-          files.map((f) => ({ name: f.name, pages: f.pages }))
-        );
+        let cumulativePageNumber = 1;
+        for (const file of files) {
+          for (const p of file.pages) {
+            aggregatedPages.push({
+              pageNumber: cumulativePageNumber++,
+              text: p.text,
+              chapterTitle: p.chapterTitle || file.name
+            });
+          }
+        }
         const totalExtractedChars = aggregatedPages.reduce((sum, p) => sum + (p.text?.trim().length || 0), 0);
         if (totalExtractedChars === 0) {
           setError('The uploaded PDF appears to be a scanned image or contains no selectable text. Please upload a searchable PDF or paste notes directly.');

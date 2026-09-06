@@ -180,10 +180,42 @@ body {
   will-change: opacity, transform;
 }
 
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 3.8s ease-in-out infinite;
+}
+
+@keyframes shadow-pulse {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scaleX(0.82);
+    opacity: 0.16;
+  }
+}
+
+.animate-shadow-pulse {
+  animation: shadow-pulse 3.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .recap-continue-enter {
+  .recap-continue-enter,
+  .animate-float-slow,
+  .animate-shadow-pulse {
     animation-duration: 1ms;
     animation-delay: 0ms;
+    animation-iteration-count: 1;
     transform: none;
   }
 }
+

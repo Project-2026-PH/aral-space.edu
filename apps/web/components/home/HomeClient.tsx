@@ -50,13 +50,13 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
         <div className="space-y-1.5">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
             <Sparkles className="h-3.5 w-3.5" />
-            MSRC Spaced Repetition Engine
+            Master your handouts with us!
           </span>
           <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
-            Quiz Creation & Mastery Studio
+            Reviewer Creation for Students
           </h1>
           <p className="max-w-xl text-xs leading-relaxed text-muted-foreground">
-            Generate high-yield exam question banks from lecture materials or manually build interactive multiple-choice decks with a continuous 7-item sliding-window mastery queue.
+            Generate reviewer question from handouts or manually build interactive multiple-choice decks.
           </p>
         </div>
 

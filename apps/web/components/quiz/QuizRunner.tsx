@@ -83,7 +83,8 @@ export default function QuizRunner(props: QuizRunnerProps) {
     toggleMute
   } = session;
 
-  const isDesktopViewportMode = currentMode === 'multiple_choice' || currentMode === 'identification';
+  const isMultipleChoiceMode = currentMode === 'multiple_choice';
+  const isDesktopViewportMode = isMultipleChoiceMode || currentMode === 'identification';
 
   if (!isProgressHydrated) {
     return <div className="mx-auto flex min-h-[50vh] max-w-md items-center justify-center text-center text-xs text-muted-foreground">Restoring your quiz progress...</div>;
@@ -146,7 +147,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
 
   return (
     <div
-      className={`mx-auto max-w-5xl space-y-6 pb-28 sm:pb-32 ${isDesktopViewportMode ? `desktop-quiz-viewport lg:flex lg:flex-col lg:gap-3 lg:space-y-0 ${pendingAdvance ? 'lg:pb-20' : 'lg:pb-8'}` : ''}`}
+      className={`mx-auto max-w-5xl ${isMultipleChoiceMode ? `mobile-multiple-choice-viewport ${pendingAdvance ? 'pb-20' : 'pb-4'}` : 'space-y-6 pb-28 sm:pb-32'} ${isDesktopViewportMode ? `desktop-quiz-viewport lg:flex lg:flex-col lg:gap-3 lg:space-y-0 ${pendingAdvance ? 'lg:pb-20' : 'lg:pb-8'}` : ''}`}
       onClick={handleSurfaceClick}
       onKeyDown={handleSurfaceKeyDown}
     >
@@ -175,8 +176,8 @@ export default function QuizRunner(props: QuizRunnerProps) {
           </button>
 
           <button type="button" onClick={toggleMute} className="p-1.5 rounded-full border border-border/80 bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors active:scale-95" title={isMuted ? 'Unmute Sound' : 'Mute Sound'} aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}>{isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
-          {isStruggleReviewMode && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-bold text-amber-500">Struggle Pile Review</span>}
-          {accumulatedStruggleIds.length > 0 && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /><span>{accumulatedStruggleIds.length} in Struggle Pile</span></span>}
+          {/* {isStruggleReviewMode && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-bold text-amber-500">Struggle Pile Review</span>}
+          {accumulatedStruggleIds.length > 0 && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /><span>{accumulatedStruggleIds.length} in Struggle Pile</span></span>} */}
         </div>
       </div>
 
@@ -206,10 +207,10 @@ export default function QuizRunner(props: QuizRunnerProps) {
         ) : <div className="h-2 w-full overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all duration-300" style={{ width: `${overallPercent}%` }} /></div>}
       </div>
 
-      <div className={isDesktopViewportMode ? 'overflow-visible lg:min-h-0 lg:flex-none' : 'overflow-hidden'}>
+      <div className={isMultipleChoiceMode ? 'quiz-question-stage min-h-0 flex-1 overflow-visible' : isDesktopViewportMode ? 'overflow-visible lg:min-h-0 lg:flex-none' : 'overflow-hidden'}>
         <div
           key={activeQuestion.id}
-          className={`${isQuestionTransitioning ? 'quiz-question-card-exit' : 'quiz-question-card-enter'} ${isDesktopViewportMode ? 'lg:h-auto lg:min-h-0' : ''}`}
+          className={`${isQuestionTransitioning ? 'quiz-question-card-exit' : 'quiz-question-card-enter'} ${isDesktopViewportMode ? 'lg:h-auto lg:min-h-0' : ''} ${isMultipleChoiceMode ? 'min-h-0' : ''}`}
         >
           <QuestionRenderer
             mode={currentMode}

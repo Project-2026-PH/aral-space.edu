@@ -234,20 +234,36 @@ body {
   }
 }
 
-/* Keep multiple-choice study cards spatially stable while allowing long content to scroll locally. */
+/* Multiple-choice study cards size to their content and cap themselves to the viewport. */
 @media (max-width: 1023px) {
   .multiple-choice-study-card {
-    height: min(680px, calc(100dvh - 12rem));
-    min-height: 480px;
+    max-height: 80vh;
+  }
+
+  .mobile-multiple-choice-viewport {
+    height: calc(100dvh - 6rem);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
     overflow: hidden;
+  }
+
+  .mobile-multiple-choice-viewport .multiple-choice-study-card {
+    height: auto;
+    max-height: 80vh;
+    min-height: 0;
+  }
+
+  .mobile-multiple-choice-viewport > .quiz-question-stage {
+    min-height: 0;
+    flex: 1 1 0%;
   }
 }
 
 @media (min-width: 1024px) {
   .multiple-choice-study-card {
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
+    max-height: 80vh;
   }
 }
 
@@ -272,6 +288,35 @@ body {
 .rich-text-content a { color: hsl(var(--primary)); text-decoration: underline; }
 .rich-text-content hr { margin: 1rem 0; border: 0; border-top: 1px solid hsl(var(--border)); }
 .rich-text-editor:empty::before { content: attr(data-placeholder); color: hsl(var(--muted-foreground)); pointer-events: none; }
+
+.rich-text-selection-toolbar {
+  display: none;
+  position: fixed;
+  z-index: 70;
+}
+
+@media (max-width: 1023px) {
+  .rich-text-selection-toolbar {
+    display: block;
+    max-width: calc(100vw - 1rem);
+  }
+
+  .rich-text-toolbar-floating {
+    flex-wrap: nowrap;
+    max-width: calc(100vw - 1rem);
+    border: 1px solid hsl(var(--border));
+    border-bottom-width: 1px;
+    border-radius: 9999px;
+    background: hsl(var(--card) / 0.98);
+    padding: 0.25rem;
+    box-shadow: 0 12px 30px hsl(var(--foreground) / 0.18);
+    white-space: nowrap;
+  }
+
+  .rich-text-toolbar-floating > span {
+    display: none;
+  }
+}
 
 /* Notes keeps the workspace fixed while the document scrolls inside its bordered editor. */
 .notes-workspace {

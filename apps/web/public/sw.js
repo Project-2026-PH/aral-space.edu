@@ -27,7 +27,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Next build assets are content-hashed and must always come from the active build.
-  if (url.pathname.startsWith('/_next/') || url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith('/_next/') || url.pathname.startsWith('/api/') || url.pathname === '/version.json') {
     return;
   }
 

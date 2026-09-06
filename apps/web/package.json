@@ -6,9 +6,10 @@
     "dev": "infisical run -- next dev --turbo",
     "dev:local": "next dev --turbo",
     "dev:infisical": "infisical run -- next dev --turbo",
+    "prebuild": "node ../../scripts/generate-version.mjs",
     "build": "next build",
-    "build:clean": "node ../../scripts/clean-next.mjs && next build",
-    "build:incremental": "next build",
+    "build:clean": "node ../../scripts/clean-next.mjs && node ../../scripts/generate-version.mjs && next build",
+    "build:incremental": "node ../../scripts/generate-version.mjs && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"

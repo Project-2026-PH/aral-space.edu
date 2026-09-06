@@ -3,6 +3,7 @@ import './globals.css';
 import Image from 'next/image';
 import Link from 'next/link';
 import PwaRegister from '@/components/PwaRegister';
+import UpdateNotification from '@/components/UpdateNotification';
 import AnonymousSessionBadge from '@/components/AnonymousSessionBadge';
 import ThemeToggle from '@/components/ThemeToggle';
 
@@ -52,6 +53,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20">
         <PwaRegister />
+        <UpdateNotification />
         <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
           <div className="max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
             <Link href="/" className="flex items-center gap-2.5 group">

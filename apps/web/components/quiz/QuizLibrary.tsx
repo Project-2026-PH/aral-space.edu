@@ -74,8 +74,11 @@ export default function QuizLibrary({
         </div>
       ) : (
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {quizzes.map((quiz) => (
-            <article
+          {quizzes.map((quiz) => {
+            const subjectName = quiz.subject?.name ?? subjects?.find((subject) => subject.id === quiz.subject_id)?.name;
+
+            return (
+              <article
               key={quiz.id}
               className="home-library-card group flex min-h-44 flex-col justify-between rounded-3xl border border-border/80 bg-card p-5 shadow-2xs transition-all hover:border-primary/40 hover:shadow-md"
             >
@@ -88,6 +91,13 @@ export default function QuizLibrary({
                   {quiz.id === 'b0000000-0000-4000-8000-000000000001' || quiz.share_token === 'kasaysayan-pilipinas-reviewer' ? (
                     <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-[11px] font-bold text-blue-600 dark:text-blue-400">
                       Sample Reviewer
+                    </span>
+                  ) : subjectName ? (
+                    <span
+                      className="max-w-[12rem] truncate rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary"
+                      title={subjectName}
+                    >
+                      {subjectName}
                     </span>
                   ) : (
                     <span className="text-[11px] font-medium text-muted-foreground">Reviewer</span>
@@ -132,8 +142,9 @@ export default function QuizLibrary({
                   <span>Practice</span>
                 </Link>
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </section>

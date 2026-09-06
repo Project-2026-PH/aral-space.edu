@@ -8,6 +8,7 @@ import NewSubjectModal from '../subject/NewSubjectModal';
 import StickyActionDock from '../ui/StickyActionDock';
 import { parseSmartClipboard, type ParsedClipboard } from '@/lib/clipboardParser';
 import { QuizTransformService } from '@quiz-creator/core';
+import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
 
 export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
 
@@ -529,6 +530,17 @@ export default function ManualQuizCreator({
 
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || 'Failed to create study set.');
+      questions.forEach((question) => {
+        recordLocalAuthoringEvent({
+          action: 'create',
+          after: makeAuthoringQuestionSnapshot(
+            question.type,
+            question.question_text,
+            question.options,
+            question.explanation
+          )
+        });
+      });
       window.localStorage.removeItem(MANUAL_DRAFT_STORAGE_KEY);
       router.push(`/quizzes/${data.id}`);
     } catch (err: any) {

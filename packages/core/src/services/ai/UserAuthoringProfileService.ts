@@ -1,23 +1,25 @@
 import { IQuizRepository } from '../../repositories/IQuizRepository';
-import { UserAuthoringProfile } from '@quiz-creator/types';
+import { UserAuthoringProfile, AuthoringPreferenceSignals } from '@quiz-creator/types';
+import { AuthoringPreferenceEngine } from './AuthoringPreferenceEngine';
 
 export class UserAuthoringProfileService {
   static readonly DEFAULT_TARGET_COUNT = 10;
 
   static async buildProfile(
     quizRepo: IQuizRepository,
-    userId?: string
+    userId?: string,
+    localSignals?: AuthoringPreferenceSignals
   ): Promise<UserAuthoringProfile> {
     try {
       const allQuizzes = await quizRepo.listQuizzes(userId);
 
       if (!allQuizzes || allQuizzes.length === 0) {
-        return {
+        return AuthoringPreferenceEngine.applyToProfile({
           targetCount: UserAuthoringProfileService.DEFAULT_TARGET_COUNT,
           sourceType: 'default',
           styleSummary: 'Standard 4-option conceptual multiple choice questions.',
           totalReviewersAnalyzed: 0
-        };
+        }, localSignals);
       }
 
       // Priority 1: Manual quizzes
@@ -28,12 +30,12 @@ export class UserAuthoringProfileService {
         : allQuizzes.filter((q) => q.source_model !== 'manual');
 
       if (targetQuizzes.length === 0) {
-        return {
+        return AuthoringPreferenceEngine.applyToProfile({
           targetCount: UserAuthoringProfileService.DEFAULT_TARGET_COUNT,
           sourceType: 'default',
           styleSummary: 'Standard 4-option conceptual multiple choice questions.',
           totalReviewersAnalyzed: 0
-        };
+        }, localSignals);
       }
 
       // Determine maximum number of questions user usually makes
@@ -68,12 +70,12 @@ export class UserAuthoringProfileService {
       }
 
       if (allQuestions.length === 0) {
-        return {
+        return AuthoringPreferenceEngine.applyToProfile({
           targetCount,
           sourceType: useManual ? 'manual' : 'ai_adjusted',
           styleSummary: 'Standard 4-option conceptual multiple choice questions.',
           totalReviewersAnalyzed: targetQuizzes.length
-        };
+        }, localSignals);
       }
 
       // Analyze formation
@@ -105,7 +107,7 @@ export class UserAuthoringProfileService {
 
       const sampleQuestions = allQuestions.slice(0, 3);
 
-      return {
+      return AuthoringPreferenceEngine.applyToProfile({
         targetCount,
         sourceType: useManual ? 'manual' : 'ai_adjusted',
         sampleQuestions,
@@ -113,15 +115,15 @@ export class UserAuthoringProfileService {
         avgQuestionLength,
         avgOptionCount,
         totalReviewersAnalyzed: targetQuizzes.length
-      };
+      }, localSignals);
     } catch (err) {
       console.warn('[UserAuthoringProfileService] failed to compute profile:', err);
-      return {
+      return AuthoringPreferenceEngine.applyToProfile({
         targetCount: UserAuthoringProfileService.DEFAULT_TARGET_COUNT,
         sourceType: 'default',
         styleSummary: 'Standard 4-option conceptual multiple choice questions.',
         totalReviewersAnalyzed: 0
-      };
+      }, localSignals);
     }
   }
 }

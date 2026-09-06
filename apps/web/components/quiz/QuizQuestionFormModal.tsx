@@ -5,6 +5,7 @@ import Modal from '../ui/Modal';
 import StickyActionDock from '../ui/StickyActionDock';
 import { QuizQuestion } from '@quiz-creator/types';
 import { QuizTransformService } from '@quiz-creator/core';
+import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
 import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered } from 'lucide-react';
 
 export type QuestionType = 'multiple_choice' | 'typed_answer' | 'identification' | 'true_false' | 'enumeration';
@@ -217,6 +218,18 @@ export default function QuizQuestionFormModal({
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || (isEditing ? 'Failed to update question' : 'Failed to create question'));
 
+      recordLocalAuthoringEvent({
+        action: isEditing ? 'edit' : 'create',
+        before: question
+          ? makeAuthoringQuestionSnapshot(
+              detectQuestionType(question),
+              question.question_text,
+              question.options || [],
+              question.explanation
+            )
+          : undefined,
+        after: makeAuthoringQuestionSnapshot(type, questionText, cleanedOptions, explanation)
+      });
       onOpenChange(false);
       onSaved();
     } catch (err: any) {

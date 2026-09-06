@@ -24,7 +24,7 @@ export default function QuizContinueDock({
 
   const dock = (
     <div
-      className="fixed inset-x-0 bottom-0 z-[60] flex w-full max-w-sm justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none sm:inset-x-auto sm:bottom-12 sm:left-1/2 sm:w-[calc(100vw-1.5rem)] sm:max-w-xl sm:-translate-x-1/2 sm:px-0 sm:pb-0"
+      className="fixed bottom-0 left-1/2 z-[60] flex w-[calc(100vw-1.5rem)] max-w-sm -translate-x-1/2 justify-center px-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] pointer-events-none sm:bottom-12 sm:max-w-xl sm:pb-0"
     >
       <button
         type="button"

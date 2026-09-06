@@ -5,7 +5,9 @@ import {
   UpdateQuizDto,
   UpdateShareConfigDto,
   UpdateSubjectShareConfigDto,
-  QuizQuestionType
+  QuizQuestionType,
+  AuthoringPreferenceSignals,
+  AuthoringQuestionType
 } from '@quiz-creator/types';
 import {
   assertPlainObject,
@@ -17,6 +19,50 @@ import {
 } from './request-security';
 
 const QUESTION_TYPES = new Set<QuizQuestionType>(['multiple_choice', 'typed_answer']);
+const AUTHORING_QUESTION_TYPES: AuthoringQuestionType[] = [
+  'multiple_choice',
+  'typed_answer',
+  'identification',
+  'true_false',
+  'enumeration'
+];
+
+function parseAuthoringSignals(value: unknown): AuthoringPreferenceSignals | undefined {
+  if (value === undefined || value === null) return undefined;
+  const object = assertPlainObject(value, 'authoringSignals');
+  const version = boundedInteger(object.version, 'authoringSignals.version', 1, 1, true)! as 1;
+  const observationCount = boundedInteger(object.observationCount, 'authoringSignals.observationCount', 0, 500, true)!;
+  const createCount = boundedInteger(object.createCount, 'authoringSignals.createCount', 0, 500, true)!;
+  const editCount = boundedInteger(object.editCount, 'authoringSignals.editCount', 0, 500, true)!;
+  const deleteCount = boundedInteger(object.deleteCount, 'authoringSignals.deleteCount', 0, 500, true)!;
+  const averageQuestionLength = boundedInteger(object.averageQuestionLength, 'authoringSignals.averageQuestionLength', 0, 10_000, true)!;
+  const averageOptionCount = boundedInteger(object.averageOptionCount, 'authoringSignals.averageOptionCount', 0, 20, true)!;
+  const averageExplanationLength = boundedInteger(object.averageExplanationLength, 'authoringSignals.averageExplanationLength', 0, 10_000, true)!;
+  const rawCounts = assertPlainObject(object.questionTypeCounts, 'authoringSignals.questionTypeCounts');
+  const questionTypeCounts = {} as Record<AuthoringQuestionType, number>;
+
+  for (const type of AUTHORING_QUESTION_TYPES) {
+    questionTypeCounts[type] = boundedInteger(
+      rawCounts[type],
+      `authoringSignals.questionTypeCounts.${type}`,
+      0,
+      500,
+      true
+    )!;
+  }
+
+  return {
+    version,
+    observationCount,
+    createCount,
+    editCount,
+    deleteCount,
+    questionTypeCounts,
+    averageQuestionLength,
+    averageOptionCount,
+    averageExplanationLength
+  };
+}
 
 function optionalText(value: unknown, field: string, maxLength: number): string | null | undefined {
   if (value === null) return null;
@@ -250,7 +296,8 @@ export function parseGenerateQuizRequest(value: unknown) {
     pageStart,
     pageEnd,
     pipelineMode,
-    // Provider credentials are deliberately omitted. They must come from server configuration.
-    authoringProfile: undefined
+    // Provider credentials and prompt exemplars remain server-authoritative.
+    authoringProfile: undefined,
+    authoringSignals: parseAuthoringSignals(object.authoringSignals)
   };
 }

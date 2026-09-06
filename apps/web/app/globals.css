@@ -233,3 +233,20 @@ body {
     overflow: visible;
   }
 }
+
+/* Keep multiple-choice study cards spatially stable while allowing long content to scroll locally. */
+@media (max-width: 1023px) {
+  .multiple-choice-study-card {
+    height: min(680px, calc(100dvh - 12rem));
+    min-height: 480px;
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 1024px) {
+  .multiple-choice-study-card {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+}

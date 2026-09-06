@@ -17,6 +17,25 @@ export interface IngestedFileInfo {
   fileSize?: number;
 }
 
+export type AuthoringQuestionType =
+  | 'multiple_choice'
+  | 'typed_answer'
+  | 'identification'
+  | 'true_false'
+  | 'enumeration';
+
+export interface AuthoringPreferenceSignals {
+  version: 1;
+  observationCount: number;
+  createCount: number;
+  editCount: number;
+  deleteCount: number;
+  questionTypeCounts: Record<AuthoringQuestionType, number>;
+  averageQuestionLength: number;
+  averageOptionCount: number;
+  averageExplanationLength: number;
+}
+
 export interface UserAuthoringProfile {
   targetCount: number;
   sourceType: 'manual' | 'ai_adjusted' | 'default';
@@ -28,6 +47,10 @@ export interface UserAuthoringProfile {
   styleSummary?: string;
   avgQuestionLength?: number;
   avgOptionCount?: number;
+  avgExplanationLength?: number;
+  preferredQuestionType?: AuthoringQuestionType;
+  preferenceConfidence?: number;
+  editCount?: number;
   totalReviewersAnalyzed?: number;
 }
 
@@ -54,6 +77,7 @@ export interface GenerateQuizRequestDto {
   apiKey?: string;
   groqApiKey?: string;
   authoringProfile?: UserAuthoringProfile;
+  authoringSignals?: AuthoringPreferenceSignals;
 }
 
 export interface QuizGenerationProgressDto {

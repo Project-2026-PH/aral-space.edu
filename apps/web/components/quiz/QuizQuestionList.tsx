@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { QuizQuestion } from '@quiz-creator/types';
 import { Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import ConfirmModal from '../ui/ConfirmModal';
+import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
 
 interface QuizQuestionListProps {
   quizId: string;
@@ -24,11 +25,25 @@ export default function QuizQuestionList({
   async function handleDelete() {
     if (!deletingId) return;
     try {
-      await fetch(`/api/quizzes/${quizId}/questions/${deletingId}`, {
+      const deletedQuestion = questions.find((question) => question.id === deletingId);
+      const res = await fetch(`/api/quizzes/${quizId}/questions/${deletingId}`, {
         method: 'DELETE'
       });
-      setDeletingId(null);
-      onDeleted();
+      if (res.ok) {
+        if (deletedQuestion) {
+          recordLocalAuthoringEvent({
+            action: 'delete',
+            before: makeAuthoringQuestionSnapshot(
+              deletedQuestion.question_type === 'typed_answer' ? 'typed_answer' : 'multiple_choice',
+              deletedQuestion.question_text,
+              deletedQuestion.options || [],
+              deletedQuestion.explanation
+            )
+          });
+        }
+        setDeletingId(null);
+        onDeleted();
+      }
     } catch (err) {
       console.error('Delete question error:', err);
     }

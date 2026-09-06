@@ -43,7 +43,11 @@ export class QuizGenerationController {
     }
 
     // Adaptive profiling: learn from user's manual or adjusted reviewer history
-    const authoringProfile = dto.authoringProfile || await UserAuthoringProfileService.buildProfile(this.quizRepo, userId);
+    const authoringProfile = dto.authoringProfile || await UserAuthoringProfileService.buildProfile(
+      this.quizRepo,
+      userId,
+      dto.authoringSignals
+    );
 
     const uniqueChapters = Array.from(
       new Set(pages.map((p) => p.chapterTitle).filter((c): c is string => Boolean(c && c.trim())))

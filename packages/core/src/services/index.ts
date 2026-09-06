@@ -22,6 +22,7 @@ export * from './pdf/decoders/PdfStreamTextExtractor';
 export * from './QuizShuffleService';
 export * from './QuizTransformService';
 export * from './QuizRenamingService';
+export * from './ai/AuthoringPreferenceEngine';
 export * from './ai/UserAuthoringProfileService';
 export * from './SampleQuizService';
 export * from './SessionTelemetryService';

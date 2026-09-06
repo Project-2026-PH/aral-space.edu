@@ -394,9 +394,9 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
   } = props;
 
   return (
-    <div className={`w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-6 ${desktopViewport ? 'desktop-quiz-card lg:h-auto lg:min-h-0 lg:overflow-visible lg:p-5 lg:space-y-3' : ''}`}>
+    <div className={`multiple-choice-study-card w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md grid grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-4 overflow-hidden ${desktopViewport ? 'desktop-quiz-card lg:h-full lg:min-h-0 lg:p-5 lg:gap-3' : ''}`}>
       {/* Top Section: Prompt & Status */}
-      <div className="space-y-3">
+      <div className="h-[7.5rem] min-h-0 overflow-y-auto space-y-3 pr-1 lg:h-[6.5rem]">
         <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Definition</span>
@@ -428,8 +428,8 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
         )}
       </div>
 
-      {/* Middle Section: Options */}
-      <div className="space-y-3">
+      {/* Reserved feedback slot */}
+      <div className="h-[4.5rem] min-h-0 overflow-y-auto space-y-3 pr-1 lg:h-[4rem]">
         {isEvaluating && answerResult !== null && (
           <div className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-xs sm:text-sm font-bold animate-in fade-in duration-200 ${answerResult
             ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
@@ -443,7 +443,10 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
             <span>{feedbackMessage || (answerResult ? 'Correct Answer!' : "No problem. You're still learning!")}</span>
           </div>
         )}
+      </div>
 
+      {/* Middle Section: Options */}
+      <div className="min-h-0 flex flex-col space-y-3">
         <div className="flex items-center justify-between text-xs font-bold text-foreground">
           <span>Choose an answer</span>
           {isRetryQuestion && (
@@ -453,7 +456,8 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {currentOptions.map((option, index) => {
             const isSelected = selectedOptionId === option.optionId;
             let style = 'border-border bg-background/50 hover:border-primary/50 hover:bg-card';
@@ -493,11 +497,12 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
               </button>
             );
           })}
+          </div>
         </div>
       </div>
 
-      {/* Bottom Section: Result Feedback & Explanation */}
-      <div className="min-h-[32px] space-y-3">
+      {/* Reserved explanation slot */}
+      <div className="h-[6rem] min-h-0 overflow-y-auto space-y-3 pr-1 lg:h-[5.5rem]">
         {isEvaluating && isExplanationVisible && (
           <div className="space-y-3 pt-1 animate-in fade-in duration-200">
             {(question.correct_explanation || question.explanation) && (

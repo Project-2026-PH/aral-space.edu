@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AiPipelineMode, HandoutPage, IngestedFileInfo } from '@quiz-creator/types';
+import { loadLocalAuthoringSignals } from '@/lib/authoringPreferences';
 import NewSubjectModal from '../subject/NewSubjectModal';
 
 export interface IngestedFileState {
@@ -503,7 +504,8 @@ export default function AiQuizGenerator({
           text: hasText ? text.trim() : undefined,
           pdfPages: aggregatedPages.length > 0 ? aggregatedPages : undefined,
           filesSummary,
-          pipelineMode
+          pipelineMode,
+          authoringSignals: loadLocalAuthoringSignals()
         }),
       });
 

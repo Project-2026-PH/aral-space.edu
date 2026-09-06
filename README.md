@@ -38,6 +38,7 @@ quiz-creator/
   - **Gemini Direct** (`gemini_direct`): Fast single-stage generation using Google Gemini (`@google/genai`).
   - **Groq Direct** (`groq_direct`): High-speed single-stage generation using Groq API.
   - **Local Generator** (`local`): Zero-credential deterministic fallback that extracts source-grounded questions for offline use.
+  - **Local Adaptive Authoring Preferences**: Learns bounded, content-free patterns from question creation and editing in browser storage, then safely adapts future generation after a confidence threshold.
   - **PDF Parser**: Extract lecture handouts and notes directly into questions.
   - **Real-Time Streaming**: Server-Sent Events (SSE) stream generation stage progress to the UI.
 - **Mastery Engine & Spaced Repetition**:
@@ -155,6 +156,7 @@ To apply database schema to Neon or PostgreSQL:
 ## 📚 Technical Documentation
 
 - **[Clipboard Parser & Transformation Flow](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md)**: Comprehensive architectural flow and algorithms for clipboard parsing, definition-to-question conversion, and True/False paraphrasing with the Term Swap Rule.
+- **[Local Adaptive Authoring Preferences](docs/LOCAL_ADAPTIVE_AUTHORING_PREFERENCES.md)**: Aggregate local preference learning, event capture, confidence rules, request validation, privacy boundaries, and extension guidance.
 - **[Infisical Secrets Setup](INFISICAL.md)**: Secrets management, KMS encryption, and environment variables.
 
 

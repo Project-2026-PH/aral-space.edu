@@ -39,6 +39,10 @@ export default function SubjectLibrary({
     );
   }, [subjects, quizzes]);
 
+  if (!loading && subjects.length === 0) {
+    return null;
+  }
+
   return (
     <section className="space-y-4" aria-labelledby="subject-library-heading">
       <div className="flex items-end justify-between gap-3">
@@ -58,16 +62,6 @@ export default function SubjectLibrary({
           {[0, 1, 2].map((item) => (
             <Skeleton key={item} className="h-44 rounded-3xl border border-border/40 bg-muted/40" />
           ))}
-        </div>
-      ) : subjects.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center">
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Layers className="h-5 w-5" />
-          </div>
-          <h3 className="mt-4 text-sm font-bold text-foreground">No subjects yet</h3>
-          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-            Create a subject to organize your study sets and share them via link.
-          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

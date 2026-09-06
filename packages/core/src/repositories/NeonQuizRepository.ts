@@ -256,7 +256,21 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async listQuizzes(userId?: string): Promise<Quiz[]> {
-    if (!userId) return [];
+    if (!userId) {
+      const rows = await this.sql`
+        SELECT 
+          q.*,
+          CASE 
+            WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
+            ELSE NULL 
+          END AS subject
+        FROM quizzes q
+        LEFT JOIN subjects s ON q.subject_id = s.id
+        WHERE q.user_id IS NULL AND COALESCE(q.is_public, TRUE) = TRUE
+        ORDER BY q.generated_at DESC
+      `;
+      return rows as Quiz[];
+    }
     const rows = await this.sql`
       SELECT 
         q.*,
@@ -267,6 +281,7 @@ export class NeonQuizRepository implements IQuizRepository {
       FROM quizzes q
       LEFT JOIN subjects s ON q.subject_id = s.id
       WHERE q.user_id = ${userId}
+         OR (q.user_id IS NULL AND COALESCE(q.is_public, TRUE) = TRUE)
          OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId})
       ORDER BY q.generated_at DESC
     `;
@@ -274,7 +289,6 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async listQuizzesAndSubjects(userId?: string): Promise<{ quizzes: Quiz[]; subjects: Subject[] }> {
-    if (!userId) return { quizzes: [], subjects: [] };
     const [quizzes, subjects] = await Promise.all([
       this.listQuizzes(userId),
       this.listSubjects(userId)
@@ -294,7 +308,11 @@ export class NeonQuizRepository implements IQuizRepository {
           FROM quizzes q
           LEFT JOIN subjects s ON q.subject_id = s.id
           WHERE q.id = ${id}
-            AND (q.user_id = ${userId} OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId}))
+            AND (
+              q.user_id = ${userId}
+              OR (q.user_id IS NULL AND COALESCE(q.is_public, TRUE) = TRUE)
+              OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId})
+            )
           LIMIT 1
         `
       : await this.sql`
@@ -307,6 +325,7 @@ export class NeonQuizRepository implements IQuizRepository {
           FROM quizzes q
           LEFT JOIN subjects s ON q.subject_id = s.id
           WHERE q.id = ${id}
+            AND (q.user_id IS NULL AND COALESCE(q.is_public, TRUE) = TRUE)
           LIMIT 1
         `;
 

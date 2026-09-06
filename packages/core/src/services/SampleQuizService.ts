@@ -25,6 +25,7 @@ export const SAMPLE_QUIZ: Quiz = {
   share_token: SAMPLE_SHARE_TOKEN,
   is_public: true,
   allow_cloning: true,
+  allow_public_answer_key: true,
   created_at: '2026-01-01T00:00:00.000Z',
   subject: SAMPLE_SUBJECT
 };

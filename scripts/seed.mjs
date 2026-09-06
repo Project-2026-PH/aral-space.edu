@@ -56,7 +56,8 @@ async function seed() {
       subject_id,
       share_token,
       is_public,
-      allow_cloning
+      allow_cloning,
+      allow_public_answer_key
     )
     VALUES (
       'b0000000-0000-4000-8000-000000000001',
@@ -67,6 +68,7 @@ async function seed() {
       'kasaysayan_reviewer',
       'a0000000-0000-4000-8000-000000000001',
       'kasaysayan-pilipinas-reviewer',
+      TRUE,
       TRUE,
       TRUE
     )
@@ -79,7 +81,8 @@ async function seed() {
       subject_id = EXCLUDED.subject_id,
       share_token = EXCLUDED.share_token,
       is_public = EXCLUDED.is_public,
-      allow_cloning = EXCLUDED.allow_cloning;
+      allow_cloning = EXCLUDED.allow_cloning,
+      allow_public_answer_key = EXCLUDED.allow_public_answer_key;
   `;
 
   const questions = [

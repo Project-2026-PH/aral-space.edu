@@ -253,7 +253,15 @@ export class SupabaseQuizRepository implements IQuizRepository {
         .from('quizzes')
         .select('*, subject:subjects(*)')
         .order('generated_at', { ascending: false });
-      if (userId) query = query.eq('user_id', userId);
+      if (userId) {
+        query = typeof query.or === 'function'
+          ? query.or(`user_id.eq.${userId},and(user_id.is.null,is_public.eq.true)`)
+          : query.eq('user_id', userId);
+      } else {
+        query = typeof query.is === 'function'
+          ? query.is('user_id', null).eq('is_public', true)
+          : query;
+      }
       const { data, error } = await query;
       if (!error) return (data || []) as Quiz[];
       throw error;
@@ -267,7 +275,15 @@ export class SupabaseQuizRepository implements IQuizRepository {
         .from('quizzes')
         .select('*, subject:subjects(*)')
         .eq('id', id);
-      if (userId) query = query.eq('user_id', userId);
+      if (userId) {
+        query = typeof query.or === 'function'
+          ? query.or(`user_id.eq.${userId},and(user_id.is.null,is_public.eq.true)`)
+          : query.eq('user_id', userId);
+      } else {
+        query = typeof query.is === 'function'
+          ? query.is('user_id', null).eq('is_public', true)
+          : query;
+      }
       const { data, error } = await query.maybeSingle();
       if (!error && data) return data;
       if (userId) {

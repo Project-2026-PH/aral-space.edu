@@ -23,9 +23,9 @@ export default function QuizLibrary({
 }: QuizLibraryProps) {
   return (
     <section className="space-y-4" aria-labelledby="quiz-library-heading">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <h2 id="quiz-library-heading" className="home-section-title mt-1 text-lg font-extrabold tracking-tight text-foreground">
+          <h2 id="quiz-library-heading" className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
             Reviewers
           </h2>
           {subjects !== undefined && (
@@ -33,13 +33,13 @@ export default function QuizLibrary({
               <label htmlFor="reviewer-subject-filter" className="sr-only">
                 Filter reviewers by subject
               </label>
-              <Filter aria-hidden="true" className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-muted-foreground" />
+              <Filter aria-hidden="true" className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-slate-700 dark:text-slate-300" />
               <select
                 id="reviewer-subject-filter"
                 value={selectedSubjectId}
                 onChange={(event) => onSubjectChange?.(event.target.value)}
                 disabled={subjects.length === 0}
-                className="rounded-2xl border border-border bg-card py-2 pl-8 pr-8 text-xs font-semibold text-foreground outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card py-2 pl-8 pr-8 text-xs font-black text-foreground shadow-brutal-sm outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <option value="">All subjects</option>
                 {subjects.map((subject) => (
@@ -51,25 +51,23 @@ export default function QuizLibrary({
             </div>
           )}
         </div>
-        <span className="home-section-count rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
+        <span className="rounded-lg border-2 border-slate-900 bg-[#fde047] text-slate-900 px-3 py-1 text-xs font-black shadow-brutal-sm">
           {quizzes.length} {quizzes.length === 1 ? 'reviewer' : 'reviewers'}
         </span>
       </div>
 
       {loading ? (
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {[0, 1, 2].map((item) => (
-            <Skeleton key={item} className="h-44 rounded-3xl border border-border/40 bg-muted/40" />
+          {[1, 2, 3].map((index) => (
+            <div key={index} className="h-44 rounded-2xl border-2 border-slate-900/30 bg-muted/40 p-5 animate-pulse" />
           ))}
         </div>
       ) : quizzes.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center">
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <BookOpen className="h-5 w-5" />
-          </div>
-          <h3 className="mt-4 text-sm font-bold text-foreground">No quizzes found</h3>
-          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-            Generate a quiz with AI or use the manual builder to create your first question bank.
+        <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-900/40 dark:border-white/30 p-8 text-center bg-white dark:bg-card">
+          <BookOpen className="h-8 w-8 text-muted-foreground" />
+          <p className="mt-2 text-sm font-black text-foreground">No reviewers found</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Create your first reviewer deck or import from a handout.
           </p>
         </div>
       ) : (
@@ -80,73 +78,75 @@ export default function QuizLibrary({
 
             return (
               <article
-              key={quiz.id}
-              className="home-library-card group flex min-h-44 flex-col justify-between rounded-3xl border border-border/80 bg-card p-5 shadow-2xs transition-all hover:border-primary/40 hover:shadow-md"
-            >
-              <Link
-                href={`/review/${quiz.id}`}
-                aria-label={`Review ${quiz.title}`}
-                className="block space-y-2 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                key={quiz.id}
+                className="group flex min-h-44 flex-col justify-between rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card p-5 shadow-brutal transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_#0f172a]"
               >
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  {quiz.id === 'b0000000-0000-4000-8000-000000000001' || quiz.share_token === 'kasaysayan-pilipinas-reviewer' ? (
-                    <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                      Sample Reviewer
+                <Link
+                  href={`/review/${quiz.id}`}
+                  aria-label={`Review ${quiz.title}`}
+                  className="block space-y-2 rounded-xl focus:outline-none"
+                >
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    {quiz.id === 'b0000000-0000-4000-8000-000000000001' || quiz.share_token === 'kasaysayan-pilipinas-reviewer' ? (
+                      <span className="rounded-md border-2 border-slate-900 bg-[#bfdbfe] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
+                        Sample Reviewer
+                      </span>
+                    ) : subjectName ? (
+                      <span
+                        style={{
+                          backgroundColor: `${subject.color}26`,
+                          borderColor: '#0f172a',
+                          color: subject.color
+                        }}
+                        className="max-w-[12rem] truncate rounded-md border-2 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm"
+                      >
+                        {subjectName}
+                      </span>
+                    ) : (
+                      <span className="rounded-md border-2 border-slate-900 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm">
+                        Reviewer
+                      </span>
+                    )}
+                    <span className="shrink-0 rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black text-slate-900 dark:text-white shadow-brutal-sm">
+                      {quiz.question_count} Qs
                     </span>
-                  ) : subjectName ? (
-                    <span
-                      style={{
-                        backgroundColor: `${subject.color}26`,
-                        borderColor: `${subject.color}59`,
-                        color: subject.color
-                      }}
-                      className="max-w-[12rem] truncate rounded-full border px-2.5 py-0.5 text-[11px] font-bold"
-                    >
-                      {subjectName}
-                    </span>
-                  ) : (
-                    <span className="text-[11px] font-medium text-muted-foreground">Reviewer</span>
-                  )}
-                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground">
-                    {quiz.question_count} Qs
-                  </span>
+                  </div>
+
+                  <h3 className="line-clamp-2 text-sm font-black text-foreground transition-colors group-hover:text-primary">
+                    {quiz.title}
+                  </h3>
+
+                  {quiz.description ? (
+                    <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground font-medium">
+                      {quiz.description}
+                    </p>
+                  ) : quiz.handout_name ? (
+                    <p className="truncate text-xs text-muted-foreground font-medium">
+                      Source: {quiz.handout_name}
+                    </p>
+                  ) : quiz.subject ? (
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                      <Layers className="h-3.5 w-3.5" />
+                      {quiz.subject.name}
+                    </p>
+                  ) : null}
+                </Link>
+
+                <div className="mt-4 flex items-center justify-between border-t-2 border-slate-900/20 dark:border-white/20 pt-4">
+                  <Link
+                    href={`/quizzes/${quiz.id}`}
+                    className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
+                  >
+                    Manage
+                  </Link>
+                  <Link
+                    href={`/practice/${quiz.id}`}
+                    className="flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-1.5 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  >
+                    <Play className="h-3 w-3 fill-current" />
+                    <span>Practice</span>
+                  </Link>
                 </div>
-
-                <h3 className="home-card-title line-clamp-2 text-sm font-bold text-foreground transition-colors group-hover:text-primary">
-                  {quiz.title}
-                </h3>
-
-                {quiz.description ? (
-                  <p className="home-card-description line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
-                    {quiz.description}
-                  </p>
-                ) : quiz.handout_name ? (
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    Source: {quiz.handout_name}
-                  </p>
-                ) : quiz.subject ? (
-                  <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Layers className="h-3 w-3" />
-                    {quiz.subject.name}
-                  </p>
-                ) : null}
-              </Link>
-
-              <div className="home-card-footer mt-4 flex items-center justify-between border-t border-border/40 pt-4">
-                <Link
-                  href={`/quizzes/${quiz.id}`}
-                  className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Manage
-                </Link>
-                <Link
-                  href={`/practice/${quiz.id}`}
-                  className="flex items-center gap-1 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary shadow-2xs transition-all hover:bg-primary hover:text-white active:scale-95"
-                >
-                  <Play className="h-3 w-3 fill-current" />
-                  <span>Practice</span>
-                </Link>
-              </div>
               </article>
             );
           })}

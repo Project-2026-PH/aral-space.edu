@@ -5,6 +5,8 @@ import { Bold, Italic, Strikethrough, Code2, Link2, ChevronDown, List, ListOrder
 
 interface RichTextToolbarProps {
   editorRef: React.RefObject<HTMLDivElement | null>;
+  selectionRef?: React.MutableRefObject<Range | null>;
+  floating?: boolean;
 }
 
 type BlockStyle = 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
@@ -19,7 +21,22 @@ const STYLE_OPTIONS: Array<{ tag: BlockStyle; label: string; shortcut: string }>
   { tag: 'h6', label: 'Heading 6', shortcut: 'Ctrl+Alt+6' },
 ];
 
-function runCommand(editorRef: React.RefObject<HTMLDivElement | null>, command: string, value?: string) {
+function restoreSelection(selectionRef?: React.MutableRefObject<Range | null>) {
+  const range = selectionRef?.current;
+  if (!range) return;
+  const selection = window.getSelection();
+  if (!selection) return;
+  selection.removeAllRanges();
+  selection.addRange(range.cloneRange());
+}
+
+function runCommand(
+  editorRef: React.RefObject<HTMLDivElement | null>,
+  command: string,
+  value?: string,
+  selectionRef?: React.MutableRefObject<Range | null>
+) {
+  restoreSelection(selectionRef);
   editorRef.current?.focus();
   document.execCommand(command, false, value);
   editorRef.current?.dispatchEvent(new Event('input', { bubbles: true }));
@@ -46,10 +63,14 @@ function MenuItem({ label, shortcut, icon, onClick, disabled = false }: {
   );
 }
 
-export default function RichTextToolbar({ editorRef }: RichTextToolbarProps) {
+export default function RichTextToolbar({ editorRef, selectionRef, floating = false }: RichTextToolbarProps) {
   const [styleOpen, setStyleOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+
+  function runEditorCommand(command: string, value?: string) {
+    runCommand(editorRef, command, value, selectionRef);
+  }
 
   function closeMenus() {
     setStyleOpen(false);
@@ -58,23 +79,23 @@ export default function RichTextToolbar({ editorRef }: RichTextToolbarProps) {
   }
 
   function setBlock(tag: BlockStyle) {
-    runCommand(editorRef, 'formatBlock', tag);
+    runEditorCommand('formatBlock', tag);
     closeMenus();
   }
 
   function addLink() {
     const url = window.prompt('Paste a link URL');
-    if (url?.trim()) runCommand(editorRef, 'createLink', url.trim());
+    if (url?.trim()) runEditorCommand('createLink', url.trim());
   }
 
   function clearFormatting() {
-    runCommand(editorRef, 'removeFormat');
-    runCommand(editorRef, 'formatBlock', 'p');
+    runEditorCommand('removeFormat');
+    runEditorCommand('formatBlock', 'p');
     closeMenus();
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1 border-b border-border/70 bg-muted/30 p-2" onMouseDown={(event) => event.preventDefault()}>
+    <div className={`rich-text-toolbar flex flex-wrap items-center gap-1 border-b border-border/70 bg-muted/30 p-2 ${floating ? 'rich-text-toolbar-floating' : ''}`} onMouseDown={(event) => event.preventDefault()}>
       <div className="relative">
         <button
           type="button"
@@ -95,25 +116,25 @@ export default function RichTextToolbar({ editorRef }: RichTextToolbarProps) {
         )}
       </div>
 
-      <button type="button" title="Bold" aria-label="Bold" onClick={() => runCommand(editorRef, 'bold')} className="inline-flex h-8 w-8 items-center justify-center rounded-lg font-bold text-foreground hover:bg-muted"><Bold className="h-4 w-4" /></button>
-      <button type="button" title="Italic" aria-label="Italic" onClick={() => runCommand(editorRef, 'italic')} className="inline-flex h-8 w-8 items-center justify-center rounded-lg font-serif italic text-foreground hover:bg-muted"><Italic className="h-4 w-4" /></button>
+      <button type="button" title="Bold" aria-label="Bold" onClick={() => runEditorCommand('bold')} className="inline-flex h-8 w-8 items-center justify-center rounded-lg font-bold text-foreground hover:bg-muted"><Bold className="h-4 w-4" /></button>
+      <button type="button" title="Italic" aria-label="Italic" onClick={() => runEditorCommand('italic')} className="inline-flex h-8 w-8 items-center justify-center rounded-lg font-serif italic text-foreground hover:bg-muted"><Italic className="h-4 w-4" /></button>
 
       <div className="relative">
         <button type="button" title="Additional formatting" aria-label="Additional formatting" aria-expanded={moreOpen} onClick={() => { setMoreOpen((value) => !value); setStyleOpen(false); setListOpen(false); }} className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-foreground hover:bg-muted ${moreOpen ? 'bg-muted' : ''}`}>•••</button>
         {moreOpen && <div className="absolute left-0 top-9 z-30 min-w-60 rounded-xl border border-border bg-card p-1.5 shadow-xl">
-          <MenuItem label="Strikethrough" shortcut="Ctrl+Shift+S" icon={<Strikethrough className="h-3.5 w-3.5" />} onClick={() => { runCommand(editorRef, 'strikeThrough'); closeMenus(); }} />
-          <MenuItem label="Code" shortcut="Ctrl+Shift+M" icon={<Code2 className="h-3.5 w-3.5" />} onClick={() => { runCommand(editorRef, 'formatBlock', 'pre'); closeMenus(); }} />
+          <MenuItem label="Strikethrough" shortcut="Ctrl+Shift+S" icon={<Strikethrough className="h-3.5 w-3.5" />} onClick={() => { runEditorCommand('strikeThrough'); closeMenus(); }} />
+          <MenuItem label="Code" shortcut="Ctrl+Shift+M" icon={<Code2 className="h-3.5 w-3.5" />} onClick={() => { runEditorCommand('formatBlock', 'pre'); closeMenus(); }} />
           <MenuItem label="Clear formatting" shortcut={'Ctrl+\\'} onClick={clearFormatting} />
           <div className="my-1 border-t border-border/70" aria-hidden="true" />
-          <MenuItem label="Horizontal line" shortcut="Ctrl+Shift+-" icon={<Minus className="h-3.5 w-3.5" />} onClick={() => { runCommand(editorRef, 'insertHorizontalRule'); closeMenus(); }} />
+          <MenuItem label="Horizontal line" shortcut="Ctrl+Shift+-" icon={<Minus className="h-3.5 w-3.5" />} onClick={() => { runEditorCommand('insertHorizontalRule'); closeMenus(); }} />
         </div>}
       </div>
 
       <div className="relative">
         <button type="button" title="List formatting" aria-label="List formatting" aria-expanded={listOpen} onClick={() => { setListOpen((value) => !value); setStyleOpen(false); setMoreOpen(false); }} className={`inline-flex h-8 items-center gap-1 rounded-lg px-2 text-foreground hover:bg-muted ${listOpen ? 'bg-muted' : ''}`}><List className="h-4 w-4" /><ChevronDown className="h-3 w-3" /></button>
         {listOpen && <div className="absolute left-0 top-9 z-30 min-w-60 rounded-xl border border-border bg-card p-1.5 shadow-xl">
-          <MenuItem label="Bullet list" shortcut="Ctrl+Shift+8" icon={<List className="h-3.5 w-3.5" />} onClick={() => { runCommand(editorRef, 'insertUnorderedList'); closeMenus(); }} />
-          <MenuItem label="Numbered list" shortcut="Ctrl+Shift+7" icon={<ListOrdered className="h-3.5 w-3.5" />} onClick={() => { runCommand(editorRef, 'insertOrderedList'); closeMenus(); }} />
+          <MenuItem label="Bullet list" shortcut="Ctrl+Shift+8" icon={<List className="h-3.5 w-3.5" />} onClick={() => { runEditorCommand('insertUnorderedList'); closeMenus(); }} />
+          <MenuItem label="Numbered list" shortcut="Ctrl+Shift+7" icon={<ListOrdered className="h-3.5 w-3.5" />} onClick={() => { runEditorCommand('insertOrderedList'); closeMenus(); }} />
         </div>}
       </div>
 

@@ -89,7 +89,9 @@ const CORRECT_FEEDBACK_MESSAGES = [
   'Nice one babyy',
   'Korique!',
   'May bitaw ka ah',
-  'Alam na alam mo ah'
+  'Alam na alam mo ah',
+  'YES NA YES FOR YOU!',
+  'Galingch namanch'
 ];
 
 const INCORRECT_FEEDBACK_MESSAGES = [
@@ -101,7 +103,8 @@ const INCORRECT_FEEDBACK_MESSAGES = [
   'Stay with it—you are making progress!',
   'No worries, Learning is a process',
   'Okay lang magkamali, bawi ka',
-  'Go Vabee, kaya mo yan'
+  'Go Vabee, kaya mo yan',
+  'Nice try though'
 ];
 
 function getRandomFeedbackMessage(messages: string[]): string {

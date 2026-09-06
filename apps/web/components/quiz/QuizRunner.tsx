@@ -207,7 +207,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
         ) : <div className="h-2 w-full overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all duration-300" style={{ width: `${overallPercent}%` }} /></div>}
       </div>
 
-      <div className={isMultipleChoiceMode ? 'quiz-question-stage min-h-0 flex-1 overflow-visible' : isDesktopViewportMode ? 'overflow-visible lg:min-h-0 lg:flex-none' : 'overflow-hidden'}>
+      <div className={isMultipleChoiceMode ? 'quiz-question-stage min-h-0 overflow-visible' : isDesktopViewportMode ? 'overflow-visible lg:min-h-0 lg:flex-none' : 'overflow-hidden'}>
         <div
           key={activeQuestion.id}
           className={`${isQuestionTransitioning ? 'quiz-question-card-exit' : 'quiz-question-card-enter'} ${isDesktopViewportMode ? 'lg:h-auto lg:min-h-0' : ''} ${isMultipleChoiceMode ? 'min-h-0' : ''}`}

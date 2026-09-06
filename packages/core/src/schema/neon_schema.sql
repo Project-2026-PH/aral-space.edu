@@ -150,6 +150,21 @@ CREATE TABLE IF NOT EXISTS security_rate_limits (
 );
 CREATE INDEX IF NOT EXISTS idx_security_rate_limits_updated_at ON security_rate_limits(updated_at);
 
+-- Ephemeral device-to-device session pairing tickets.
+CREATE TABLE IF NOT EXISTS anonymous_pairing_tickets (
+    ticket_id TEXT PRIMARY KEY,
+    anon_user_id TEXT NOT NULL,
+    passcode_hash TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_anon_pairing_user ON anonymous_pairing_tickets(anon_user_id);
+CREATE INDEX IF NOT EXISTS idx_anon_pairing_expires ON anonymous_pairing_tickets(expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_anon_pairing_active_user ON anonymous_pairing_tickets(anon_user_id) WHERE used_at IS NULL;
+
 -- -----------------------------------------------------------------------------
 -- Seed: Sample Filipino History Reviewer (Kasaysayan ng Pilipinas 1-10)
 -- -----------------------------------------------------------------------------

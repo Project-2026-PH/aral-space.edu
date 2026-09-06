@@ -51,13 +51,19 @@ export async function createAnonymousSessionValue(userId = `anon_${crypto.random
   return `${payload}.${await sign(payload)}`;
 }
 
+export const ANON_USER_ID_REGEX = /^anon_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isValidAnonymousUserId(userId: unknown): userId is string {
+  return typeof userId === 'string' && ANON_USER_ID_REGEX.test(userId);
+}
+
 export async function verifyAnonymousSessionValue(value: string | undefined): Promise<string | null> {
   if (!value) return null;
   const parts = value.split('.');
   if (parts.length !== 3) return null;
   const [userId, expiresAtText, signature] = parts;
   const expiresAt = Number(expiresAtText);
-  if (!/^anon_[0-9a-f-]{36}$/i.test(userId) || !Number.isInteger(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000)) {
+  if (!isValidAnonymousUserId(userId) || !Number.isInteger(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000)) {
     return null;
   }
   try {

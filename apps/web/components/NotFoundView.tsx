@@ -25,98 +25,128 @@ export default function NotFoundView({
 
   const [eyeState, setEyeState] = useState<EyeState>('dizzy');
   const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
-  const activeTimersRef = useRef<NodeJS.Timeout[]>([]);
 
-  const clearTimers = useCallback(() => {
-    activeTimersRef.current.forEach(clearTimeout);
-    activeTimersRef.current = [];
+  const eyeStateRef = useRef<EyeState>('dizzy');
+  eyeStateRef.current = eyeState;
+
+  const isInteractingRef = useRef<boolean>(false);
+  const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const naturalBlinkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoLoopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Wake robot up into glancing state
+  const wakeAndGlance = useCallback(() => {
+    if (eyeStateRef.current === 'dizzy') {
+      setEyeState('blinking');
+      setTimeout(() => {
+        setEyeState('glancing');
+      }, 100);
+    } else if (eyeStateRef.current === 'blinking') {
+      setEyeState('glancing');
+    }
   }, []);
 
-  const triggerGlimpseSequence = useCallback((duration = 2000) => {
-    clearTimers();
+  // Handle pointer tracking across the screen
+  const handlePointerMove = useCallback((e: PointerEvent | React.PointerEvent) => {
+    isInteractingRef.current = true;
 
-    // 1. Initial blink to open eyes
-    setEyeState('blinking');
+    // Wake robot up immediately if currently dizzy
+    if (eyeStateRef.current === 'dizzy') {
+      wakeAndGlance();
+    }
 
-    const t1 = setTimeout(() => {
-      // 2. Open curious eyes looking at user
-      setEyeState('glancing');
+    if (mascotRef.current) {
+      const rect = mascotRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
 
-      // 3. Optional mini double-take blink during glance
-      const t2 = setTimeout(() => {
-        setEyeState('blinking');
-        const t3 = setTimeout(() => {
-          setEyeState('glancing');
-        }, 110);
-        activeTimersRef.current.push(t3);
-      }, duration * 0.45);
+      // Calculate direction relative to viewport
+      const dx = (e.clientX - centerX) / (window.innerWidth * 0.45);
+      const dy = (e.clientY - centerY) / (window.innerHeight * 0.45);
 
-      // 4. Blink shut
-      const t4 = setTimeout(() => {
-        setEyeState('blinking');
-        // 5. Back to dizzy sleep
-        const t5 = setTimeout(() => {
-          setEyeState('dizzy');
-          setEyeOffset({ x: 0, y: 0 });
-        }, 130);
-        activeTimersRef.current.push(t5);
-      }, duration);
+      const clampedX = Math.max(-1, Math.min(1, dx));
+      const clampedY = Math.max(-1, Math.min(1, dy));
 
-      activeTimersRef.current.push(t2, t4);
-    }, 120);
+      setEyeOffset({
+        x: Number((clampedX * 7.5).toFixed(2)),
+        y: Number((clampedY * 6).toFixed(2)),
+      });
+    }
 
-    activeTimersRef.current.push(t1);
-  }, [clearTimers]);
-
-  // Periodic automatic glimpse loop every 4.8 seconds when not actively hovered
-  useEffect(() => {
-    if (isHovered) return;
-
-    const interval = setInterval(() => {
-      triggerGlimpseSequence(1900);
-    }, 4800);
-
-    return () => {
-      clearInterval(interval);
-      clearTimers();
-    };
-  }, [isHovered, triggerGlimpseSequence, clearTimers]);
-
-  // Mouse tracking on mascot to make pupils gaze toward the cursor
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!mascotRef.current) return;
-    const rect = mascotRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    const dx = (e.clientX - centerX) / (rect.width / 2);
-    const dy = (e.clientY - centerY) / (rect.height / 2);
-
-    setEyeOffset({
-      x: Math.max(-5.5, Math.min(5.5, dx * 5.5)),
-      y: Math.max(-4.5, Math.min(4.5, dy * 4.5)),
-    });
-  };
-
-  const handlePointerEnter = () => {
-    setIsHovered(true);
-    triggerGlimpseSequence(3200);
-  };
-
-  const handlePointerLeave = () => {
-    setIsHovered(false);
-    // Smooth reset to dizzy after short delay
-    const t = setTimeout(() => {
+    // Reset idle timeout: after 2.6s without movement, blink back to dizzy sleep
+    if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+    idleTimeoutRef.current = setTimeout(() => {
+      isInteractingRef.current = false;
       setEyeState('blinking');
-      const t2 = setTimeout(() => {
+      setTimeout(() => {
         setEyeState('dizzy');
         setEyeOffset({ x: 0, y: 0 });
-      }, 120);
-      activeTimersRef.current.push(t2);
-    }, 400);
-    activeTimersRef.current.push(t);
-  };
+      }, 130);
+    }, 2600);
+  }, [wakeAndGlance]);
+
+  // Window-wide pointer tracking so mascot catches glimpse of user anywhere on screen
+  useEffect(() => {
+    const onWindowPointerMove = (e: PointerEvent) => {
+      handlePointerMove(e);
+    };
+
+    window.addEventListener('pointermove', onWindowPointerMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', onWindowPointerMove);
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+    };
+  }, [handlePointerMove]);
+
+  // Periodic natural blink while actively watching the user
+  useEffect(() => {
+    naturalBlinkIntervalRef.current = setInterval(() => {
+      if (eyeStateRef.current === 'glancing') {
+        setEyeState('blinking');
+        setTimeout(() => {
+          if (isInteractingRef.current) {
+            setEyeState('glancing');
+          }
+        }, 110);
+      }
+    }, 3800);
+
+    return () => {
+      if (naturalBlinkIntervalRef.current) clearInterval(naturalBlinkIntervalRef.current);
+    };
+  }, []);
+
+  // Autonomous peek loop when completely idle (e.g. touch/keyboard or stationary user)
+  useEffect(() => {
+    const runAutoLoop = () => {
+      autoLoopTimeoutRef.current = setTimeout(() => {
+        if (!isInteractingRef.current && eyeStateRef.current === 'dizzy') {
+          // Wake up briefly to check room
+          setEyeState('blinking');
+          setTimeout(() => {
+            setEyeState('glancing');
+            setEyeOffset({ x: 0, y: 1 });
+            setTimeout(() => {
+              setEyeState('blinking');
+              setTimeout(() => {
+                setEyeState('dizzy');
+                setEyeOffset({ x: 0, y: 0 });
+                runAutoLoop();
+              }, 120);
+            }, 1800);
+          }, 110);
+        } else {
+          runAutoLoop();
+        }
+      }, 5000);
+    };
+
+    runAutoLoop();
+
+    return () => {
+      if (autoLoopTimeoutRef.current) clearTimeout(autoLoopTimeoutRef.current);
+    };
+  }, []);
 
   return (
     <div className="relative min-h-[calc(100vh-10rem)] w-full flex flex-col items-center justify-center overflow-hidden px-4 py-10 sm:py-16 text-center select-none">
@@ -161,12 +191,9 @@ export default function NotFoundView({
       </div>
 
       <div className="relative z-10 flex flex-col items-center max-w-xl mx-auto">
-        {/* Enlarged Robot 404 Mascot with Interactive Blinking Eyes */}
+        {/* Enlarged Robot 404 Mascot with Gaze Tracking Eyes */}
         <div
           ref={mascotRef}
-          onPointerMove={handlePointerMove}
-          onPointerEnter={handlePointerEnter}
-          onPointerLeave={handlePointerLeave}
           className="relative mb-8 flex flex-col items-center group cursor-default"
         >
           <div className="animate-float-slow transition-transform hover:scale-105 duration-300 ease-out">
@@ -176,9 +203,9 @@ export default function NotFoundView({
               xmlns="http://www.w3.org/2000/svg"
               className="h-52 w-52 sm:h-64 sm:w-64 md:h-72 md:w-72 lg:h-80 lg:w-80 text-primary drop-shadow-2xl transition-colors duration-300"
               role="img"
-              aria-label="404 Dizzy Robot Mascot that blinks and catches glimpses"
+              aria-label="404 Dizzy Robot Mascot that tracks cursor and blinks"
             >
-              {/* Antenna Ping Wave (radiates when catching a glimpse of the user) */}
+              {/* Antenna Ping Wave (radiates when watching the user) */}
               {eyeState === 'glancing' && (
                 <>
                   <circle
@@ -404,52 +431,34 @@ export default function NotFoundView({
 
               {eyeState === 'glancing' && (
                 <>
-                  {/* Left Curious Glimpse Eye */}
-                  <g className="text-primary transition-transform duration-75 ease-out">
-                    <circle
-                      cx={107 + eyeOffset.x}
-                      cy={139 + eyeOffset.y}
-                      r="16"
-                      fill="currentColor"
-                    />
+                  {/* Left Curious Glimpse Eye (Glides following cursor) */}
+                  <g
+                    className="text-primary"
+                    style={{
+                      transform: `translate(${eyeOffset.x}px, ${eyeOffset.y}px)`,
+                      transition: 'transform 80ms ease-out',
+                    }}
+                  >
+                    <circle cx="107" cy="139" r="16" fill="currentColor" />
                     {/* Primary Catchlight */}
-                    <circle
-                      cx={103 + eyeOffset.x}
-                      cy={134 + eyeOffset.y}
-                      r="5.5"
-                      fill="#FFFFFF"
-                    />
+                    <circle cx="103" cy="134" r="5.5" fill="#FFFFFF" />
                     {/* Secondary Catchlight */}
-                    <circle
-                      cx={112 + eyeOffset.x}
-                      cy={143 + eyeOffset.y}
-                      r="2.2"
-                      fill="#FFFFFF"
-                    />
+                    <circle cx="112" cy="143" r="2.2" fill="#FFFFFF" />
                   </g>
 
-                  {/* Right Curious Glimpse Eye */}
-                  <g className="text-primary transition-transform duration-75 ease-out">
-                    <circle
-                      cx={173 + eyeOffset.x}
-                      cy={139 + eyeOffset.y}
-                      r="16"
-                      fill="currentColor"
-                    />
+                  {/* Right Curious Glimpse Eye (Glides following cursor) */}
+                  <g
+                    className="text-primary"
+                    style={{
+                      transform: `translate(${eyeOffset.x}px, ${eyeOffset.y}px)`,
+                      transition: 'transform 80ms ease-out',
+                    }}
+                  >
+                    <circle cx="173" cy="139" r="16" fill="currentColor" />
                     {/* Primary Catchlight */}
-                    <circle
-                      cx={169 + eyeOffset.x}
-                      cy={134 + eyeOffset.y}
-                      r="5.5"
-                      fill="#FFFFFF"
-                    />
+                    <circle cx="169" cy="134" r="5.5" fill="#FFFFFF" />
                     {/* Secondary Catchlight */}
-                    <circle
-                      cx={178 + eyeOffset.x}
-                      cy={143 + eyeOffset.y}
-                      r="2.2"
-                      fill="#FFFFFF"
-                    />
+                    <circle cx="178" cy="143" r="2.2" fill="#FFFFFF" />
                   </g>
                 </>
               )}

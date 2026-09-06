@@ -47,24 +47,24 @@ export default function SubjectLibrary({
     <section className="space-y-4" aria-labelledby="subject-library-heading">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Your library</p>
-          <h2 id="subject-library-heading" className="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+          <p className="home-section-eyebrow text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Your library</p>
+          <h2 id="subject-library-heading" className="home-section-title mt-1 text-lg font-extrabold tracking-tight text-foreground">
             Subjects
           </h2>
         </div>
-        <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
+        <span className="home-section-count rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
           {subjects.length} {subjects.length === 1 ? 'subject' : 'subjects'}
         </span>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((item) => (
             <Skeleton key={item} className="h-44 rounded-3xl border border-border/40 bg-muted/40" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {subjects.map((subject, index) => {
             const isPublic = subject.is_public !== false;
             const canManage = Boolean(viewerId && subject.user_id === viewerId);
@@ -95,19 +95,19 @@ export default function SubjectLibrary({
                   }
                 }}
                 style={{ animationDelay: `${index * 70}ms` }}
-                className={`subject-card-enter group flex min-h-44 flex-col justify-between overflow-hidden rounded-3xl border border-border/80 bg-card shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-primary/30 ${canOpen ? 'cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md' : ''}`}
+                className={`home-library-card subject-card-enter group flex min-h-44 flex-col justify-between overflow-hidden rounded-3xl border border-border/80 bg-card shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-primary/30 ${canOpen ? 'cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md' : ''}`}
               >
-                <div className="p-5">
+                <div className="home-card-content p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <span
                         aria-hidden="true"
                         style={{ backgroundColor: subject.color }}
-                        className="h-10 w-10 shrink-0 rounded-2xl border border-black/5 shadow-inner"
+                        className="home-card-color h-10 w-10 shrink-0 rounded-2xl border border-black/5 shadow-inner"
                       />
                       <div className="min-w-0">
-                        <h3 className="truncate text-sm font-extrabold text-foreground">{subject.name}</h3>
-                        <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                        <h3 className="home-card-title truncate text-sm font-extrabold text-foreground">{subject.name}</h3>
+                        <p className="home-card-meta mt-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                           <BookOpen className="h-3 w-3" />
                           {quizCount} {quizCount === 1 ? 'study set' : 'study sets'}
                         </p>
@@ -125,7 +125,7 @@ export default function SubjectLibrary({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between border-t border-border/40 px-5 py-3">
+                <div className="home-card-footer flex items-center justify-between border-t border-border/40 px-5 py-3">
                   {subject.share_token && isPublic ? (
                     <Link
                       href={`/subjects/share/${subject.share_token}`}

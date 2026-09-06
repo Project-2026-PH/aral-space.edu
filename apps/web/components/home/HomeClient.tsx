@@ -45,18 +45,18 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
   });
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="home-page space-y-8 pb-20">
       {/* Hero Welcome */}
-      <div className="flex flex-col justify-between gap-6 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8 md:flex-row md:items-center">
+      <div className="home-hero flex flex-col justify-between gap-6 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8 md:flex-row md:items-center">
         <div className="space-y-1.5">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+          <span className="home-hero-badge inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
             <Sparkles className="h-3.5 w-3.5" />
             Master your handouts with us!
           </span>
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="home-hero-title text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
             Reviewer Creation for Students
           </h1>
-          <p className="max-w-xl text-xs leading-relaxed text-muted-foreground">
+          <p className="home-hero-description max-w-xl text-xs leading-relaxed text-muted-foreground">
             Generate reviewer question from handouts or manually build interactive multiple-choice decks.
           </p>
         </div>
@@ -64,7 +64,7 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           <button
             onClick={() => setShowAiModal(true)}
-            className="flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95"
+            className="home-primary-action flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95"
           >
             <Sparkles className="h-4 w-4" />
             <span>Generate with AI</span>
@@ -85,7 +85,7 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
               setOpeningManualQuiz(true);
             }}
             aria-busy={openingManualQuiz}
-            className="flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 text-xs font-bold text-foreground transition-all hover:bg-muted active:scale-95"
+            className="home-secondary-action flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 text-xs font-bold text-foreground transition-all hover:bg-muted active:scale-95"
           >
             {openingManualQuiz ? (
               <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -106,13 +106,13 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
             placeholder="Search reviewer library..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-2xl border border-border bg-card py-2.5 pl-10 pr-4 text-xs font-medium text-foreground shadow-2xs focus:border-primary focus:outline-none"
+            className="home-search-input w-full rounded-2xl border border-border bg-card py-2.5 pl-10 pr-4 text-xs font-medium text-foreground shadow-2xs focus:border-primary focus:outline-none"
           />
         </div>
         <button
           type="button"
           onClick={() => setShowSubjectModal(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95 sm:w-auto"
+          className="home-create-subject flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95 sm:w-auto"
         >
           <Plus className="h-4 w-4" />
           <span>Create a Subject</span>

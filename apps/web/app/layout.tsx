@@ -53,9 +53,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20">
-        <PwaRegister />
-        <UpdateNotification />
-        <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
+        <div className="default-ui-scale">
+          <PwaRegister />
+          <UpdateNotification />
+          <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
           <div className="max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
             <Link href="/" className="flex items-center gap-2.5 group">
               <Image
@@ -82,6 +83,7 @@ export default function RootLayout({
         <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-8">
           {children}
         </main>
+        </div>
       </body>
     </html>
   );

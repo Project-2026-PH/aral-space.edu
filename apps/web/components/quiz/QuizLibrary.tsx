@@ -25,7 +25,7 @@ export default function QuizLibrary({
     <section className="space-y-4" aria-labelledby="quiz-library-heading">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <h2 id="quiz-library-heading" className="mt-1 text-lg font-extrabold tracking-tight text-foreground">
+          <h2 id="quiz-library-heading" className="home-section-title mt-1 text-lg font-extrabold tracking-tight text-foreground">
             Reviewers
           </h2>
           {subjects !== undefined && (
@@ -51,13 +51,13 @@ export default function QuizLibrary({
             </div>
           )}
         </div>
-        <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
+        <span className="home-section-count rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
           {quizzes.length} {quizzes.length === 1 ? 'reviewer' : 'reviewers'}
         </span>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
           {[0, 1, 2].map((item) => (
             <Skeleton key={item} className="h-44 rounded-3xl border border-border/40 bg-muted/40" />
           ))}
@@ -73,11 +73,11 @@ export default function QuizLibrary({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
           {quizzes.map((quiz) => (
             <article
               key={quiz.id}
-              className="group flex min-h-44 flex-col justify-between rounded-3xl border border-border/80 bg-card p-5 shadow-2xs transition-all hover:border-primary/40 hover:shadow-md"
+              className="home-library-card group flex min-h-44 flex-col justify-between rounded-3xl border border-border/80 bg-card p-5 shadow-2xs transition-all hover:border-primary/40 hover:shadow-md"
             >
               <Link
                 href={`/review/${quiz.id}`}
@@ -97,12 +97,12 @@ export default function QuizLibrary({
                   </span>
                 </div>
 
-                <h3 className="line-clamp-2 text-sm font-bold text-foreground transition-colors group-hover:text-primary">
+                <h3 className="home-card-title line-clamp-2 text-sm font-bold text-foreground transition-colors group-hover:text-primary">
                   {quiz.title}
                 </h3>
 
                 {quiz.description ? (
-                  <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="home-card-description line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
                     {quiz.description}
                   </p>
                 ) : quiz.handout_name ? (
@@ -117,7 +117,7 @@ export default function QuizLibrary({
                 ) : null}
               </Link>
 
-              <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-4">
+              <div className="home-card-footer mt-4 flex items-center justify-between border-t border-border/40 pt-4">
                 <Link
                   href={`/quizzes/${quiz.id}`}
                   className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"

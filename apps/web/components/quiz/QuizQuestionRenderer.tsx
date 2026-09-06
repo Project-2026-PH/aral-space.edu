@@ -112,9 +112,20 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
         </div>
 
         {/* Input & Action Button */}
-        <div className="w-full max-w-md mx-auto space-y-3">
+        <form
+          autoComplete="off"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!isEvaluating && identificationInput.trim()) {
+              onSubmitTyped('learn');
+            }
+          }}
+          className="w-full max-w-md mx-auto space-y-3"
+        >
           <input
             type="text"
+            name="quiz_study_response"
+            id="quiz_study_response"
             autoFocus
             autoComplete="off"
             autoCorrect="off"
@@ -122,13 +133,13 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
             spellCheck={false}
             data-form-type="other"
             data-lpignore="true"
+            data-1p-ignore="true"
+            data-bwignore="true"
+            aria-autocomplete="none"
             placeholder="Type your answer..."
             value={identificationInput}
             onChange={(event) => onInputChange(event.target.value)}
             disabled={isEvaluating}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') onSubmitTyped('learn');
-            }}
             className={`w-full rounded-2xl border bg-background px-4 py-3 text-sm font-medium text-foreground text-center focus:outline-none transition-colors ${typedAnswerCorrect === true
               ? 'border-emerald-500 ring-1 ring-emerald-500'
               : typedAnswerCorrect === false
@@ -137,14 +148,13 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
               }`}
           />
           <button
-            type="button"
-            onClick={() => onSubmitTyped('learn')}
+            type="submit"
             disabled={isEvaluating || !identificationInput.trim()}
             className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Check Answer
           </button>
-        </div>
+        </form>
       </div>
 
       {/* Bottom Section: Feedback */}
@@ -247,7 +257,7 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
     <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4">
       {/* Top Section */}
       <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        <span>Identification Prompt</span>
+        <span>Question Prompt</span>
         <button
           type="button"
           onClick={onShowHint}
@@ -274,33 +284,43 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
         </div>
 
         {/* Input & Action Button */}
-        <div className="w-full max-w-md mx-auto space-y-3">
+        <form
+          autoComplete="off"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!isEvaluating && identificationInput.trim()) {
+              onSubmitTyped('identification');
+            }
+          }}
+          className="w-full max-w-md mx-auto space-y-3"
+        >
           <input
             type="text"
+            name="quiz_identification_response"
+            id="quiz_identification_response"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
             data-form-type="other"
             data-lpignore="true"
+            data-1p-ignore="true"
+            data-bwignore="true"
+            aria-autocomplete="none"
             placeholder="Type exact answer..."
             value={identificationInput}
             onChange={(event) => onInputChange(event.target.value)}
             disabled={isEvaluating}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && identificationInput.trim()) onSubmitTyped('identification');
-            }}
             className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground text-center focus:border-primary focus:outline-none"
           />
           <button
-            type="button"
-            onClick={() => onSubmitTyped('identification')}
+            type="submit"
             disabled={isEvaluating || !identificationInput.trim()}
             className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Check Answer
           </button>
-        </div>
+        </form>
       </div>
 
       {/* Result Section */}

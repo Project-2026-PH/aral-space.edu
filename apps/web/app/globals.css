@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   --background: 30 20% 98%;
   --foreground: 220 25% 15%;
@@ -78,9 +82,232 @@ body {
   }
 }
 
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1deg);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 4s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes marquee-right {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0%, 0, 0);
+  }
+}
+
+.animate-marquee-right {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: marquee-right 28s linear infinite;
+}
+
+/* Fanned Card Showcase animation */
+@keyframes sticker-wiggle {
+  0%, 100% {
+    transform: translateY(0) rotate(var(--sticker-deg, 0deg));
+  }
+  50% {
+    transform: translateY(-4px) rotate(calc(var(--sticker-deg, 0deg) + 6deg));
+  }
+}
+
+.fanned-card {
+  will-change: transform, box-shadow;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease, z-index 0.1s;
+}
+
+.fanned-card:hover {
+  transform: translateY(-20px) scale(1.06) rotate(0deg) !important;
+  box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.25), 0 12px 16px -6px rgba(0, 0, 0, 0.2) !important;
+  z-index: 50 !important;
+}
+
+.card-badge {
+  animation: sticker-wiggle 3s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Neo-brutalist Editorial Grid Tokens */
+.shadow-brutal {
+  box-shadow: 4px 4px 0px 0px #0f172a;
+}
+.dark .shadow-brutal {
+  box-shadow: 4px 4px 0px 0px #000000;
+}
+
+.shadow-brutal-sm {
+  box-shadow: 2px 2px 0px 0px #0f172a;
+}
+.dark .shadow-brutal-sm {
+  box-shadow: 2px 2px 0px 0px #000000;
+}
+
+.shadow-brutal-accent {
+  box-shadow: 4px 4px 0px 0px #f97316;
+}
+
+@keyframes landing-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes landing-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+.animate-landing-hero {
+  animation: landing-fade-up 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-landing-flashcard {
+  animation: landing-zoom-in 800ms cubic-bezier(0.16, 1, 0.3, 1) 200ms both;
+}
+
+.animate-landing-cta {
+  animation: landing-fade-up 700ms cubic-bezier(0.16, 1, 0.3, 1) 350ms both;
+}
+
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-spring-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translate3d(0, 24px, 0);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translate3d(0, -4px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+.animate-modal-backdrop {
+  animation: modal-backdrop-in 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-pop {
+  animation: modal-spring-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Custom scrollbar for flashcard back side */
+.custom-scrollbar-card {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+}
+
+.custom-scrollbar-card::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar-card::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.35);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.custom-scrollbar-card::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.65);
+}
+
+/* For light cards inside flashcard */
+.card-light .custom-scrollbar-card,
+.custom-scrollbar-card-light {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(30, 41, 59, 0.35) transparent;
+}
+
+.custom-scrollbar-card-light::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar-card-light::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar-card-light::-webkit-scrollbar-thumb {
+  background-color: rgba(30, 41, 59, 0.3);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.custom-scrollbar-card-light::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(30, 41, 59, 0.6);
+}
+
+@keyframes doodle-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+}
+
+.animate-doodle-float {
+  animation: doodle-float 5s ease-in-out infinite;
+}
+
+
 .subject-card-enter {
   animation: subject-card-enter 360ms ease-out both;
 }
+
 
 @keyframes quiz-question-card-enter {
   from {
@@ -205,22 +432,12 @@ body {
 }
 
 
-/* Match a 130% browser zoom on desktop without changing mobile sizing. */
-@media (min-width: 1024px) {
-  .default-ui-scale {
-    zoom: 1.3;
-    width: calc(100% / 1.3);
-    min-height: calc(100vh / 1.3);
-    margin-inline: auto;
-  }
-}
-
 /* Keep desktop identification and multiple-choice sessions within the viewport. */
 @media (min-width: 1024px) {
   .desktop-quiz-viewport {
-    height: calc(100vh / 1.3 - 6rem);
+    height: calc(100vh - 6rem);
     min-height: 0;
-    max-height: calc(100vh / 1.3 - 6rem);
+    max-height: calc(100vh - 6rem);
     overflow: hidden;
   }
 }

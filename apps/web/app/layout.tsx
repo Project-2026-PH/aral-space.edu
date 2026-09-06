@@ -6,6 +6,7 @@ import PwaRegister from '@/components/PwaRegister';
 import UpdateNotification from '@/components/UpdateNotification';
 import AnonymousSessionBadge from '@/components/AnonymousSessionBadge';
 import ThemeToggle from '@/components/ThemeToggle';
+import DevelopersModal from '@/components/home/DevelopersModal';
 
 export const viewport: Viewport = {
   themeColor: '#4f46e5',
@@ -32,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -52,11 +53,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20">
-        <div className="default-ui-scale">
-          <PwaRegister />
-          <UpdateNotification />
-          <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
+      <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 overflow-x-hidden">
+        <PwaRegister />
+        <UpdateNotification />
+        <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">
           <div className="max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
             <Link href="/" className="flex items-center gap-2.5 group">
               <Image
@@ -80,10 +80,32 @@ export default function RootLayout({
           </div>
         </header>
 
-        <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-8">
+        <main className="w-full min-h-[calc(100vh-4rem)]">
           {children}
         </main>
-        </div>
+
+        <footer className="w-full border-t-2 border-slate-900/80 dark:border-white/30 bg-white dark:bg-[#0c0f1d] py-10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-5">
+            {/* Developers section with heart (modal popup for github links) */}
+            <DevelopersModal />
+
+            {/* Terms and Privacy Links */}
+            <div className="flex items-center gap-6 text-xs font-bold text-slate-600 dark:text-slate-400">
+              <Link
+                href="/terms"
+                className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-4 decoration-slate-300 dark:decoration-slate-700 transition-colors"
+              >
+                Terms of Service
+              </Link>
+              <Link
+                href="/privacy"
+                className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-4 decoration-slate-300 dark:decoration-slate-700 transition-colors"
+              >
+                Privacy Policy
+              </Link>
+            </div>
+          </div>
+        </footer>
       </body>
     </html>
   );

@@ -1,10 +1,11 @@
 'use client';
 
 import React from 'react';
-import { ChevronRight, Sparkles, Volume2 } from 'lucide-react';
+import { Sparkles, Volume2 } from 'lucide-react';
 import type { QuizMode, QuizQuestion } from '@quiz-creator/types';
 import { getQuestionAnswer } from '@/lib/quizAnswerEvaluation';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
+import QuizContinueDock from '@/components/quiz/QuizContinueDock';
 
 interface QuizRecapProps {
   questions: QuizQuestion[];
@@ -155,12 +156,7 @@ export default function QuizRecap({
         </div>
       </section>
 
-      <div className="recap-continue-enter fixed inset-x-4 bottom-4 z-20 mx-auto flex max-w-5xl flex-col items-center justify-center gap-3 rounded-2xl border border-border/80 bg-background/90 px-4 py-3 shadow-xl backdrop-blur-md sm:flex-row sm:justify-between">
-        <p className="text-[10px] font-semibold text-muted-foreground sm:text-xs">Press any key to continue</p>
-        <button type="button" onClick={onAdvance} className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-[10px] font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95">
-          Continue <ChevronRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      <QuizContinueDock onAdvance={onAdvance} />
     </div>
   );
 }

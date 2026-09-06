@@ -118,9 +118,7 @@ export function useQuizSession({
   shuffleOptions = true
 }: UseQuizSessionProps) {
   const processedQuestions = useMemo(() => {
-    const optionReadyQuestions = mode === 'multiple_choice' || mode === 'reverse'
-      ? QuizTransformService.prepareQuestionsForOptions(initialQuestions)
-      : initialQuestions;
+    const optionReadyQuestions = QuizTransformService.prepareQuestionsForOptions(initialQuestions);
 
     return mode === 'reverse'
       ? QuizTransformService.generateReverseQuestions(optionReadyQuestions)
@@ -647,6 +645,28 @@ export function useQuizSession({
     pendingAdvance
   ]);
 
+  function shuffleRemainingQueue() {
+    setQueueState((current) => {
+      const [currentActive, ...restActive] = current.activeQueue;
+      const shuffledRest = [...restActive].sort(() => Math.random() - 0.5);
+      const shuffledUnserved = current.unservedQueue
+        ? [...current.unservedQueue].sort(() => Math.random() - 0.5)
+        : undefined;
+
+      return {
+        ...current,
+        activeQueue: currentActive !== undefined ? [currentActive, ...shuffledRest] : [],
+        unservedQueue: shuffledUnserved
+      };
+    });
+
+    if (activeQuestion && activeQuestion.options?.length > 0) {
+      setCurrentOptions(
+        QuizShuffleService.shuffleOptions(activeQuestion.options, activeQuestion.correct_answer)
+      );
+    }
+  }
+
   return {
     questions,
     session,
@@ -689,6 +709,7 @@ export function useQuizSession({
     advance,
     startStruggleReview,
     complete,
+    shuffleRemainingQueue,
     handleSurfaceClick,
     handleSurfaceKeyDown,
     toggleMute: () => quizAudio.toggleMute()

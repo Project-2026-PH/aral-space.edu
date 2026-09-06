@@ -56,6 +56,7 @@ interface SharedQuestionProps {
   onInputChange: (value: string) => void;
   onFlip: () => void;
   onShowHint: () => void;
+  onAdvance?: () => void;
 }
 
 export interface QuizQuestionRendererProps extends SharedQuestionProps {
@@ -76,8 +77,10 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
     isHintVisible,
     onInputChange,
     onSubmitTyped,
-    onShowHint
+    onShowHint,
+    onAdvance
   } = props;
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   return (
     <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4">
@@ -116,13 +119,17 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
           autoComplete="off"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!isEvaluating && identificationInput.trim()) {
+            if (identificationSubmitted) {
+              onAdvance?.();
+            } else if (!isEvaluating && identificationInput.trim()) {
+              inputRef.current?.blur();
               onSubmitTyped('learn');
             }
           }}
           className="w-full max-w-md mx-auto space-y-3"
         >
           <input
+            ref={inputRef}
             type="text"
             name="quiz_study_response"
             id="quiz_study_response"
@@ -139,7 +146,7 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
             placeholder="Type your answer..."
             value={identificationInput}
             onChange={(event) => onInputChange(event.target.value)}
-            disabled={isEvaluating}
+            disabled={isEvaluating || identificationSubmitted}
             className={`w-full rounded-2xl border bg-background px-4 py-3 text-sm font-medium text-foreground text-center focus:outline-none transition-colors ${typedAnswerCorrect === true
               ? 'border-emerald-500 ring-1 ring-emerald-500'
               : typedAnswerCorrect === false
@@ -147,13 +154,24 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
                 : 'border-border focus:border-primary'
               }`}
           />
-          <button
-            type="submit"
-            disabled={isEvaluating || !identificationInput.trim()}
-            className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Check Answer
-          </button>
+          {identificationSubmitted ? (
+            <button
+              type="button"
+              onClick={() => onAdvance?.()}
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 active:scale-95 animate-in fade-in duration-200"
+            >
+              <span>Continue</span>
+              <span aria-hidden="true">›</span>
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={isEvaluating || !identificationInput.trim()}
+              className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Check Answer
+            </button>
+          )}
         </form>
       </div>
 
@@ -250,8 +268,10 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
     isHintVisible,
     onInputChange,
     onSubmitTyped,
-    onShowHint
+    onShowHint,
+    onAdvance
   } = props;
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   return (
     <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4">
@@ -288,13 +308,17 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
           autoComplete="off"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!isEvaluating && identificationInput.trim()) {
+            if (identificationSubmitted) {
+              onAdvance?.();
+            } else if (!isEvaluating && identificationInput.trim()) {
+              inputRef.current?.blur();
               onSubmitTyped('identification');
             }
           }}
           className="w-full max-w-md mx-auto space-y-3"
         >
           <input
+            ref={inputRef}
             type="text"
             name="quiz_identification_response"
             id="quiz_identification_response"
@@ -310,16 +334,27 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
             placeholder="Type exact answer..."
             value={identificationInput}
             onChange={(event) => onInputChange(event.target.value)}
-            disabled={isEvaluating}
+            disabled={isEvaluating || identificationSubmitted}
             className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground text-center focus:border-primary focus:outline-none"
           />
-          <button
-            type="submit"
-            disabled={isEvaluating || !identificationInput.trim()}
-            className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Check Answer
-          </button>
+          {identificationSubmitted ? (
+            <button
+              type="button"
+              onClick={() => onAdvance?.()}
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 active:scale-95 animate-in fade-in duration-200"
+            >
+              <span>Continue</span>
+              <span aria-hidden="true">›</span>
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={isEvaluating || !identificationInput.trim()}
+              className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Check Answer
+            </button>
+          )}
         </form>
       </div>
 
@@ -420,7 +455,10 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
             let style = 'border-border bg-background/50 hover:border-primary/50 hover:bg-card';
             if (isEvaluating) {
               if (option.isCorrect) {
-                style = 'border-2 border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30 font-semibold';
+                const userSelectedWrong = selectedOptionId !== null && selectedOptionId !== option.optionId;
+                style = userSelectedWrong
+                  ? 'border-2 border-dashed border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30 font-semibold'
+                  : 'border-2 border-solid border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30 font-semibold';
               } else if (isSelected && !option.isCorrect) {
                 style = 'border-destructive bg-destructive/10 text-destructive ring-1 ring-destructive font-semibold';
               } else {

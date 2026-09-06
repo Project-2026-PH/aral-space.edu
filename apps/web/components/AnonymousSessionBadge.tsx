@@ -62,6 +62,17 @@ export default function AnonymousSessionBadge() {
     };
   }, [isOpen]);
 
+  // Lock background scroll when open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
+
   // Countdown timer for pairing code
   useEffect(() => {
     if (!codeExpiresAt) {
@@ -225,10 +236,11 @@ export default function AnonymousSessionBadge() {
 
       {isOpen && (
         <>
-          {/* Backdrop for mobile */}
+          {/* Backdrop blurring background on all screen sizes */}
           <div
-            className="fixed inset-0 bg-background/60 backdrop-blur-xs z-40 sm:hidden animate-in fade-in duration-150"
+            className="fixed inset-0 bg-background/80 dark:bg-black/70 backdrop-blur-md z-40 animate-in fade-in duration-200"
             onClick={() => setIsOpen(false)}
+            aria-hidden="true"
           />
 
           <div className="absolute right-0 top-full mt-2.5 w-[calc(100vw-2rem)] max-w-[420px] sm:w-[420px] rounded-3xl border border-border/80 bg-card/95 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl z-50 animate-in fade-in sm:zoom-in-95 duration-200">

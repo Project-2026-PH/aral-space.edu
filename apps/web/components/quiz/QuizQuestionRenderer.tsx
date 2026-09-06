@@ -80,76 +80,81 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
   } = props;
 
   return (
-    <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-6">
-      {/* Top Section: Header & Question Prompt */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          <span>{mode === 'learn' ? 'Learn Mode · Type the answer' : 'Not enough choices · Type the answer'}</span>
-          <div className="flex items-center gap-2.5">
-            <WindFlameBadge
-              streak={currentStreak !== undefined ? currentStreak : (currentProg?.streak_count || 0)}
-              totalQuestions={totalQuestions || 5}
-              size="sm"
-            />
-            <button
-              type="button"
-              onClick={onShowHint}
-              disabled={isHintVisible || isEvaluating || identificationSubmitted}
-              className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Lightbulb className={`h-3.5 w-3.5 ${isHintVisible ? 'text-amber-500 fill-amber-500/20' : 'text-primary'}`} />
-              <span>{isHintVisible ? 'Hint active' : 'Hint'}</span>
-            </button>
-          </div>
+    <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4">
+      {/* Top Section: Header */}
+      <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span>{mode === 'learn' ? 'Learn Mode · Type the answer' : 'Not enough choices · Type the answer'}</span>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={onShowHint}
+            disabled={isHintVisible || isEvaluating || identificationSubmitted}
+            className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Lightbulb className={`h-3.5 w-3.5 ${isHintVisible ? 'text-amber-500 fill-amber-500/20' : 'text-primary'}`} />
+            <span>{isHintVisible ? 'Hint active' : 'Hint'}</span>
+          </button>
         </div>
-        <p className="text-sm sm:text-base font-bold text-foreground leading-relaxed">
-          {question.question_text}
-        </p>
-        {isHintVisible && (
-          <div className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-700 dark:text-amber-300 animate-in fade-in duration-200">
-            <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-            <span>Hint: {getQuestionHint(question)}</span>
-          </div>
-        )}
       </div>
 
-      {/* Middle Section: Input & Action Button */}
-      <div className="space-y-3 flex-1 flex flex-col justify-center">
-        <input
-          type="text"
-          autoFocus
-          placeholder="Type your answer..."
-          value={identificationInput}
-          onChange={(event) => onInputChange(event.target.value)}
-          disabled={isEvaluating}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') onSubmitTyped('learn');
-          }}
-          className={`w-full rounded-2xl border bg-background px-4 py-3 text-sm font-medium text-foreground focus:outline-none transition-colors ${typedAnswerCorrect === true
-            ? 'border-emerald-500 ring-1 ring-emerald-500'
-            : typedAnswerCorrect === false
-              ? 'border-destructive ring-1 ring-destructive'
-              : 'border-border focus:border-primary'
-            }`}
-        />
-        <button
-          type="button"
-          onClick={() => onSubmitTyped('learn')}
-          disabled={isEvaluating || !identificationInput.trim()}
-          className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Check Answer
-        </button>
+      {/* Centered Question & Input Body */}
+      <div className="flex-1 flex flex-col justify-center items-center text-center space-y-6 my-auto py-2">
+        <div className="space-y-3 max-w-xl mx-auto">
+          <p className="text-base sm:text-lg font-bold text-foreground leading-relaxed text-center">
+            {question.question_text}
+          </p>
+          {isHintVisible && (
+            <div className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300 animate-in fade-in duration-200">
+              <Lightbulb className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+              <span>Hint: {getQuestionHint(question)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Input & Action Button */}
+        <div className="w-full max-w-md mx-auto space-y-3">
+          <input
+            type="text"
+            autoFocus
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-form-type="other"
+            data-lpignore="true"
+            placeholder="Type your answer..."
+            value={identificationInput}
+            onChange={(event) => onInputChange(event.target.value)}
+            disabled={isEvaluating}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') onSubmitTyped('learn');
+            }}
+            className={`w-full rounded-2xl border bg-background px-4 py-3 text-sm font-medium text-foreground text-center focus:outline-none transition-colors ${typedAnswerCorrect === true
+              ? 'border-emerald-500 ring-1 ring-emerald-500'
+              : typedAnswerCorrect === false
+                ? 'border-destructive ring-1 ring-destructive'
+                : 'border-border focus:border-primary'
+              }`}
+          />
+          <button
+            type="button"
+            onClick={() => onSubmitTyped('learn')}
+            disabled={isEvaluating || !identificationInput.trim()}
+            className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Check Answer
+          </button>
+        </div>
       </div>
 
       {/* Bottom Section: Feedback */}
       <div className="min-h-[72px]">
         {identificationSubmitted && (
-          <div className={`rounded-2xl border p-4 text-xs space-y-2 animate-in fade-in duration-200 ${typedAnswerCorrect
+          <div className={`rounded-2xl border p-4 text-xs space-y-2 text-center animate-in fade-in duration-200 ${typedAnswerCorrect
             ? 'border-emerald-500/30 bg-emerald-500/10'
             : 'border-destructive/30 bg-destructive/10'
             }`}>
-            <div className="flex items-center gap-2 font-bold">
+            <div className="flex items-center justify-center gap-2 font-bold">
               {typedAnswerCorrect ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-destructive" />}
               <span>{typedAnswerCorrect ? 'Correct answer' : 'Keep practicing'}</span>
             </div>
@@ -239,57 +244,69 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
   } = props;
 
   return (
-    <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-6">
+    <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4">
       {/* Top Section */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          <span>Identification Prompt</span>
-          <button
-            type="button"
-            onClick={onShowHint}
-            disabled={isHintVisible || isEvaluating || identificationSubmitted}
-            className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Lightbulb className={`h-3.5 w-3.5 ${isHintVisible ? 'text-amber-500 fill-amber-500/20' : 'text-primary'}`} />
-            <span>{isHintVisible ? 'Hint active' : 'Need a hint?'}</span>
-          </button>
-        </div>
-        <p className="text-sm sm:text-base font-bold text-foreground leading-relaxed">{question.question_text}</p>
-        {isHintVisible && (
-          <div className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-700 dark:text-amber-300 animate-in fade-in duration-200">
-            <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-            <span>Hint: {getQuestionHint(question)}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Input Section */}
-      <div className="space-y-3 flex-1 flex flex-col justify-center">
-        <input
-          type="text"
-          placeholder="Type exact answer..."
-          value={identificationInput}
-          onChange={(event) => onInputChange(event.target.value)}
-          disabled={isEvaluating}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && identificationInput.trim()) onSubmitTyped('identification');
-          }}
-          className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground focus:border-primary focus:outline-none"
-        />
+      <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span>Identification Prompt</span>
         <button
           type="button"
-          onClick={() => onSubmitTyped('identification')}
-          disabled={isEvaluating || !identificationInput.trim()}
-          className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={onShowHint}
+          disabled={isHintVisible || isEvaluating || identificationSubmitted}
+          className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Check Answer
+          <Lightbulb className={`h-3.5 w-3.5 ${isHintVisible ? 'text-amber-500 fill-amber-500/20' : 'text-primary'}`} />
+          <span>{isHintVisible ? 'Hint active' : 'Need a hint?'}</span>
         </button>
+      </div>
+
+      {/* Centered Question & Input Body */}
+      <div className="flex-1 flex flex-col justify-center items-center text-center space-y-6 my-auto py-2">
+        <div className="space-y-3 max-w-xl mx-auto">
+          <p className="text-base sm:text-lg font-bold text-foreground leading-relaxed text-center">
+            {question.question_text}
+          </p>
+          {isHintVisible && (
+            <div className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300 animate-in fade-in duration-200">
+              <Lightbulb className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+              <span>Hint: {getQuestionHint(question)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Input & Action Button */}
+        <div className="w-full max-w-md mx-auto space-y-3">
+          <input
+            type="text"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-form-type="other"
+            data-lpignore="true"
+            placeholder="Type exact answer..."
+            value={identificationInput}
+            onChange={(event) => onInputChange(event.target.value)}
+            disabled={isEvaluating}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && identificationInput.trim()) onSubmitTyped('identification');
+            }}
+            className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm font-medium text-foreground text-center focus:border-primary focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => onSubmitTyped('identification')}
+            disabled={isEvaluating || !identificationInput.trim()}
+            className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Check Answer
+          </button>
+        </div>
       </div>
 
       {/* Result Section */}
       <div className="min-h-[72px]">
         {identificationSubmitted && (
-          <div className="rounded-2xl border border-border/80 bg-muted/40 p-4 text-xs space-y-1 animate-in fade-in duration-200">
+          <div className="rounded-2xl border border-border/80 bg-muted/40 p-4 text-xs space-y-1 text-center animate-in fade-in duration-200">
             <p className="font-bold text-foreground">Correct Answer: {getQuestionAnswer(question)}</p>
             {question.explanation && <p className="text-muted-foreground text-[11px] leading-relaxed">💡 {question.explanation}</p>}
           </div>

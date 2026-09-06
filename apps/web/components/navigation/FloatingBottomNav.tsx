@@ -212,7 +212,7 @@ export default function FloatingBottomNav({
           top: `${position.y}px`,
           transform: 'none',
           touchAction: 'none',
-          zIndex: 50,
+          zIndex: 30,
         }
       : {};
 
@@ -236,7 +236,7 @@ export default function FloatingBottomNav({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         style={tabletStyle}
-        className={`fixed z-50 select-none block lg:hidden ${
+        className={`fixed z-30 select-none block lg:hidden ${
           !isTablet
             ? 'bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2'
             : isDragging

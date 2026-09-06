@@ -62,7 +62,7 @@ export default function QuizRecap({
       onClick={onSurfaceClick}
       onKeyDown={onSurfaceKeyDown}
       aria-label="Quick recap. Press any key or select Continue to resume."
-      className="mx-auto min-h-[calc(100vh-2rem)] max-w-5xl space-y-8 pb-28 outline-none"
+      className="mx-auto min-h-[calc(100vh-2rem)] max-w-3xl w-full space-y-8 pb-36 sm:pb-40 outline-none px-2 sm:px-0"
     >
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -146,10 +146,20 @@ export default function QuizRecap({
           <h2 className="text-xs font-bold text-foreground">Terms studied in this round</h2>
           <div className="space-y-2">
             {recapQuestions.map((question) => (
-              <div key={question.id} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.4fr)_auto] items-center gap-3 rounded-md border border-border/80 bg-card px-3 py-2.5 shadow-sm sm:gap-4 sm:px-4">
-                <p className="min-w-0 text-[10px] font-semibold leading-snug text-foreground sm:text-xs">{question.question_text}</p>
-                <p className="min-w-0 border-l border-border/80 pl-3 text-[10px] leading-snug text-muted-foreground sm:pl-4 sm:text-xs">{getQuestionAnswer(question) || 'No definition provided.'}</p>
-                <div className="flex items-center gap-2 text-muted-foreground" aria-hidden="true"><Sparkles className="h-3 w-3 text-primary" /><Volume2 className="h-3 w-3" /></div>
+              <div
+                key={question.id}
+                className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.4fr)_auto] items-start sm:items-center gap-2 sm:gap-4 rounded-xl sm:rounded-2xl border border-border/80 bg-card p-3 sm:px-4 sm:py-2.5 shadow-sm"
+              >
+                <p className="min-w-0 text-xs font-semibold leading-snug text-foreground">{question.question_text}</p>
+                <div className="min-w-0 border-t sm:border-t-0 sm:border-l border-border/80 pt-1.5 sm:pt-0 sm:pl-4">
+                  <p className="text-xs leading-snug font-medium text-emerald-600 dark:text-emerald-400 sm:text-muted-foreground">
+                    {getQuestionAnswer(question) || 'No definition provided.'}
+                  </p>
+                </div>
+                <div className="flex items-center justify-end gap-2 text-muted-foreground" aria-hidden="true">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  <Volume2 className="h-3.5 w-3.5" />
+                </div>
               </div>
             ))}
           </div>

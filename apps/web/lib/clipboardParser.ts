@@ -1,6 +1,8 @@
 export type ParsedClipboard =
   | { type: 'single_pair'; term: string; definition: string }
   | { type: 'bulk_terms'; items: Array<{ term: string; definition: string }> }
+  | { type: 'question_answer'; question: string; answer: string }
+  | { type: 'question_answers'; items: Array<{ question: string; answer: string }> }
   | { type: 'enumeration_blocks'; blocks: Array<{ header: string; items: string[] }> };
 
 /** Bullet/enumeration markers that may prefix a term line. */
@@ -41,11 +43,90 @@ function isLabelLike(value: string): boolean {
   return value.length <= 80 && value.split(/\s+/).length <= 10;
 }
 
+function isQuestionLike(value: string): boolean {
+  return (
+    /\?$/.test(value) ||
+    /^(?:what|who|where|when|why|how|which|define|explain|describe|identify|name|list|state|give)\b/i.test(value)
+  );
+}
+
 function looksLikeTerm(candidate: string): boolean {
   if (!TERM_SHAPE.test(candidate)) return false;
   const words = candidate.split(/\s+/);
   return words.length <= 10;
 }
+
+const NUMBERED_LINE = /^\s*\(?\d+[.)]\s*(.+)$/;
+
+/**
+ * Extracts numbered question/answer blocks such as:
+ * `1. What is an AP?` followed by `Answer: Access Point`.
+ */
+function extractNumberedQuestionAnswers(text: string): Array<{ question: string; answer: string }> {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const pairs: Array<{ question: string; answer: string }> = [];
+  let question: string | null = null;
+  let answerParts: string[] = [];
+
+  const flush = () => {
+    if (!question || answerParts.length === 0) return;
+    const answer = answerParts.join(' ').replace(/\s+/g, ' ').trim();
+    if (answer) pairs.push({ question, answer });
+    question = null;
+    answerParts = [];
+  };
+
+  for (const line of lines) {
+    const numbered = line.match(NUMBERED_LINE);
+    if (numbered) {
+      flush();
+      const candidate = numbered[1]
+        .replace(/^(?:question|q)\s*[:.)-]\s*/i, '')
+        .trim();
+      question = isQuestionLike(candidate) ? candidate : null;
+      continue;
+    }
+
+    if (question) {
+      answerParts.push(line.replace(/^(?:answer|ans|a)\s*[:.)-]\s*/i, '').trim());
+    }
+  }
+
+  flush();
+  return pairs;
+}
+
+/**
+ * Extracts numbered term/definition blocks such as:
+ * `1. Rogue AP Attack` followed by its definition on the next line.
+ * Numbered lists with no continuation remain enumeration lists.
+ */
+function extractNumberedTermDefinitions(text: string): Array<{ term: string; definition: string }> {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const pairs: Array<{ term: string; definition: string }> = [];
+  let current: { term: string; parts: string[] } | null = null;
+
+  const flush = () => {
+    if (!current) return;
+    const definition = current.parts.join(' ').replace(/\s+/g, ' ').trim();
+    if (definition) pairs.push({ term: current.term, definition });
+    current = null;
+  };
+
+  for (const line of lines) {
+    const numbered = line.match(NUMBERED_LINE);
+    if (numbered) {
+      flush();
+      current = { term: numbered[1].trim(), parts: [] };
+    } else if (current) {
+      current.parts.push(line);
+    }
+  }
+
+  flush();
+  return pairs;
+}
+
 
 /**
  * Bulleted item with no delimiter at all, e.g.
@@ -122,6 +203,22 @@ function extractBulkTerms(
 export function parseSmartClipboard(raw: string): ParsedClipboard | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
+
+  const numberedQuestionAnswers = extractNumberedQuestionAnswers(trimmed);
+  if (numberedQuestionAnswers.length > 0) {
+    if (numberedQuestionAnswers.length === 1) {
+      return { type: 'question_answer', ...numberedQuestionAnswers[0] };
+    }
+    return { type: 'question_answers', items: numberedQuestionAnswers };
+  }
+
+  const numberedTermDefinitions = extractNumberedTermDefinitions(trimmed);
+  if (numberedTermDefinitions.length > 0) {
+    if (numberedTermDefinitions.length === 1) {
+      return { type: 'single_pair', ...numberedTermDefinitions[0] };
+    }
+    return { type: 'bulk_terms', items: numberedTermDefinitions };
+  }
 
   // 1. Check for Bulk Bulleted Term/Definition List first
   // Supports `:`, ` - `, ` – `, ` — ` delimiters and multi-line wrapped definitions.

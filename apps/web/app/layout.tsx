@@ -16,8 +16,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Quiz Creator & Mastery Hub',
-  description: 'MSRC-Driven AI Question Authoring & Spaced Repetition Mastery Engine',
+  title: ' Aral Space',
+  description: 'Local-First reviewer generator.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,

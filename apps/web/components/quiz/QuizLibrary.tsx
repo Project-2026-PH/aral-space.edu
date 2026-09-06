@@ -75,7 +75,8 @@ export default function QuizLibrary({
       ) : (
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
           {quizzes.map((quiz) => {
-            const subjectName = quiz.subject?.name ?? subjects?.find((subject) => subject.id === quiz.subject_id)?.name;
+            const subject = quiz.subject ?? subjects?.find((candidate) => candidate.id === quiz.subject_id);
+            const subjectName = subject?.name;
 
             return (
               <article
@@ -94,8 +95,12 @@ export default function QuizLibrary({
                     </span>
                   ) : subjectName ? (
                     <span
-                      className="max-w-[12rem] truncate rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary"
-                      title={subjectName}
+                      style={{
+                        backgroundColor: `${subject.color}26`,
+                        borderColor: `${subject.color}59`,
+                        color: subject.color
+                      }}
+                      className="max-w-[12rem] truncate rounded-full border px-2.5 py-0.5 text-[11px] font-bold"
                     >
                       {subjectName}
                     </span>

@@ -308,11 +308,29 @@ export default function ManualQuizCreator({
     setQuestions(next);
   }
 
+  function applyQuestionAnswer(qIdx: number, question: string, answer: string) {
+    const next = [...questions];
+    next[qIdx] = {
+      ...next[qIdx],
+      type: 'identification',
+      question_text: question,
+      options: [answer],
+      correct_answer: 0
+    };
+    setQuestions(next);
+  }
+
   function handlePromptPaste(qIdx: number, e: React.ClipboardEvent<HTMLInputElement>) {
     const text = e.clipboardData.getData('text');
     if (!text) return;
 
     const parsed = parseSmartClipboard(text);
+    if (parsed && parsed.type === 'question_answer') {
+      e.preventDefault();
+      applyQuestionAnswer(qIdx, parsed.question, parsed.answer);
+      return;
+    }
+
     if (parsed && parsed.type === 'single_pair') {
       e.preventDefault();
       const next = [...questions];
@@ -327,7 +345,7 @@ export default function ManualQuizCreator({
       return;
     }
 
-    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'enumeration_blocks')) {
+    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
       setPendingImport(parsed);
     }
@@ -338,6 +356,12 @@ export default function ManualQuizCreator({
     if (!text) return;
 
     const parsed = parseSmartClipboard(text);
+    if (parsed && parsed.type === 'question_answer') {
+      e.preventDefault();
+      applyQuestionAnswer(qIdx, parsed.question, parsed.answer);
+      return;
+    }
+
     if (parsed && parsed.type === 'single_pair') {
       e.preventDefault();
       const next = [...questions];
@@ -352,7 +376,7 @@ export default function ManualQuizCreator({
       return;
     }
 
-    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'enumeration_blocks')) {
+    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
       setPendingImport(parsed);
     }
@@ -367,7 +391,7 @@ export default function ManualQuizCreator({
     if (!text) return;
 
     const parsed = parseSmartClipboard(text);
-    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'enumeration_blocks')) {
+    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
       setPendingImport(parsed);
     }
@@ -386,6 +410,21 @@ export default function ManualQuizCreator({
       }));
 
       // If existing list only contains 1 empty initial card, replace it
+      const isFirstEmpty =
+        questions.length === 1 &&
+        !questions[0].question_text.trim() &&
+        questions[0].options.every((o) => !o.trim());
+
+      setQuestions((prev) => (isFirstEmpty ? newCards : [...prev, ...newCards]));
+    } else if (pendingImport.type === 'question_answers') {
+      const newCards: QuestionDraft[] = pendingImport.items.map((item) => ({
+        type: 'identification',
+        question_text: item.question,
+        options: [item.answer],
+        correct_answer: 0,
+        explanation: ''
+      }));
+
       const isFirstEmpty =
         questions.length === 1 &&
         !questions[0].question_text.trim() &&
@@ -518,12 +557,18 @@ export default function ManualQuizCreator({
                 <h4 className="text-sm font-extrabold text-foreground flex items-center gap-2">
                   <span>Smart Clipboard Detected</span>
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/15 text-primary">
-                    {pendingImport.type === 'bulk_terms' ? 'Term/Definition List' : 'Slide Enumeration'}
+                    {pendingImport.type === 'bulk_terms'
+                      ? 'Term/Definition List'
+                      : pendingImport.type === 'question_answers'
+                      ? 'Question/Answer List'
+                      : 'Slide Enumeration'}
                   </span>
                 </h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {pendingImport.type === 'bulk_terms'
                     ? `✨ Detected ${pendingImport.items.length} Term/Definition pairs ready to convert into identification cards.`
+                    : pendingImport.type === 'question_answers'
+                    ? `✨ Detected ${pendingImport.items.length} numbered question/answer pairs ready to import.`
                     : pendingImport.type === 'enumeration_blocks'
                     ? `✨ Detected ${pendingImport.blocks.length} Enumeration group(s) (${pendingImport.blocks.map((b) => b.header).slice(0, 2).join(', ')}${pendingImport.blocks.length > 2 ? '...' : ''}) ready to convert.`
                     : '✨ Detected structured text ready to convert.'}
@@ -557,6 +602,8 @@ export default function ManualQuizCreator({
               <ClipboardPaste className="h-4 w-4" />
               <span>
                 {pendingImport.type === 'bulk_terms'
+                  ? `Import ${pendingImport.items.length} Question Cards`
+                  : pendingImport.type === 'question_answers'
                   ? `Import ${pendingImport.items.length} Question Cards`
                   : pendingImport.type === 'enumeration_blocks'
                   ? `Import ${pendingImport.blocks.length} Enumeration Cards`

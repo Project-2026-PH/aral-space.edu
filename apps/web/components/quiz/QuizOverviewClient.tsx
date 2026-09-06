@@ -8,7 +8,8 @@ import QuizStartConfigModal from './QuizStartConfigModal';
 import ShareQuizModal from './ShareQuizModal';
 import QuizExportMenu from './QuizExportMenu';
 import ConfirmModal from '../ui/ConfirmModal';
-import { Play, Plus, Edit, Trash2, ArrowLeft, Share2 } from 'lucide-react';
+import StickyActionDock from '../ui/StickyActionDock';
+import { Play, Plus, Edit, Trash2, ArrowLeft, Share2, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -28,6 +29,7 @@ export default function QuizOverviewClient({
   const [questions, setQuestions] = useState<QuizQuestion[]>(initialQuestions);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(quiz.title);
+  const [savingTitle, setSavingTitle] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
   const [showStartModal, setShowStartModal] = useState(false);
@@ -49,6 +51,7 @@ export default function QuizOverviewClient({
 
   async function handleSaveTitle() {
     if (!titleInput.trim()) return;
+    setSavingTitle(true);
     try {
       const res = await fetch(`/api/quizzes/${quiz.id}`, {
         method: 'PATCH',
@@ -62,6 +65,8 @@ export default function QuizOverviewClient({
       }
     } catch (err) {
       console.error('Title save error:', err);
+    } finally {
+      setSavingTitle(false);
     }
   }
 
@@ -126,12 +131,6 @@ export default function QuizOverviewClient({
                   onChange={(e) => setTitleInput(e.target.value)}
                   className="rounded-xl border border-primary bg-background px-3 py-1.5 text-lg font-bold text-foreground focus:outline-none flex-1"
                 />
-                <button
-                  onClick={handleSaveTitle}
-                  className="rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white"
-                >
-                  Save
-                </button>
                 <button
                   onClick={() => setIsEditingTitle(false)}
                   className="rounded-xl px-3 py-1.5 text-xs font-semibold text-muted-foreground"
@@ -202,6 +201,17 @@ export default function QuizOverviewClient({
           onDeleted={refreshQuestions}
         />
       </div>
+
+      {isEditingTitle && (
+        <StickyActionDock
+          onAction={handleSaveTitle}
+          disabled={savingTitle || !titleInput.trim()}
+          ariaLabel="Save quiz title"
+          message="Save your reviewer title"
+          buttonText={savingTitle ? 'Saving...' : 'Save'}
+          icon={<Save className="h-4 w-4" />}
+        />
+      )}
 
       <QuizQuestionFormModal
         open={showQuestionModal}

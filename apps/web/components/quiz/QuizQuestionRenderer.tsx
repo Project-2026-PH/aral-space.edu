@@ -57,6 +57,7 @@ interface SharedQuestionProps {
   onFlip: () => void;
   onShowHint: () => void;
   onAdvance?: () => void;
+  desktopViewport?: boolean;
 }
 
 export interface QuizQuestionRendererProps extends SharedQuestionProps {
@@ -78,12 +79,13 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
     onInputChange,
     onSubmitTyped,
     onShowHint,
-    onAdvance
+    onAdvance,
+    desktopViewport
   } = props;
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   return (
-    <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4">
+    <div className={`w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4 ${desktopViewport ? 'desktop-quiz-card lg:h-auto lg:min-h-0 lg:overflow-visible lg:p-5 lg:space-y-3' : ''}`}>
       {/* Top Section: Header */}
       <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
         <span>{mode === 'learn' ? 'Learn Mode · Type the answer' : 'Not enough choices · Type the answer'}</span>
@@ -101,7 +103,7 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
       </div>
 
       {/* Centered Question & Input Body */}
-      <div className="flex-1 flex flex-col justify-center items-center text-center space-y-6 my-auto py-2">
+      <div className={`flex-1 flex flex-col justify-center items-center text-center space-y-6 my-auto py-2 ${desktopViewport ? 'lg:space-y-3' : ''}`}>
         <div className="space-y-3 max-w-xl mx-auto">
           <p className="text-base sm:text-lg font-bold text-foreground leading-relaxed text-center">
             {question.question_text}
@@ -126,7 +128,7 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
               onSubmitTyped('learn');
             }
           }}
-          className="w-full max-w-md mx-auto space-y-3"
+          className={`w-full max-w-md mx-auto space-y-3 ${desktopViewport ? 'lg:space-y-2' : ''}`}
         >
           <input
             ref={inputRef}
@@ -178,7 +180,7 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
       {/* Bottom Section: Feedback */}
       <div className="min-h-[72px]">
         {identificationSubmitted && (
-          <div className={`rounded-2xl border p-4 text-xs space-y-2 text-center animate-in fade-in duration-200 ${typedAnswerCorrect
+          <div className={`rounded-2xl border p-4 text-xs space-y-2 text-center animate-in fade-in duration-200 lg:p-3 ${typedAnswerCorrect
             ? 'border-emerald-500/30 bg-emerald-500/10'
             : 'border-destructive/30 bg-destructive/10'
             }`}>
@@ -269,12 +271,13 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
     onInputChange,
     onSubmitTyped,
     onShowHint,
-    onAdvance
+    onAdvance,
+    desktopViewport
   } = props;
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   return (
-    <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4">
+    <div className={`w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4 ${desktopViewport ? 'desktop-quiz-card lg:h-auto lg:min-h-0 lg:overflow-visible lg:p-5 lg:space-y-3' : ''}`}>
       {/* Top Section */}
       <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
         <span>Question Prompt</span>
@@ -290,7 +293,7 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
       </div>
 
       {/* Centered Question & Input Body */}
-      <div className="flex-1 flex flex-col justify-center items-center text-center space-y-6 my-auto py-2">
+      <div className={`flex-1 flex flex-col justify-center items-center text-center space-y-6 my-auto py-2 ${desktopViewport ? 'lg:space-y-3' : ''}`}>
         <div className="space-y-3 max-w-xl mx-auto">
           <p className="text-base sm:text-lg font-bold text-foreground leading-relaxed text-center">
             {question.question_text}
@@ -315,7 +318,7 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
               onSubmitTyped('identification');
             }
           }}
-          className="w-full max-w-md mx-auto space-y-3"
+          className={`w-full max-w-md mx-auto space-y-3 ${desktopViewport ? 'lg:space-y-2' : ''}`}
         >
           <input
             ref={inputRef}
@@ -386,11 +389,12 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
     currentOptions,
     isRetryQuestion,
     onAnswer,
-    onShowHint
+    onShowHint,
+    desktopViewport
   } = props;
 
   return (
-    <div className="w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-6">
+    <div className={`w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-6 ${desktopViewport ? 'desktop-quiz-card lg:h-auto lg:min-h-0 lg:overflow-visible lg:p-5 lg:space-y-3' : ''}`}>
       {/* Top Section: Prompt & Status */}
       <div className="space-y-3">
         <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -473,7 +477,7 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
                 onClick={() => onAnswer(option)}
                 disabled={isEvaluating}
                 aria-keyshortcuts={String(index + 1)}
-                className={`flex items-start gap-3 rounded-2xl border p-3.5 sm:p-4 text-left transition-all active:scale-[0.98] ${style}`}
+                className={`flex items-start gap-3 rounded-2xl border p-3.5 sm:p-4 text-left transition-all active:scale-[0.98] lg:p-2.5 ${style}`}
               >
                 <span className={`flex items-center justify-center w-6 h-6 rounded-lg text-xs font-bold shrink-0 transition-colors ${isEvaluating && option.isCorrect
                   ? 'bg-emerald-500 text-white'
@@ -497,7 +501,7 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
         {isEvaluating && isExplanationVisible && (
           <div className="space-y-3 pt-1 animate-in fade-in duration-200">
             {(question.correct_explanation || question.explanation) && (
-              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-xs text-muted-foreground space-y-1">
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-xs text-muted-foreground space-y-1 lg:p-3">
                 <div className="flex items-center gap-1.5 font-bold text-foreground">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <span>Principle & Explanation:</span>
@@ -506,7 +510,7 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
               </div>
             )}
             {selectedOptionId !== null && selectedOptionId !== question.correct_answer && question.distractor_explanations?.[selectedOptionId] && (
-              <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-xs text-muted-foreground space-y-1">
+              <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-xs text-muted-foreground space-y-1 lg:p-3">
                 <div className="flex items-center gap-1.5 font-bold text-destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <span>Why Choice {currentOptions.findIndex((option) => option.optionId === selectedOptionId) + 1} is Incorrect:</span>

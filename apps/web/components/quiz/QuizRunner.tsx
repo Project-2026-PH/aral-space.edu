@@ -83,6 +83,8 @@ export default function QuizRunner(props: QuizRunnerProps) {
     toggleMute
   } = session;
 
+  const isDesktopViewportMode = currentMode === 'multiple_choice' || currentMode === 'identification';
+
   if (!isProgressHydrated) {
     return <div className="mx-auto flex min-h-[50vh] max-w-md items-center justify-center text-center text-xs text-muted-foreground">Restoring your quiz progress...</div>;
   }
@@ -143,7 +145,11 @@ export default function QuizRunner(props: QuizRunnerProps) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-28 sm:pb-32" onClick={handleSurfaceClick} onKeyDown={handleSurfaceKeyDown}>
+    <div
+      className={`mx-auto max-w-5xl space-y-6 pb-28 sm:pb-32 ${isDesktopViewportMode ? `desktop-quiz-viewport lg:flex lg:flex-col lg:gap-3 lg:space-y-0 ${pendingAdvance ? 'lg:pb-20' : 'lg:pb-8'}` : ''}`}
+      onClick={handleSurfaceClick}
+      onKeyDown={handleSurfaceKeyDown}
+    >
       <div className="flex items-center justify-between">
         <Link href={`/review/${quiz.id}`} className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />Return to Reviewer</Link>
         <div className="flex items-center gap-2.5 sm:gap-3">
@@ -177,26 +183,37 @@ export default function QuizRunner(props: QuizRunnerProps) {
       <div className="space-y-2" aria-label={`Quiz progress: ${totalLockedCount} of ${questions.length} questions mastered (${correctAnswerCount} answers correct)`}>
         <div className="flex items-center justify-between text-xs font-bold text-muted-foreground"><span>Progress</span></div>
         {currentMode === 'multiple_choice' || currentMode === 'reverse' || currentMode === 'identification' ? (
-          <div className="relative pt-1">
-            <div className="flex h-2 w-full gap-1" aria-hidden="true">{progressSegments.map((segment) => <div key={segment.id} className="min-w-0 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${segment.fillPercent}%` }} /></div>)}</div>
-            {totalLockedCount > 0 && totalLockedCount < questions.length && (
-              <div
-                className="absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-emerald-600 text-sm font-black text-white shadow-sm ring-2 ring-background transition-[left] duration-300"
-                style={{ left: `${progressPercent}%` }}
-                aria-hidden="true"
-              >
-                {totalLockedCount}
-              </div>
-            )}
-            <div className="absolute right-0 top-1/2 flex h-7 w-7 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-muted-foreground text-sm font-black text-background shadow-sm ring-2 ring-background" aria-hidden="true">{questions.length}</div>
+          <div className="flex w-full min-w-0 items-center gap-2 pt-1 pr-2">
+            <div className="relative min-w-0 flex-1">
+              <div className="flex h-2 w-full gap-1" aria-hidden="true">{progressSegments.map((segment) => <div key={segment.id} className="min-w-0 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${segment.fillPercent}%` }} /></div>)}</div>
+              {totalLockedCount > 0 && totalLockedCount < questions.length && (
+                <div
+                  className="absolute left-0 top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-emerald-600 text-sm font-black text-white shadow-sm ring-2 ring-background transition-[left] duration-300"
+                  style={{ left: `${progressPercent}%` }}
+                  aria-hidden="true"
+                >
+                  {totalLockedCount}
+                </div>
+              )}
+            </div>
+            <div
+              className="mr-4 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted-foreground text-sm font-black text-background shadow-sm ring-2 ring-background"
+              aria-hidden="true"
+            >
+              {questions.length}
+            </div>
           </div>
         ) : <div className="h-2 w-full overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all duration-300" style={{ width: `${overallPercent}%` }} /></div>}
       </div>
 
-      <div className="overflow-hidden">
-        <div key={activeQuestion.id} className={isQuestionTransitioning ? 'quiz-question-card-exit' : 'quiz-question-card-enter'}>
+      <div className={isDesktopViewportMode ? 'overflow-visible lg:min-h-0 lg:flex-none' : 'overflow-hidden'}>
+        <div
+          key={activeQuestion.id}
+          className={`${isQuestionTransitioning ? 'quiz-question-card-exit' : 'quiz-question-card-enter'} ${isDesktopViewportMode ? 'lg:h-auto lg:min-h-0' : ''}`}
+        >
           <QuestionRenderer
             mode={currentMode}
+            desktopViewport={isDesktopViewportMode}
             question={activeQuestion}
             currentProg={currentProg}
             currentStreak={currentStreak}

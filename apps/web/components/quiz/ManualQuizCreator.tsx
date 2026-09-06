@@ -5,6 +5,7 @@ import { Plus, Trash2, Save, ArrowLeft, X, Check, CircleDot, PenLine, ToggleLeft
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import NewSubjectModal from '../subject/NewSubjectModal';
+import StickyActionDock from '../ui/StickyActionDock';
 import { parseSmartClipboard, type ParsedClipboard } from '@/lib/clipboardParser';
 import { QuizTransformService } from '@quiz-creator/core';
 
@@ -503,7 +504,7 @@ export default function ManualQuizCreator({
   return (
     <div
       onPaste={handleContainerPaste}
-      className="max-w-4xl mx-auto space-y-6 pb-20 relative"
+      className="max-w-4xl mx-auto space-y-6 pb-32 sm:pb-36 relative"
     >
       {/* Smart Clipboard Import Preview Modal / Banner */}
       {pendingImport && (
@@ -591,15 +592,6 @@ export default function ManualQuizCreator({
           {draftStatus === 'error' && (
             <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Draft could not be saved</span>
           )}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-2xl bg-primary px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            <span>{saving ? 'Saving...' : 'Save & Publish Quiz'}</span>
-          </button>
         </div>
       </div>
 
@@ -745,6 +737,17 @@ export default function ManualQuizCreator({
           setSubjectId(created.id);
         }}
       />
+
+      {!showSubjectModal && (
+        <StickyActionDock
+          onAction={handleSave}
+          disabled={saving}
+          ariaLabel="Save and publish quiz"
+          message="Your quiz is saved locally while you work"
+          buttonText={saving ? 'Saving...' : 'Save & Publish Quiz'}
+          icon={<Save className="h-4 w-4" />}
+        />
+      )}
 
       {/* Questions list */}
       <div className="space-y-4">

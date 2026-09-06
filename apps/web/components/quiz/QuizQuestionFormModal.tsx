@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
+import StickyActionDock from '../ui/StickyActionDock';
 import { QuizQuestion } from '@quiz-creator/types';
 import { QuizTransformService } from '@quiz-creator/core';
 import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered } from 'lucide-react';
@@ -466,16 +467,15 @@ export default function QuizQuestionFormModal({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-xl bg-primary px-5 py-2 text-xs font-bold text-white hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Question'}
-          </button>
         </div>
       </div>
+      <StickyActionDock
+        onAction={handleSave}
+        disabled={saving}
+        ariaLabel={isEditing ? 'Save question changes' : 'Add question'}
+        message={isEditing ? 'Save your question changes' : 'Add this question to your reviewer'}
+        buttonText={saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Question'}
+      />
     </Modal>
   );
 }

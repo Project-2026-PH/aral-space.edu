@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Modal from '../ui/Modal';
+import StickyActionDock from '../ui/StickyActionDock';
 import { Check } from 'lucide-react';
 
 export interface SubjectColor {
@@ -36,8 +37,8 @@ export default function NewSubjectModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreate(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!name.trim()) {
       setError('Please enter a subject name.');
       return;
@@ -160,15 +161,15 @@ export default function NewSubjectModal({
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={loading || !name.trim()}
-            className="rounded-xl bg-primary px-5 py-2 text-xs font-bold text-white hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
-          >
-            {loading ? 'Creating...' : 'Create Subject'}
-          </button>
         </div>
       </form>
+      <StickyActionDock
+        onAction={() => void handleCreate()}
+        disabled={loading || !name.trim()}
+        ariaLabel="Create subject"
+        message="Create this subject and add it to your library"
+        buttonText={loading ? 'Creating...' : 'Create Subject'}
+      />
     </Modal>
   );
 }

@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink, Layers, Link2, Lock, Pencil, Plus, Save } from
 import { Quiz, Subject, SubjectAccess } from '@quiz-creator/types';
 import QuizLibrary from '@/components/quiz/QuizLibrary';
 import ShareSubjectModal from './ShareSubjectModal';
+import StickyActionDock from '@/components/ui/StickyActionDock';
 
 interface SubjectOverviewClientProps {
   subject: Subject;
@@ -82,8 +83,17 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
             {access.can_edit && (
               <>
                 {editing ? (
-                  <button type="button" onClick={saveSubject} disabled={saving} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
-                    <Save className="h-3.5 w-3.5" /> {saving ? 'Saving...' : 'Save subject'}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setName(subject.name);
+                      setColor(subject.color);
+                      setError(null);
+                      setEditing(false);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted"
+                  >
+                    Cancel
                   </button>
                 ) : (
                   <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted">
@@ -111,6 +121,16 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
       </div>
 
       <QuizLibrary quizzes={quizzes} loading={false} />
+      {editing && (
+        <StickyActionDock
+          onAction={saveSubject}
+          disabled={saving}
+          ariaLabel="Save subject changes"
+          message="Save your subject changes"
+          buttonText={saving ? 'Saving...' : 'Save subject'}
+          icon={<Save className="h-4 w-4" />}
+        />
+      )}
       <ShareSubjectModal open={sharing} onOpenChange={setSharing} subject={subject} onUpdated={(config) => setSubject((current) => ({ ...current, ...config }))} />
     </div>
   );

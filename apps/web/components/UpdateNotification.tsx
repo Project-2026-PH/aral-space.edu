@@ -82,7 +82,7 @@ export default function UpdateNotification() {
     checkForUpdate();
   }, [pathname]);
 
-  // 4. Intercept ChunkLoadError / dynamic import failure globally for automatic recovery
+  // Intercept ChunkLoadError / dynamic import failure globally for automatic recovery
   useEffect(() => {
     const isChunkFailure = (msg?: string) =>
       /Loading chunk [\d]+ failed|ChunkLoadError|Failed to fetch dynamically imported module/i.test(msg || '');

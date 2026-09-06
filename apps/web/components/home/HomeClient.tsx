@@ -12,6 +12,7 @@ import Link from 'next/link';
 const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizModal'), {
   ssr: false,
 });
+import FloatingBottomNav from '@/components/navigation/FloatingBottomNav';
 
 export interface HomeClientProps {
   initialQuizzes: Quiz[];
@@ -118,32 +119,36 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
         </button>
       </div>
 
-      <SubjectLibrary
-        subjects={subjects}
-        quizzes={quizzes}
-        viewerId={viewerId}
-        loading={loading}
-        onSubjectDeleted={(subjectId) => {
-          setSubjects((current) => current.filter((subject) => subject.id !== subjectId));
-          setQuizzes((current) => current.filter((quiz) => quiz.subject_id !== subjectId));
-          setSelectedSubjectId((current) => current === subjectId ? '' : current);
-        }}
-        onSubjectUpdated={(subjectId, config) => {
-          setSubjects((current) => current.map((subject) => (
-            subject.id === subjectId
-              ? { ...subject, ...config }
-              : subject
-          )));
-        }}
-      />
+      <div id="subjects-section" className="scroll-mt-20">
+        <SubjectLibrary
+          subjects={subjects}
+          quizzes={quizzes}
+          viewerId={viewerId}
+          loading={loading}
+          onSubjectDeleted={(subjectId) => {
+            setSubjects((current) => current.filter((subject) => subject.id !== subjectId));
+            setQuizzes((current) => current.filter((quiz) => quiz.subject_id !== subjectId));
+            setSelectedSubjectId((current) => current === subjectId ? '' : current);
+          }}
+          onSubjectUpdated={(subjectId, config) => {
+            setSubjects((current) => current.map((subject) => (
+              subject.id === subjectId
+                ? { ...subject, ...config }
+                : subject
+            )));
+          }}
+        />
+      </div>
 
-      <QuizLibrary
-        quizzes={filtered}
-        loading={loading}
-        subjects={subjects}
-        selectedSubjectId={selectedSubjectId}
-        onSubjectChange={setSelectedSubjectId}
-      />
+      <div id="reviewers-section" className="scroll-mt-20">
+        <QuizLibrary
+          quizzes={filtered}
+          loading={loading}
+          subjects={subjects}
+          selectedSubjectId={selectedSubjectId}
+          onSubjectChange={setSelectedSubjectId}
+        />
+      </div>
 
       <NewSubjectModal
         open={showSubjectModal}
@@ -159,6 +164,11 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
       <GenerateQuizModal
         open={showAiModal}
         onOpenChange={setShowAiModal}
+      />
+
+      <FloatingBottomNav
+        onOpenAiModal={() => setShowAiModal(true)}
+        onOpenSubjectModal={() => setShowSubjectModal(true)}
       />
     </div>
   );

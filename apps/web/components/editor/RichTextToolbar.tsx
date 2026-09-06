@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Bold, Italic, Strikethrough, Code2, Link2, ChevronDown, List, ListOrdered, Pilcrow, Minus, IndentIncrease, IndentDecrease } from 'lucide-react';
+import { Bold, Italic, Strikethrough, Code2, Link2, ChevronDown, List, ListOrdered, Pilcrow, Minus, IndentIncrease, IndentDecrease, Undo2, Redo2 } from 'lucide-react';
 
 interface RichTextToolbarProps {
   editorRef: React.RefObject<HTMLDivElement | null>;
@@ -37,8 +37,18 @@ function runCommand(
   selectionRef?: React.MutableRefObject<Range | null>
 ) {
   restoreSelection(selectionRef);
-  editorRef.current?.focus();
-  document.execCommand(command, false, value);
+  if (editorRef.current) {
+    editorRef.current.focus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !editorRef.current.contains(sel.anchorNode)) {
+      const range = document.createRange();
+      range.selectNodeContents(editorRef.current);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+  }
+  document.execCommand(command, false, value ?? '');
   editorRef.current?.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
@@ -96,6 +106,26 @@ export default function RichTextToolbar({ editorRef, selectionRef, floating = fa
 
   return (
     <div className={`rich-text-toolbar flex flex-wrap items-center gap-1 border-b border-border/70 bg-muted/30 p-2 ${floating ? 'rich-text-toolbar-floating' : ''}`} onMouseDown={(event) => event.preventDefault()}>
+      <button
+        type="button"
+        title="Undo (Ctrl+Z)"
+        aria-label="Undo"
+        onClick={() => runEditorCommand('undo')}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground hover:bg-muted active:scale-95"
+      >
+        <Undo2 className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        title="Redo (Ctrl+Y / Ctrl+Shift+Z)"
+        aria-label="Redo"
+        onClick={() => runEditorCommand('redo')}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground hover:bg-muted active:scale-95"
+      >
+        <Redo2 className="h-4 w-4" />
+      </button>
+      <div className="mx-0.5 h-4 w-[1px] bg-border/70" aria-hidden="true" />
+
       <div className="relative">
         <button
           type="button"

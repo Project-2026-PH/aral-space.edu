@@ -313,7 +313,8 @@ body {
 .rich-text-content code { border-radius: 0.25rem; background: hsl(var(--accent)); padding: 0.1rem 0.3rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
 .rich-text-content pre code { background: transparent; padding: 0; }
 .rich-text-content a { color: hsl(var(--primary)); text-decoration: underline; }
-.rich-text-content hr { margin: 1rem 0; border: 0; border-top: 1px solid hsl(var(--border)); }
+.rich-text-content hr { margin: 1.25rem 0; border: 0; border-top: 1.5px solid hsl(220 15% 68%); }
+.dark .rich-text-content hr { border-top-color: hsl(217 15% 36%); }
 .rich-text-editor {
   -webkit-touch-callout: none;
 }

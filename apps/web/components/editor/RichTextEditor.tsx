@@ -96,8 +96,12 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
 
   useEffect(() => {
     if (!editorRef.current) return;
+    if (value === lastValue.current) return;
     const normalized = normalizeRichTextHtml(value);
-    if (value === lastValue.current && editorRef.current.innerHTML === normalized) return;
+    if (editorRef.current.innerHTML === normalized) {
+      lastValue.current = value;
+      return;
+    }
     editorRef.current.innerHTML = normalized;
     lastValue.current = value;
   }, [value]);
@@ -234,8 +238,24 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
       }
     }
 
-    const hasCtrl = event.ctrlKey && !event.metaKey;
-    if (!hasCtrl) return;
+    const hasCtrl = event.ctrlKey || event.metaKey;
+
+    if (hasCtrl && !event.altKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      document.execCommand(event.shiftKey ? 'redo' : 'undo');
+      handleInput();
+      return;
+    }
+
+    if (hasCtrl && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'y') {
+      event.preventDefault();
+      document.execCommand('redo');
+      handleInput();
+      return;
+    }
+
+    const hasCtrlOnly = event.ctrlKey && !event.metaKey;
+    if (!hasCtrlOnly) return;
 
     let command: string | null = null;
     let value: string | undefined;

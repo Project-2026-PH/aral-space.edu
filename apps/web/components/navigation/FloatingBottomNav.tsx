@@ -40,6 +40,18 @@ export default function FloatingBottomNav({
     || pathname.startsWith('/quizzes/')
     || pathname === '/notes';
 
+  const isNotesActive = pathname === '/notes' || pathname.startsWith('/notes/');
+  const isReviewerActive = !isNotesActive && (
+    (isHomeRoute && activeTab === 'reviewers') ||
+    pathname === '/quizzes' ||
+    pathname.startsWith('/quizzes/')
+  );
+  const isSubjectsActive = !isNotesActive && !isReviewerActive && (
+    (isHomeRoute && activeTab === 'subjects') ||
+    pathname === '/subjects' ||
+    pathname.startsWith('/subjects/')
+  );
+
   // Responsive device classification
   const updateDeviceMode = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -71,9 +83,9 @@ export default function FloatingBottomNav({
     return () => window.removeEventListener('resize', updateDeviceMode);
   }, [updateDeviceMode]);
 
-  // Track active section via scroll position
+  // Track active section via scroll position on home route
   useEffect(() => {
-    if (!isVisibleRoute) return;
+    if (!isHomeRoute) return;
 
     const handleScroll = () => {
       const reviewersEl = document.getElementById('reviewers-section');
@@ -93,7 +105,7 @@ export default function FloatingBottomNav({
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isVisibleRoute]);
+  }, [isHomeRoute]);
 
   // Initialize tablet position to bottom center once mounted
   useEffect(() => {
@@ -285,14 +297,14 @@ export default function FloatingBottomNav({
             onClick={() => scrollToSection('subjects-section', 'subjects')}
             aria-label="Navigate to Subjects"
             className={`group relative flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold transition-all duration-200 active:scale-95 ${
-              activeTab === 'subjects'
+              isSubjectsActive
                 ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-800 dark:text-zinc-100 dark:border dark:border-zinc-700/70'
                 : 'text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100'
             } ${isVertical ? 'w-full justify-center px-2 py-2.5' : ''}`}
           >
             <div
               className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                activeTab === 'subjects'
+                isSubjectsActive
                   ? 'bg-transparent text-white'
                   : 'text-zinc-600 group-hover:text-zinc-900 dark:text-zinc-400 dark:group-hover:text-zinc-200'
               }`}
@@ -402,14 +414,14 @@ export default function FloatingBottomNav({
             onClick={() => scrollToSection('reviewers-section', 'reviewers')}
             aria-label="Navigate to Reviewer"
             className={`group relative flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold transition-all duration-200 active:scale-95 ${
-              activeTab === 'reviewers'
+              isReviewerActive
                 ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-800 dark:text-zinc-100 dark:border dark:border-zinc-700/70'
                 : 'text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100'
             } ${isVertical ? 'w-full justify-center px-2 py-2.5' : ''}`}
           >
             <div
               className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
-                activeTab === 'reviewers'
+                isReviewerActive
                   ? 'bg-transparent text-white'
                   : 'text-zinc-600 group-hover:text-zinc-900 dark:text-zinc-400 dark:group-hover:text-zinc-200'
               }`}
@@ -423,7 +435,7 @@ export default function FloatingBottomNav({
             href="/notes"
             aria-label="Open Notes"
             className={`group relative flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold transition-all duration-200 active:scale-95 ${
-              pathname === '/notes'
+              isNotesActive
                 ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-800 dark:text-zinc-100 dark:border dark:border-zinc-700/70'
                 : 'text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100'
             } ${isVertical ? 'w-full justify-center px-2 py-2.5' : ''}`}

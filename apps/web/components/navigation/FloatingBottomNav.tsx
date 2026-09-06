@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { BookOpen, Layers, Plus, Sparkles, GripVertical, GripHorizontal, FilePlus2 } from 'lucide-react';
+import { BookOpen, Layers, Plus, Sparkles, GripVertical, GripHorizontal, FilePlus2, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 interface FloatingBottomNavProps {
@@ -37,7 +37,8 @@ export default function FloatingBottomNav({
     || pathname === '/subjects'
     || pathname.startsWith('/subjects/')
     || pathname === '/quizzes'
-    || pathname.startsWith('/quizzes/');
+    || pathname.startsWith('/quizzes/')
+    || pathname === '/notes';
 
   // Responsive device classification
   const updateDeviceMode = useCallback(() => {
@@ -364,6 +365,20 @@ export default function FloatingBottomNav({
                   </button>
 
                   <Link
+                    href="/notes"
+                    onClick={() => setShowQuickMenu(false)}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary active:scale-[0.98]"
+                  >
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold">New Note</p>
+                      <p className="text-[10px] text-muted-foreground">Capture formatted study notes</p>
+                    </div>
+                  </Link>
+
+                  <Link
                     href="/new?mode=manual"
                     onClick={() => setShowQuickMenu(false)}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary active:scale-[0.98]"
@@ -403,6 +418,19 @@ export default function FloatingBottomNav({
             </div>
             {!isVertical && <span>Reviewer</span>}
           </button>
+
+          <Link
+            href="/notes"
+            aria-label="Open Notes"
+            className={`group relative flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold transition-all duration-200 active:scale-95 ${
+              pathname === '/notes'
+                ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-800 dark:text-zinc-100 dark:border dark:border-zinc-700/70'
+                : 'text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100'
+            } ${isVertical ? 'w-full justify-center px-2 py-2.5' : ''}`}
+          >
+            <div className="flex h-6 w-6 items-center justify-center rounded-md"><FileText className="h-4 w-4" /></div>
+            {!isVertical && <span>Notes</span>}
+          </Link>
         </div>
       </nav>
     </>

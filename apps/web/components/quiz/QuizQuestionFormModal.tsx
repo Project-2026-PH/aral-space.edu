@@ -7,6 +7,8 @@ import { QuizQuestion } from '@quiz-creator/types';
 import { QuizTransformService } from '@quiz-creator/core';
 import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
 import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered } from 'lucide-react';
+import RichTextEditor from '@/components/editor/RichTextEditor';
+import { hasRichTextContent, richTextToPlainText } from '@/lib/richText';
 
 export type QuestionType = 'multiple_choice' | 'typed_answer' | 'identification' | 'true_false' | 'enumeration';
 
@@ -126,8 +128,8 @@ export default function QuizQuestionFormModal({
         ? (options[0] || answerText || '')
         : (options[correctAnswer] || options[0] || answerText || '');
 
-      if (termCandidate.trim() && questionText.trim()) {
-        setQuestionText(QuizTransformService.paraphraseToStatement(questionText, termCandidate.trim()));
+      if (termCandidate.trim() && hasRichTextContent(questionText)) {
+        setQuestionText(QuizTransformService.paraphraseToStatement(richTextToPlainText(questionText), termCandidate.trim()));
       }
       newOptions = ['True', 'False'];
       newCorrect = newCorrect === 1 ? 1 : 0;
@@ -146,7 +148,7 @@ export default function QuizQuestionFormModal({
   }
 
   async function handleSave() {
-    if (!questionText.trim()) {
+    if (!hasRichTextContent(questionText)) {
       setError('Please provide a question prompt.');
       return;
     }
@@ -281,18 +283,18 @@ export default function QuizQuestionFormModal({
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-            Question Prompt
-          </label>
-          <textarea
-            rows={3}
-            placeholder="Type question prompt here..."
-            value={questionText}
-            onChange={(e) => setQuestionText(e.target.value)}
-            className="w-full rounded-2xl border border-border bg-background p-3 text-xs text-foreground focus:border-primary focus:outline-none resize-none font-medium"
-          />
-        </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Question Prompt
+            </label>
+            <RichTextEditor
+              value={questionText}
+              onChange={setQuestionText}
+              placeholder="Type question prompt here..."
+              minHeight="120px"
+              data-skip-clipboard-intercept="true"
+            />
+          </div>
 
         {/* Dynamic Type Inputs */}
         {type === 'multiple_choice' && (
@@ -486,12 +488,12 @@ export default function QuizQuestionFormModal({
           <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
             Explanation
           </label>
-          <input
-            type="text"
-            placeholder="Why is the chosen option correct?"
+          <RichTextEditor
             value={explanation}
-            onChange={(e) => setExplanation(e.target.value)}
-            className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none"
+            onChange={setExplanation}
+            placeholder="Why is the chosen option correct?"
+            minHeight="90px"
+            data-skip-clipboard-intercept="true"
           />
         </div>
 

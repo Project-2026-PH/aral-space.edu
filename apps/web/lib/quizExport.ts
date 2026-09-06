@@ -1,4 +1,5 @@
 import type { Quiz, QuizQuestion } from '@quiz-creator/types';
+import { normalizeRichTextHtml, sanitizeRichTextHtml } from '@/lib/richText';
 
 export interface QuizExportQuestion {
   question_text: string;
@@ -101,13 +102,13 @@ export function buildQuizPrintDocument(quiz: Quiz, questions: QuizQuestion[]): s
         ? `<ul>${question.options.map((option) => `<li>${escapeHtml(option)}</li>`).join('')}</ul>`
         : '';
       const explanation = question.explanation
-        ? `<p class="explanation"><strong>Explanation:</strong> ${escapeHtml(question.explanation)}</p>`
+        ? `<div class="explanation"><strong>Explanation:</strong> ${sanitizeRichTextHtml(normalizeRichTextHtml(question.explanation))}</div>`
         : '';
 
       return `
         <article class="question">
           <h2>Question ${index + 1}</h2>
-          <p class="prompt">${escapeHtml(question.question_text)}</p>
+          <div class="prompt">${sanitizeRichTextHtml(normalizeRichTextHtml(question.question_text))}</div>
           ${options}
           <p class="answer"><strong>Answer:</strong> ${escapeHtml(question.answer_text)}</p>
           ${explanation}
@@ -123,15 +124,17 @@ export function buildQuizPrintDocument(quiz: Quiz, questions: QuizQuestion[]): s
     <style>
       @page { margin: 18mm; }
       * { box-sizing: border-box; }
-      body { color: #172033; font-family: Arial, sans-serif; line-height: 1.5; margin: 0; }
-      h1 { font-size: 24px; margin: 0 0 4px; }
-      h2 { border-bottom: 1px solid #d8dee9; font-size: 15px; margin: 0 0 10px; padding-bottom: 5px; }
-      .description { color: #536174; margin: 0 0 22px; }
-      .question { border: 1px solid #d8dee9; border-radius: 8px; margin: 0 0 14px; padding: 14px; page-break-inside: avoid; }
-      .prompt { font-size: 14px; margin: 0 0 8px; white-space: pre-wrap; }
+      body { background: #fff; color: #000; font-family: Arial, sans-serif; line-height: 1.5; margin: 0; }
+      h1 { color: #000; font-size: 24px; margin: 0 0 4px; }
+      h2 { color: #000; border-bottom: 1px solid #000; font-size: 15px; margin: 0 0 10px; padding-bottom: 5px; }
+      .description { color: #000; margin: 0 0 22px; }
+      .question { background: #fff; border: 1px solid #000; border-radius: 8px; margin: 0 0 14px; padding: 14px; page-break-inside: avoid; }
+      .prompt { color: #000; font-size: 14px; margin: 0 0 8px; white-space: pre-wrap; }
       ul { margin: 6px 0 10px 20px; padding: 0; }
-      .answer { background: #eef8f1; border-radius: 5px; margin: 10px 0 0; padding: 7px 9px; }
-      .explanation { color: #536174; font-size: 12px; margin: 8px 0 0; }
+      ul::marker, ol::marker { color: #000; }
+      .answer { background: #fff; border: 1px solid #000; color: #000; border-radius: 5px; margin: 10px 0 0; padding: 7px 9px; }
+      .explanation { color: #000; font-size: 12px; margin: 8px 0 0; }
+      @media print { html, body { background: #fff !important; color: #000 !important; } }
     </style>
   </head>
   <body>

@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import NewSubjectModal from '@/components/subject/NewSubjectModal';
 import SubjectLibrary from '@/components/subject/SubjectLibrary';
 import QuizLibrary from '@/components/quiz/QuizLibrary';
-import { Sparkles, Plus, Search, LoaderCircle } from 'lucide-react';
+import { Sparkles, Plus, Search, LoaderCircle, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizModal'), {
@@ -109,14 +109,23 @@ export default function HomeClient({ initialQuizzes, initialSubjects, viewerId }
             className="home-search-input w-full rounded-2xl border border-border bg-card py-2.5 pl-10 pr-4 text-xs font-medium text-foreground shadow-2xs focus:border-primary focus:outline-none"
           />
         </div>
-        <button
-          type="button"
-          onClick={() => setShowSubjectModal(true)}
-          className="home-create-subject flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95 sm:w-auto"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Create a Subject</span>
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            type="button"
+            onClick={() => setShowSubjectModal(true)}
+            className="home-create-subject flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-xs font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95 sm:w-auto"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Create a Subject</span>
+          </button>
+          <Link
+            href="/notes"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card px-5 py-3 text-xs font-bold text-foreground transition-all hover:bg-muted active:scale-95 sm:w-auto"
+          >
+            <FileText className="h-4 w-4 text-primary" />
+            <span>Create a Note</span>
+          </Link>
+        </div>
       </div>
 
       <div id="subjects-section" className="scroll-mt-20">

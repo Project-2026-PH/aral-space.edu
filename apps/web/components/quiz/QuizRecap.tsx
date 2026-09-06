@@ -5,6 +5,7 @@ import { Sparkles, Volume2 } from 'lucide-react';
 import type { QuizMode, QuizQuestion } from '@quiz-creator/types';
 import { getQuestionAnswer } from '@/lib/quizAnswerEvaluation';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
+import RichTextContent from '@/components/editor/RichTextContent';
 
 interface QuizRecapProps {
   questions: QuizQuestion[];
@@ -147,7 +148,7 @@ export default function QuizRecap({
                 key={question.id}
                 className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.4fr)_auto] items-start sm:items-center gap-2 sm:gap-4 rounded-xl sm:rounded-2xl border border-border/80 bg-card p-3 sm:px-4 sm:py-2.5 shadow-sm"
               >
-                <p className="min-w-0 text-xs font-semibold leading-snug text-foreground">{question.question_text}</p>
+                <RichTextContent html={question.question_text} className="min-w-0 text-xs font-semibold leading-snug text-foreground" />
                 <div className="min-w-0 border-t sm:border-t-0 sm:border-l border-border/80 pt-1.5 sm:pt-0 sm:pl-4">
                   <p className="text-xs leading-snug font-medium text-emerald-600 dark:text-emerald-400 sm:text-muted-foreground">
                     {getQuestionAnswer(question) || 'No definition provided.'}

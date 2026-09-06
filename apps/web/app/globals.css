@@ -250,3 +250,63 @@ body {
     overflow: hidden;
   }
 }
+
+/* Shared rich-text document styling used by Notes and reviewer prompts. */
+.rich-text-content > :first-child { margin-top: 0; }
+.rich-text-content > :last-child { margin-bottom: 0; }
+.rich-text-content p { margin: 0 0 0.6rem; white-space: pre-wrap; }
+.rich-text-content h1 { margin: 0 0 0.75rem; font-size: 1.45em; font-weight: 800; line-height: 1.2; }
+.rich-text-content h2 { margin: 0 0 0.65rem; font-size: 1.2em; font-weight: 800; line-height: 1.25; }
+.rich-text-content h3 { margin: 0 0 0.55rem; font-size: 1.05em; font-weight: 800; line-height: 1.3; }
+.rich-text-content h4 { margin: 0 0 0.5rem; font-size: 1em; font-weight: 800; line-height: 1.3; }
+.rich-text-content h5 { margin: 0 0 0.45rem; font-size: 0.95em; font-weight: 800; line-height: 1.3; }
+.rich-text-content h6 { margin: 0 0 0.4rem; font-size: 0.9em; font-weight: 800; line-height: 1.3; }
+.rich-text-content ul, .rich-text-content ol { margin: 0 0 0.65rem; padding-left: 1.5rem; }
+.rich-text-content ul::marker, .rich-text-content ol::marker { color: hsl(var(--foreground)); }
+.dark .rich-text-editor ul::marker, .dark .rich-text-editor ol::marker { color: #fff; }
+.rich-text-content li { margin: 0.2rem 0; }
+.rich-text-content blockquote { margin: 0 0 0.65rem; border-left: 3px solid hsl(var(--primary)); padding-left: 0.8rem; color: hsl(var(--muted-foreground)); }
+.rich-text-content pre { margin: 0 0 0.65rem; overflow-x: auto; border-radius: 0.75rem; background: hsl(224 25% 12%); padding: 0.75rem; color: #f8fafc; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; white-space: pre-wrap; }
+.rich-text-content code { border-radius: 0.25rem; background: hsl(var(--accent)); padding: 0.1rem 0.3rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.rich-text-content pre code { background: transparent; padding: 0; }
+.rich-text-content a { color: hsl(var(--primary)); text-decoration: underline; }
+.rich-text-content hr { margin: 1rem 0; border: 0; border-top: 1px solid hsl(var(--border)); }
+.rich-text-editor:empty::before { content: attr(data-placeholder); color: hsl(var(--muted-foreground)); pointer-events: none; }
+
+/* Notes keeps the workspace fixed while the document scrolls inside its bordered editor. */
+.notes-workspace {
+  height: min(760px, calc(100vh - 11rem));
+  min-height: 520px;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+.notes-workspace > aside,
+.notes-workspace > section {
+  min-height: 0;
+}
+
+.notes-editor {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0%;
+  flex-direction: column;
+}
+
+.notes-editor > .rich-text-editor {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 767px) {
+  .notes-workspace {
+    height: calc(100vh - 10rem);
+    min-height: 480px;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}

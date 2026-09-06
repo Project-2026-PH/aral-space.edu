@@ -9,6 +9,8 @@ import StickyActionDock from '../ui/StickyActionDock';
 import { parseSmartClipboard, type ParsedClipboard } from '@/lib/clipboardParser';
 import { QuizTransformService } from '@quiz-creator/core';
 import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
+import RichTextEditor from '@/components/editor/RichTextEditor';
+import { hasRichTextContent, richTextToPlainText } from '@/lib/richText';
 
 export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
 
@@ -158,7 +160,7 @@ export default function ManualQuizCreator({
     const hasContent = Boolean(
       title.trim() ||
       description.trim() ||
-      questions.some((question) => question.question_text.trim() || question.options.some((option) => option.trim()))
+      questions.some((question) => hasRichTextContent(question.question_text) || question.options.some((option) => option.trim()))
     );
     if (!hasContent) return;
 
@@ -246,8 +248,8 @@ export default function ManualQuizCreator({
         ? (current.options[0] || '')
         : (current.options[current.correct_answer] || current.options[0] || '');
 
-      if (termCandidate.trim() && current.question_text.trim()) {
-        newQuestionText = QuizTransformService.paraphraseToStatement(current.question_text, termCandidate.trim());
+      if (termCandidate.trim() && hasRichTextContent(current.question_text)) {
+        newQuestionText = QuizTransformService.paraphraseToStatement(richTextToPlainText(current.question_text), termCandidate.trim());
       }
       newOptions = ['True', 'False'];
       newCorrect = newCorrect === 1 ? 1 : 0;
@@ -319,7 +321,7 @@ export default function ManualQuizCreator({
     setQuestions(next);
   }
 
-  function handlePromptPaste(qIdx: number, e: React.ClipboardEvent<HTMLInputElement>) {
+  function handlePromptPaste(qIdx: number, e: React.ClipboardEvent<HTMLElement>) {
     const text = e.clipboardData.getData('text');
     if (!text) return;
 
@@ -459,7 +461,7 @@ export default function ManualQuizCreator({
     const payloadQuestions = [];
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (!q.question_text.trim()) {
+      if (!hasRichTextContent(q.question_text)) {
         setError(`Question #${i + 1} is missing question text.`);
         return;
       }
@@ -502,12 +504,12 @@ export default function ManualQuizCreator({
       }
 
       payloadQuestions.push({
-        question_text: q.question_text.trim(),
+        question_text: q.question_text,
         answer_text: answerText,
         question_type: questionType,
         options: opts,
         correct_answer: correct,
-        explanation: q.explanation?.trim() || null,
+        explanation: hasRichTextContent(q.explanation) ? q.explanation : null,
         source_pages: null
       });
     }
@@ -892,17 +894,15 @@ export default function ManualQuizCreator({
                 )}
               </div>
 
-              {/* Question prompt input */}
-              <div>
-                <input
-                  type="text"
-                  placeholder="Enter your question prompt (or paste term/definition pair)..."
-                  value={q.question_text}
-                  onChange={(e) => updateQuestionText(qIdx, e.target.value)}
-                  onPaste={(e) => handlePromptPaste(qIdx, e)}
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
-                />
-              </div>
+              {/* Question prompt editor */}
+              <RichTextEditor
+                value={q.question_text}
+                onChange={(value) => updateQuestionText(qIdx, value)}
+                onPaste={(event) => handlePromptPaste(qIdx, event)}
+                placeholder="Enter your question prompt (or paste term/definition pair)..."
+                minHeight="100px"
+                data-skip-clipboard-intercept="true"
+              />
 
               {/* Dynamic Type Body */}
               {q.type === 'multiple_choice' && (
@@ -1059,17 +1059,17 @@ export default function ManualQuizCreator({
                 </div>
               )}
 
-              {/* Explanation Field */}
+              {/* Explanation editor */}
               <div>
                 <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Explanation <span className="font-normal normal-case tracking-normal">(optional)</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Explain why this answer is correct..."
+                <RichTextEditor
                   value={q.explanation || ''}
-                  onChange={(e) => updateExplanation(qIdx, e.target.value)}
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
+                  onChange={(value) => updateExplanation(qIdx, value)}
+                  placeholder="Explain why this answer is correct..."
+                  minHeight="90px"
+                  data-skip-clipboard-intercept="true"
                 />
               </div>
             </div>

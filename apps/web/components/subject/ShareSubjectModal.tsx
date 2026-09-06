@@ -69,7 +69,7 @@ export default function ShareSubjectModal({
     return () => {
       cancelled = true;
     };
-  }, [open, subject]);
+  }, [open, subject?.id]);
 
   async function updateConfig(updates: { is_public?: boolean; reset_token?: boolean }) {
     if (!subject) return;

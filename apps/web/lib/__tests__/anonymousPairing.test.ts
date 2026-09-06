@@ -161,18 +161,19 @@ describe('Ephemeral Anonymous Session Pairing Service', () => {
     ).rejects.toThrow('Invalid or expired sync code');
   });
 
-  it('enforces single-use tickets: burning code after successful redemption', async () => {
+  it('allows the same ticket to sync multiple devices until it expires', async () => {
     const userA = 'anon_11111111-2222-3333-4444-555555555555';
     const userB = 'anon_22222222-3333-4444-5555-666666666666';
     const userC = 'anon_33333333-4444-5555-6666-777777777777';
 
     const { ticketId, passcode } = await createPairingTicket(userA);
-    await redeemPairingTicket({ ticketId, passcode, currentAnonUserId: userB });
+    await expect(
+      redeemPairingTicket({ ticketId, passcode, currentAnonUserId: userB })
+    ).resolves.toEqual({ targetAnonUserId: userA });
 
-    // Second redemption must fail
     await expect(
       redeemPairingTicket({ ticketId, passcode, currentAnonUserId: userC })
-    ).rejects.toThrow('This sync code has already been used');
+    ).resolves.toEqual({ targetAnonUserId: userA });
   });
 
   it('rejects pairing when target session is same as current session', async () => {

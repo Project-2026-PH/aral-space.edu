@@ -339,7 +339,7 @@ export default function AnonymousSessionBadge() {
             {activeTab === 'share' && (
               <div className="py-4 space-y-3.5">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Generate an ephemeral sync code to connect this session to your mobile phone or another browser.
+                  Generate a short-lived sync code to connect this session to your mobile phone or another browser. You can reuse it on additional devices until it expires.
                 </p>
 
                 {shareError && (
@@ -388,7 +388,7 @@ export default function AnonymousSessionBadge() {
                     )}
 
                     <p className="text-[11px] text-muted-foreground">
-                      On your second device, tap <strong>Connect</strong> and enter this Sync ID & passcode.
+                      On your other device, tap <strong>Connect</strong> and enter this Sync ID & passcode. The code remains reusable until it expires.
                     </p>
                   </div>
                 ) : (

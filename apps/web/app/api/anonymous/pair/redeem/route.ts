@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     );
     if (rateLimit) return rateLimit;
 
-    // 1. PairingTicketService: validate and atomically consume pairing ticket
+    // 1. PairingTicketService: validate the short-lived ticket without consuming it
     const { targetAnonUserId } = await redeemPairingTicket({
       ticketId,
       passcode,

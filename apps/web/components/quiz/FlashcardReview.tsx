@@ -5,13 +5,11 @@ import { Quiz, QuizQuestion } from '@quiz-creator/types';
 import {
   ChevronLeft,
   ChevronRight,
-  Expand,
   Layers,
   Lightbulb,
   Maximize,
   Pencil,
   PenTool,
-  Play,
   Settings,
   Shuffle,
   Star,
@@ -119,7 +117,6 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const [isHintVisible, setIsHintVisible] = useState(false);
   const [trackProgress, setTrackProgress] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [cards, setCards] = useState(questions);
   const [incorrectIds, setIncorrectIds] = useState<string[]>([]);
   const [shuffleQuestions, setShuffleQuestions] = useState(false);
@@ -241,20 +238,6 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
       // Ignore storage restrictions and keep the in-memory session usable.
     }
   }, [quiz.id, sessionHydrated, saveProgress, shuffleQuestions, cards, cardIndex, incorrectIds, isFlipped, hasSeenAnswer]);
-
-  useEffect(() => {
-    if (!isAutoPlaying || cards.length < 2) return;
-
-    const timer = window.setInterval(() => {
-      setCardIndex((current) => (current + 1) % cards.length);
-      setIsFlipped(false);
-      hasSeenAnswerRef.current = false;
-      setHasSeenAnswer(false);
-      setIsHintVisible(false);
-    }, 4000);
-
-    return () => window.clearInterval(timer);
-  }, [cards.length, isAutoPlaying]);
 
   useEffect(() => {
     return () => {
@@ -475,14 +458,6 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     setIsFlipped(false);
     hasSeenAnswerRef.current = false;
     setHasSeenAnswer(false);
-    setIsHintVisible(false);
-  }
-
-  function shuffleCards() {
-    setCards((current) => [...current].sort(() => Math.random() - 0.5));
-    setCardIndex(0);
-    setIsFlipped(false);
-    hasSeenAnswerRef.current = false;
     setIsHintVisible(false);
   }
 
@@ -708,12 +683,6 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             </span>
           </button>
           <div className="flex items-center gap-4">
-            <button type="button" onClick={() => setIsAutoPlaying((current) => !current)} aria-label={isAutoPlaying ? 'Pause autoplay' : 'Play autoplay'} className="rounded-full border border-border bg-card p-3 transition-colors hover:bg-muted">
-              {isAutoPlaying ? <span className="text-sm font-black text-foreground">Ⅱ</span> : <Play className="h-4 w-4 fill-current text-foreground" />}
-            </button>
-            <button type="button" onClick={shuffleCards} aria-label="Shuffle flashcards" className="rounded-full border border-border bg-card p-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-              <Expand className="h-4 w-4" />
-            </button>
             <button
               type="button"
               onClick={() => setShowSettingsModal(true)}

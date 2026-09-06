@@ -163,10 +163,9 @@ class PostgresPairingTicketRepository implements PairingTicketRepository {
   async claimTicket(ticketId: string, passcodeHash: string, currentAnonUserId: string): Promise<string | null> {
     const rows = await this.sql`
       UPDATE anonymous_pairing_tickets
-      SET used_at = now()
+      SET used_at = COALESCE(used_at, now())
       WHERE ticket_id = ${ticketId}
         AND passcode_hash = ${passcodeHash}
-        AND used_at IS NULL
         AND expires_at > now()
         AND attempts < max_attempts
         AND anon_user_id != ${currentAnonUserId}
@@ -180,7 +179,6 @@ class PostgresPairingTicketRepository implements PairingTicketRepository {
       UPDATE anonymous_pairing_tickets
       SET attempts = attempts + 1
       WHERE ticket_id = ${ticketId}
-        AND used_at IS NULL
         AND expires_at > now()
         AND attempts < max_attempts
       RETURNING attempts, max_attempts
@@ -227,7 +225,7 @@ class MemoryPairingTicketRepository implements PairingTicketRepository {
   async clearPreviousTickets(anonUserId: string): Promise<void> {
     const nowSec = Math.floor(Date.now() / 1000);
     for (const [key, ticket] of localTickets.entries()) {
-      if (ticket.expiresAt < nowSec || ticket.usedAt !== null || ticket.anonUserId === anonUserId) {
+      if (ticket.expiresAt < nowSec || ticket.anonUserId === anonUserId) {
         localTickets.delete(key);
       }
     }
@@ -246,7 +244,6 @@ class MemoryPairingTicketRepository implements PairingTicketRepository {
     const nowSec = Math.floor(Date.now() / 1000);
     if (
       !ticket ||
-      ticket.usedAt !== null ||
       ticket.expiresAt <= nowSec ||
       ticket.attempts >= ticket.maxAttempts ||
       ticket.anonUserId === currentAnonUserId ||
@@ -254,14 +251,16 @@ class MemoryPairingTicketRepository implements PairingTicketRepository {
     ) {
       return null;
     }
-    ticket.usedAt = nowSec;
+    if (ticket.usedAt === null) {
+      ticket.usedAt = nowSec;
+    }
     return ticket.anonUserId;
   }
 
   async recordFailedAttempt(ticketId: string): Promise<{ attempts: number; maxAttempts: number } | null> {
     const ticket = localTickets.get(ticketId);
     const nowSec = Math.floor(Date.now() / 1000);
-    if (!ticket || ticket.usedAt !== null || ticket.expiresAt <= nowSec || ticket.attempts >= ticket.maxAttempts) {
+    if (!ticket || ticket.expiresAt <= nowSec || ticket.attempts >= ticket.maxAttempts) {
       return null;
     }
     ticket.attempts += 1;
@@ -365,8 +364,8 @@ export interface RedeemPairingOptions {
 }
 
 /**
- * Validates and atomically consumes a pairing ticket.
- * Increments `attempts` on invalid passcode, locking out after PAIRING_MAX_ATTEMPTS.
+ * Validates a pairing ticket without consuming it. The ticket remains usable by
+ * additional devices until its short expiration window closes.
  */
 export async function redeemPairingTicket(options: RedeemPairingOptions): Promise<{ targetAnonUserId: string }> {
   let { ticketId, passcode, fullCode, currentAnonUserId } = options;
@@ -397,16 +396,13 @@ export async function redeemPairingTicket(options: RedeemPairingOptions): Promis
     return { targetAnonUserId };
   }
 
-  // 2. Claim failed. Check diagnostics to identify if ticket is missing, self-pairing, used, or expired
+  // 2. Claim failed. Check diagnostics to identify if ticket is missing, self-pairing, or expired
   const diag = await repo.getTicketDiagnostics(normalizedTicketId);
   if (!diag) {
     throw new Error('Invalid or expired sync code.');
   }
   if (diag.anonUserId === currentAnonUserId) {
     throw new Error('This device is already using this session.');
-  }
-  if (diag.usedAt !== null) {
-    throw new Error('This sync code has already been used.');
   }
   const now = Math.floor(Date.now() / 1000);
   if (diag.expiresAt <= now) {
@@ -431,7 +427,7 @@ export async function redeemPairingTicket(options: RedeemPairingOptions): Promis
 }
 
 /**
- * Un-consumes a pairing ticket if downstream transactional operations fail.
+ * Clears the first-redemption marker if downstream transactional operations fail.
  */
 export async function rollbackPairingTicket(ticketId?: string): Promise<void> {
   if (!ticketId) return;

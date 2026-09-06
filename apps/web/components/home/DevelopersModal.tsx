@@ -48,6 +48,15 @@ const DEVELOPERS: DeveloperConfig[] = [
 
 export default function DevelopersModal() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsOpen(false);
+      setIsClosing(false);
+    }, 200);
+  };
   const [profiles, setProfiles] = useState<Record<string, GitHubProfile>>({
     aelanimm: {
       username: 'aelanimm',
@@ -102,11 +111,19 @@ export default function DevelopersModal() {
 
       {/* Modal Dialog */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-modal-backdrop overflow-y-auto">
+        <div
+          onClick={handleClose}
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto ${
+            isClosing ? 'animate-modal-backdrop-out' : 'animate-modal-backdrop'
+          }`}
+        >
           <div
             role="dialog"
             aria-modal="true"
-            className="relative w-full max-w-lg rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] p-6 sm:p-7 shadow-brutal space-y-6 text-slate-900 dark:text-white my-8 animate-modal-pop will-change-transform"
+            onClick={(e) => e.stopPropagation()}
+            className={`relative w-full max-w-lg rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] p-6 sm:p-7 shadow-brutal space-y-6 text-slate-900 dark:text-white my-8 ${
+              isClosing ? 'animate-modal-pop-out' : 'animate-modal-pop'
+            } will-change-transform`}
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b-2 border-slate-900/15 dark:border-white/15 pb-4">
@@ -121,7 +138,7 @@ export default function DevelopersModal() {
               </div>
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={handleClose}
                 aria-label="Close dialog"
                 className="rounded-lg p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-900 cursor-pointer"
               >
@@ -244,7 +261,7 @@ export default function DevelopersModal() {
             <div className="pt-1">
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={handleClose}
                 className="w-full py-3 rounded-2xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-black text-xs uppercase tracking-wider border-2 border-slate-900 shadow-brutal-sm transition-all cursor-pointer"
               >
                 Close

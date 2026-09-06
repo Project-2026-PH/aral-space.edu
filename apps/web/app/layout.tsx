@@ -7,6 +7,7 @@ import UpdateNotification from '@/components/UpdateNotification';
 import AnonymousSessionBadge from '@/components/AnonymousSessionBadge';
 import ThemeToggle from '@/components/ThemeToggle';
 import DevelopersModal from '@/components/home/DevelopersModal';
+import LegalModal from '@/components/home/LegalModal';
 
 export const viewport: Viewport = {
   themeColor: '#4f46e5',
@@ -89,21 +90,8 @@ export default function RootLayout({
             {/* Developers section with heart (modal popup for github links) */}
             <DevelopersModal />
 
-            {/* Terms and Privacy Links */}
-            <div className="flex items-center gap-6 text-xs font-bold text-slate-600 dark:text-slate-400">
-              <Link
-                href="/terms"
-                className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-4 decoration-slate-300 dark:decoration-slate-700 transition-colors"
-              >
-                Terms of Service
-              </Link>
-              <Link
-                href="/privacy"
-                className="hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-4 decoration-slate-300 dark:decoration-slate-700 transition-colors"
-              >
-                Privacy Policy
-              </Link>
-            </div>
+            {/* Terms and Privacy Links with smooth open/close modal */}
+            <LegalModal />
           </div>
         </footer>
       </body>

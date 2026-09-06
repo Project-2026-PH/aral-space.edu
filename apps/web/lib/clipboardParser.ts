@@ -43,6 +43,41 @@ function isLabelLike(value: string): boolean {
   return value.length <= 80 && value.split(/\s+/).length <= 10;
 }
 
+/**
+ * A long or sentence-like line after a label-shaped heading is likely the
+ * heading's wrapped definition rather than the right side of a delimiter.
+ */
+function isDefinitionLikeLine(value: string): boolean {
+  const line = value.trim();
+  return line.length >= 40 || /[,.;!?]/.test(line) || /^(?:a|an|the|this|that|these|those|often|when|where|developers?|it|they)\b/i.test(line);
+}
+
+/**
+ * Distinguishes a standalone heading such as `M10 — Extraneous Functionality`
+ * from an inline pair such as `DNS — Domain Name System`.
+ */
+function splitStandaloneHeading(body: string, followingLine?: string): string | null {
+  if (!followingLine) return null;
+  const match = body.match(/^(.{2,80}?)\s+[–—]\s+(.{2,80})$/);
+  if (!match) return null;
+
+  const prefix = match[1].trim();
+  const title = match[2].trim();
+  if (!looksLikeTerm(prefix) || !/^[A-Z0-9]/.test(title) || !isLabelLike(title) || !isDefinitionLikeLine(followingLine)) {
+    return null;
+  }
+
+  return `${prefix} — ${title}`;
+}
+
+function nextNonEmptyLine(lines: string[], index: number): string | undefined {
+  for (let nextIndex = index + 1; nextIndex < lines.length; nextIndex++) {
+    const line = lines[nextIndex].trim();
+    if (line) return line;
+  }
+  return undefined;
+}
+
 function isQuestionLike(value: string): boolean {
   return (
     /\?$/.test(value) ||
@@ -166,12 +201,20 @@ function extractBulkTerms(
     current = null;
   };
 
-  for (const rawLine of lines) {
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const rawLine = lines[lineIndex];
     const line = rawLine.trim();
     if (!line) continue;
 
     const isBulleted = BULLET_PREFIX.test(line);
     const body = line.replace(BULLET_PREFIX, '').replace(/^\*\*|\*\*$/g, '').trim();
+    const headingTerm = splitStandaloneHeading(body, nextNonEmptyLine(lines, lineIndex));
+    if (headingTerm) {
+      flush();
+      current = { term: headingTerm, parts: [] };
+      continue;
+    }
+
     const delimited = body.match(TERM_DELIMITER);
     const candidate = delimited?.[1]?.replace(/\*\*/g, '').trim();
 
@@ -228,6 +271,9 @@ export function parseSmartClipboard(raw: string): ParsedClipboard | null {
     // bulleted siblings can safely be recovered via the Title Case heuristic.
     const withFallback = extractBulkTerms(trimmed, true);
     if (withFallback.length > bulkMatches.length) bulkMatches = withFallback;
+  }
+  if (bulkMatches.length === 1) {
+    return { type: 'single_pair', ...bulkMatches[0] };
   }
   if (bulkMatches.length >= 2) {
     return { type: 'bulk_terms', items: bulkMatches };

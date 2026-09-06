@@ -3,6 +3,7 @@ import { Quiz, QuizQuestion, QuizMode } from '@quiz-creator/types';
 import QuizRunner from '@/components/quiz/QuizRunner';
 import { MasterySessionController } from '@quiz-creator/controllers/MasterySessionController';
 import { getAnonymousUserId } from '@/lib/anonymous';
+import { getPersonalizedFeedbackForUser } from '@/lib/personalized-feedback';
 import { getQuizRepository, getSessionRepository } from '@/lib/db';
 
 export default async function PracticePage({
@@ -61,6 +62,7 @@ export default async function PracticePage({
       mode={mode}
       shuffleQuestions={shuffleQuestions}
       shuffleOptions={shuffleOptions}
+      personalizedFeedback={getPersonalizedFeedbackForUser(userId)}
     />
   );
 }

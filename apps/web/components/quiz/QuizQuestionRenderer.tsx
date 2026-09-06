@@ -418,9 +418,9 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
   }, [question.question_text]);
 
   return (
-    <div className={`multiple-choice-study-card w-full h-auto max-h-[80vh] rounded-3xl border border-border/80 bg-card p-4 sm:p-6 shadow-md flex flex-col gap-2 sm:gap-3 overflow-y-auto ${desktopViewport ? 'desktop-quiz-card lg:max-h-[80vh] lg:p-5 lg:gap-3' : ''}`}>
+    <div className={`multiple-choice-study-card w-full min-w-0 h-auto max-h-[80vh] rounded-3xl border border-border/80 bg-card p-4 sm:p-6 shadow-md flex flex-col gap-2 sm:gap-3 overflow-x-hidden overflow-y-auto ${desktopViewport ? 'desktop-quiz-card lg:max-h-[80vh] lg:p-5 lg:gap-3' : ''}`}>
       {/* Top Section: Prompt & Status */}
-      <div className="shrink-0 space-y-2 pr-1">
+      <div className="flex-none shrink-0 space-y-2 pr-1">
         <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Definition</span>
@@ -473,7 +473,7 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
       )}
 
       {/* Middle Section: Options */}
-      <div className="min-h-0 flex flex-1 flex-col space-y-2">
+      <div className="min-h-0 flex flex-none flex-col space-y-2 lg:flex-1">
         <div className="flex items-center justify-between text-xs font-bold text-foreground">
           <span>Choose an answer</span>
           {isRetryQuestion && (
@@ -483,7 +483,7 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
           )}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-visible pr-1 lg:overflow-y-auto">
+        <div className="min-h-0 flex-none overflow-visible pr-1 lg:flex-1 lg:overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
           {currentOptions.map((option, index) => {
             const isSelected = selectedOptionId === option.optionId;

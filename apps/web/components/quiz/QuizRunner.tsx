@@ -38,7 +38,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [shuffleToast, setShuffleToast] = useState(false);
 
-  const session = useQuizSession(props);
+  const session = useQuizSession({ ...props, mode: currentMode });
   const {
     questions,
     progressMap,
@@ -127,7 +127,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
           overallPercent={overallPercent}
           progressSegments={progressSegments}
           progressPercent={progressPercent}
-          mode={mode}
+          mode={currentMode}
           currentStreak={currentStreak}
           bestStreak={bestStreak}
           onSurfaceClick={handleSurfaceClick}
@@ -176,7 +176,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
 
       <div className="space-y-2" aria-label={`Quiz progress: ${totalLockedCount} of ${questions.length} questions mastered (${correctAnswerCount} answers correct)`}>
         <div className="flex items-center justify-between text-xs font-bold text-muted-foreground"><span>Progress</span></div>
-        {mode === 'multiple_choice' || mode === 'reverse' ? (
+        {currentMode === 'multiple_choice' || currentMode === 'reverse' || currentMode === 'identification' ? (
           <div className="relative pt-1">
             <div className="flex h-2 w-full gap-1" aria-hidden="true">{progressSegments.map((segment) => <div key={segment.id} className="min-w-0 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${segment.fillPercent}%` }} /></div>)}</div>
             {totalLockedCount > 0 && totalLockedCount < questions.length && (

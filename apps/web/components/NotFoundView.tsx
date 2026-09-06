@@ -167,9 +167,7 @@ export default function NotFoundView({
           onPointerMove={handlePointerMove}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
-          onClick={() => triggerGlimpseSequence(2600)}
-          className="relative mb-8 flex flex-col items-center cursor-pointer group"
-          title="Click or hover to wake robot!"
+          className="relative mb-8 flex flex-col items-center group cursor-default"
         >
           <div className="animate-float-slow transition-transform hover:scale-105 duration-300 ease-out">
             <svg

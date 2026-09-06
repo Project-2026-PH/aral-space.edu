@@ -7,6 +7,7 @@ import FloatingBottomNav from '@/components/navigation/FloatingBottomNav';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { createNote, loadNotes, saveNotes, type NoteDocument } from '@/lib/notes';
 import { openPrintDocument, richTextToPlainText } from '@/lib/richText';
+import { NotesReviewerBuilder } from '@quiz-creator/core/services/NotesReviewerBuilder';
 
 export default function NotesClient() {
   const [notes, setNotes] = useState<NoteDocument[]>([]);
@@ -59,7 +60,12 @@ export default function NotesClient() {
     }
     setSavingReviewer(true);
     setStatus(null);
-    const lines = plainText.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+    const questions = NotesReviewerBuilder.build({ text: plainText });
+    if (questions.length === 0) {
+      setStatus('No structured terms, definitions, comparisons, or timeline entries were detected. Add explicit term-definition notes before saving a reviewer.');
+      setSavingReviewer(false);
+      return;
+    }
     try {
       const response = await fetch('/api/quizzes', {
         method: 'POST',
@@ -68,14 +74,7 @@ export default function NotesClient() {
           title: selectedNote.title.trim() || 'Notes reviewer',
           description: plainText,
           source_model: 'notes',
-          questions: lines.map((line) => ({
-            question_text: `Recall: ${line}`,
-            answer_text: line,
-            question_type: 'typed_answer',
-            options: [],
-            correct_answer: 0,
-            explanation: null
-          }))
+          questions
         })
       });
       const data = await response.json().catch(() => null);
@@ -120,7 +119,7 @@ export default function NotesClient() {
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-card p-4 sm:p-7">
           {selectedNote ? <>
             <div className="mb-5 flex items-center gap-3 border-b border-border/70 pb-4"><input value={selectedNote.title} onChange={(event) => updateNote({ title: event.target.value })} aria-label="Note title" className="min-w-0 flex-1 bg-transparent text-2xl font-extrabold tracking-tight text-foreground outline-none placeholder:text-muted-foreground" placeholder="Untitled note" /><button type="button" onClick={removeNote} aria-label="Delete note" className="rounded-xl p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button></div>
-            <RichTextEditor key={selectedNote.id} value={selectedNote.content} onChange={(content) => updateNote({ content })} placeholder="Capture ideas, key concepts, lists, links, and code..." minHeight="0px" className="notes-editor" floatingToolbar data-skip-clipboard-intercept="true" />
+            <RichTextEditor key={selectedNote.id} value={selectedNote.content} onChange={(content) => updateNote({ content })} placeholder="Capture ideas, key concepts, lists, links, and code..." minHeight="0px" className="notes-editor" floatingToolbar enableGrammarCheck data-skip-clipboard-intercept="true" />
             <div className="mt-3 flex items-center justify-between text-[10px] font-semibold text-muted-foreground"><span className="inline-flex items-center gap-1"><Save className="h-3 w-3" />Saved locally on this device</span><span>{new Date(selectedNote.updatedAt).toLocaleString()}</span></div>
           </> : <div className="flex flex-1 flex-col items-center justify-center py-24 text-center"><FileText className="mb-3 h-10 w-10 text-primary/50" /><h2 className="text-lg font-extrabold text-foreground">Your notes workspace</h2><p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">Create a Trello-style study document with headings, emphasis, lists, links, and code blocks.</p><button type="button" onClick={addNote} className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white"><Plus className="h-3.5 w-3.5" />Create your first note</button></div>}
         </section>

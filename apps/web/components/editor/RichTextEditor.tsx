@@ -1,8 +1,12 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import RichTextToolbar from './RichTextToolbar';
+import GrammarOverlay from './GrammarOverlay';
+import GrammarSuggestionPopup from './GrammarSuggestionPopup';
 import { normalizeRichTextHtml, sanitizeRichTextHtml } from '@/lib/richText';
+import { GrammarIssue, GrammarCheckResponse } from '@/lib/grammar/types';
+import { extractTextWithOffsets, createRangeFromOffsets } from '@/lib/grammar/domOffsetMapper';
 
 interface RichTextEditorProps {
   value: string;
@@ -11,16 +15,63 @@ interface RichTextEditorProps {
   minHeight?: string;
   className?: string;
   floatingToolbar?: boolean;
+  enableGrammarCheck?: boolean;
   onPaste?: React.ClipboardEventHandler<HTMLDivElement>;
   'data-skip-clipboard-intercept'?: string;
 }
 
-export default function RichTextEditor({ value, onChange, placeholder = 'Start writing...', minHeight = '150px', className = '', floatingToolbar = false, ...props }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = 'Start writing...', minHeight = '150px', className = '', floatingToolbar = false, enableGrammarCheck = false, ...props }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
   const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{ top: number; left: number } | null>(null);
   const lastValue = useRef(value);
+
+  const [grammarIssues, setGrammarIssues] = useState<GrammarIssue[]>([]);
+  const [activeGrammarIssue, setActiveGrammarIssue] = useState<GrammarIssue | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; isAbove?: boolean; arrowLeft?: number } | null>(null);
+  const grammarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const checkAbortRef = useRef<AbortController | null>(null);
+  const ignoredIssueIdsRef = useRef<Set<string>>(new Set());
+
+  const runGrammarCheck = useCallback(async () => {
+    if (!enableGrammarCheck || !editorRef.current) return;
+    const { text } = extractTextWithOffsets(editorRef.current);
+    if (!text.trim()) {
+      setGrammarIssues([]);
+      return;
+    }
+
+    if (checkAbortRef.current) {
+      checkAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    checkAbortRef.current = controller;
+
+    try {
+      const res = await fetch('/api/grammar-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: controller.signal
+      });
+
+      if (!res.ok) return;
+      const data: GrammarCheckResponse = await res.json();
+      const active = (data.issues || []).filter((issue) => !ignoredIssueIdsRef.current.has(issue.id));
+      setGrammarIssues(active);
+    } catch {
+      // Aborted or fetch error
+    }
+  }, [enableGrammarCheck]);
+
+  const scheduleGrammarCheck = useCallback(() => {
+    if (!enableGrammarCheck) return;
+    if (grammarTimeoutRef.current) clearTimeout(grammarTimeoutRef.current);
+    grammarTimeoutRef.current = setTimeout(() => {
+      runGrammarCheck();
+    }, 900);
+  }, [enableGrammarCheck, runGrammarCheck]);
 
   function hideSelectionToolbar() {
     savedSelectionRef.current = null;
@@ -102,6 +153,10 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
       lastValue.current = value;
       return;
     }
+    if (typeof document !== 'undefined' && (document.activeElement === editorRef.current || editorRef.current.contains(document.activeElement))) {
+      lastValue.current = value;
+      return;
+    }
     editorRef.current.innerHTML = normalized;
     lastValue.current = value;
   }, [value]);
@@ -111,6 +166,116 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
     const next = sanitizeRichTextHtml(editorRef.current.innerHTML);
     lastValue.current = next;
     onChange(next);
+    scheduleGrammarCheck();
+  }
+
+  useEffect(() => {
+    if (enableGrammarCheck) {
+      scheduleGrammarCheck();
+    }
+  }, [enableGrammarCheck, scheduleGrammarCheck]);
+
+  useEffect(() => {
+    if (!activeGrammarIssue) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('.grammar-squiggle') || target?.closest('[role="dialog"]')) {
+        return;
+      }
+      setActiveGrammarIssue(null);
+      setPopupPosition(null);
+    };
+
+    const handleScrollOrResize = () => {
+      setActiveGrammarIssue(null);
+      setPopupPosition(null);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [activeGrammarIssue]);
+
+  function handleSelectGrammarIssue(issue: GrammarIssue, rect: DOMRect) {
+    const popupWidth = 288;
+    const popupHeight = 160;
+
+    let left = rect.left + rect.width / 2 - popupWidth / 2;
+    left = Math.max(12, Math.min(window.innerWidth - popupWidth - 12, left));
+
+    let top = rect.bottom + 8;
+    let isAbove = false;
+    if (top + popupHeight > window.innerHeight - 12) {
+      top = Math.max(12, rect.top - popupHeight - 8);
+      isAbove = true;
+    }
+
+    const targetCenterX = rect.left + rect.width / 2;
+    const arrowLeft = Math.max(16, Math.min(popupWidth - 24, targetCenterX - left - 5));
+
+    setActiveGrammarIssue(issue);
+    setPopupPosition({ top, left, isAbove, arrowLeft });
+  }
+
+  function handleApplyGrammarSuggestion(issue: GrammarIssue, replacement: string) {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const firstChar = issue.originalText.trim().charAt(0);
+    const isFirstUpper = firstChar === firstChar.toUpperCase() && firstChar !== firstChar.toLowerCase();
+    const formattedReplacement = isFirstUpper && replacement.length > 0
+      ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
+      : replacement;
+
+    const { entries } = extractTextWithOffsets(editor);
+    const range = createRangeFromOffsets(entries, issue.from, issue.to, issue.originalText);
+
+    if (range) {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      let success = false;
+      try {
+        success = document.execCommand('insertText', false, formattedReplacement);
+      } catch {
+        success = false;
+      }
+
+      if (!success) {
+        range.deleteContents();
+        const textNode = document.createTextNode(formattedReplacement);
+        range.insertNode(textNode);
+        range.collapse(false);
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+
+      handleInput();
+    }
+
+    setActiveGrammarIssue(null);
+    setPopupPosition(null);
+    setGrammarIssues((prev) => prev.filter((i) => i.id !== issue.id));
+    scheduleGrammarCheck();
+  }
+
+  function handleIgnoreGrammarIssue(issue: GrammarIssue) {
+    ignoredIssueIdsRef.current.add(issue.id);
+    setGrammarIssues((prev) => prev.filter((i) => i.id !== issue.id));
+    setActiveGrammarIssue(null);
+    setPopupPosition(null);
   }
 
   function handleAutoBullet(): boolean {
@@ -287,7 +452,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
   }
 
   return (
-    <div ref={containerRef} className={`overflow-hidden rounded-2xl border border-border bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 ${className}`}>
+    <div ref={containerRef} className={`relative overflow-hidden rounded-2xl border border-border bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 ${className}`}>
       <RichTextToolbar editorRef={editorRef} />
       {floatingToolbar && selectionToolbarPosition && (
         <div
@@ -302,6 +467,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
       <div
         ref={editorRef}
         contentEditable
+        spellCheck={false}
         suppressContentEditableWarning
         role="textbox"
         aria-multiline="true"
@@ -320,6 +486,27 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
         style={{ minHeight }}
         {...props}
       />
+      {enableGrammarCheck && (
+        <GrammarOverlay
+          editorRef={editorRef}
+          containerRef={containerRef}
+          issues={grammarIssues}
+          activeIssueId={activeGrammarIssue?.id || null}
+          onSelectIssue={handleSelectGrammarIssue}
+        />
+      )}
+      {enableGrammarCheck && activeGrammarIssue && popupPosition && (
+        <GrammarSuggestionPopup
+          issue={activeGrammarIssue}
+          position={popupPosition}
+          onApply={handleApplyGrammarSuggestion}
+          onIgnore={handleIgnoreGrammarIssue}
+          onClose={() => {
+            setActiveGrammarIssue(null);
+            setPopupPosition(null);
+          }}
+        />
+      )}
     </div>
   );
 }

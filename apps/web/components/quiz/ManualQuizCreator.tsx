@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, ArrowLeft, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, GripVertical, Tag, Sparkles, ClipboardPaste } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, Tag, Sparkles, ClipboardPaste } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import NewSubjectModal from '../subject/NewSubjectModal';
@@ -16,6 +16,49 @@ interface QuestionDraft {
   options: string[];
   correct_answer: number;
   explanation?: string;
+}
+
+interface ManualQuizDraft {
+  version: 1;
+  updatedAt: string;
+  title: string;
+  description: string;
+  subjectId: string;
+  questions: QuestionDraft[];
+}
+
+const MANUAL_DRAFT_STORAGE_KEY = 'quiz-creator:manual-draft:v1';
+const MANUAL_DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function parseManualQuizDraft(raw: string | null): ManualQuizDraft | null {
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<ManualQuizDraft>;
+    const updatedAt = Date.parse(parsed.updatedAt || '');
+    if (
+      parsed.version !== 1 ||
+      !Number.isFinite(updatedAt) ||
+      Date.now() - updatedAt > MANUAL_DRAFT_MAX_AGE_MS ||
+      typeof parsed.title !== 'string' ||
+      typeof parsed.description !== 'string' ||
+      typeof parsed.subjectId !== 'string' ||
+      !Array.isArray(parsed.questions)
+    ) {
+      return null;
+    }
+
+    return {
+      version: 1,
+      updatedAt: parsed.updatedAt as string,
+      title: parsed.title,
+      description: parsed.description,
+      subjectId: parsed.subjectId,
+      questions: parsed.questions as QuestionDraft[]
+    };
+  } catch {
+    return null;
+  }
 }
 
 const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -53,6 +96,9 @@ export default function ManualQuizCreator({
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftRecovery, setDraftRecovery] = useState<ManualQuizDraft | null>(null);
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saved' | 'error'>('idle');
 
   useEffect(() => {
     const requestedSubjectId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('subjectId') : null;
@@ -91,6 +137,70 @@ export default function ManualQuizCreator({
     };
   }, [subjects]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setDraftHydrated(true);
+      return;
+    }
+
+    const draft = parseManualQuizDraft(window.localStorage.getItem(MANUAL_DRAFT_STORAGE_KEY));
+    if (draft) {
+      setDraftRecovery(draft);
+    } else {
+      window.localStorage.removeItem(MANUAL_DRAFT_STORAGE_KEY);
+      setDraftHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated || typeof window === 'undefined') return;
+
+    const hasContent = Boolean(
+      title.trim() ||
+      description.trim() ||
+      questions.some((question) => question.question_text.trim() || question.options.some((option) => option.trim()))
+    );
+    if (!hasContent) return;
+
+    const timeout = window.setTimeout(() => {
+      try {
+        const draft: ManualQuizDraft = {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          title,
+          description,
+          subjectId,
+          questions
+        };
+        window.localStorage.setItem(MANUAL_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        setDraftStatus('saved');
+      } catch {
+        setDraftStatus('error');
+      }
+    }, 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [draftHydrated, title, description, subjectId, questions]);
+
+  function restoreDraft() {
+    if (!draftRecovery) return;
+    setTitle(draftRecovery.title);
+    setDescription(draftRecovery.description);
+    setSubjectId(draftRecovery.subjectId);
+    setQuestions(draftRecovery.questions);
+    setDraftRecovery(null);
+    setDraftHydrated(true);
+    setDraftStatus('saved');
+  }
+
+  function discardDraft() {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(MANUAL_DRAFT_STORAGE_KEY);
+    }
+    setDraftRecovery(null);
+    setDraftHydrated(true);
+    setDraftStatus('idle');
+  }
   function moveQuestion(fromIndex: number, toIndex: number) {
     if (toIndex < 0 || toIndex >= questions.length || fromIndex === toIndex) return;
     const next = [...questions];
@@ -381,6 +491,7 @@ export default function ManualQuizCreator({
 
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || 'Failed to create study set.');
+      window.localStorage.removeItem(MANUAL_DRAFT_STORAGE_KEY);
       router.push(`/quizzes/${data.id}`);
     } catch (err: any) {
       setError(err.message || 'Failed to save study set.');
@@ -474,6 +585,12 @@ export default function ManualQuizCreator({
               <span>Generate with AI</span>
             </button>
           )}
+          {draftStatus === 'saved' && (
+            <span className="text-[11px] font-semibold text-muted-foreground">Draft saved locally</span>
+          )}
+          {draftStatus === 'error' && (
+            <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Draft could not be saved</span>
+          )}
           <button
             type="button"
             onClick={handleSave}
@@ -485,6 +602,33 @@ export default function ManualQuizCreator({
           </button>
         </div>
       </div>
+
+      {draftRecovery && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-bold text-foreground">Unsaved draft found</p>
+            <p className="mt-0.5 text-muted-foreground">
+              Last saved {new Date(draftRecovery.updatedAt).toLocaleString()}. Restore it to continue where you left off.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="rounded-xl px-3 py-1.5 font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              onClick={restoreDraft}
+              className="rounded-xl bg-primary px-3 py-1.5 font-bold text-white transition-colors hover:bg-primary/90"
+            >
+              Restore draft
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-xs font-semibold text-destructive">
@@ -617,20 +761,6 @@ export default function ManualQuizCreator({
           return (
             <div
               key={qIdx}
-              draggable
-              onDragStart={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('input, textarea, select, button')) {
-                  e.preventDefault();
-                  return;
-                }
-                e.dataTransfer.effectAllowed = 'move';
-                setDraggedIdx(qIdx);
-              }}
-              onDragEnd={() => {
-                setDraggedIdx(null);
-                setDragOverIdx(null);
-              }}
               onDragOver={(e) => {
                 e.preventDefault();
                 setDragOverIdx(qIdx);
@@ -657,18 +787,24 @@ export default function ManualQuizCreator({
               {/* Header: Drag handle, Number, Category Badges & Delete */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <div
-                    className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-primary p-1 rounded-lg hover:bg-muted transition-colors"
-                    title="Drag to reorder card"
+                  <span
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'move';
+                      setDraggedIdx(qIdx);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedIdx(null);
+                      setDragOverIdx(null);
+                    }}
+                    className="flex items-center justify-center w-7 h-7 rounded-xl bg-primary/10 text-primary text-xs font-extrabold shrink-0 select-none cursor-grab active:cursor-grabbing"
+                    title="Drag to reorder question"
+                    aria-label={`Drag question ${qIdx + 1} to reorder`}
                   >
-                    <GripVertical className="h-4 w-4" />
-                  </div>
-
-                  <span className="flex items-center justify-center w-7 h-7 rounded-xl bg-primary/10 text-primary text-xs font-extrabold shrink-0 select-none">
                     #{qIdx + 1}
                   </span>
 
-                  <span className="text-xs font-bold text-muted-foreground">Category:</span>
+                  <span className="text-xs font-bold text-muted-foreground">Question:</span>
                 </div>
 
                 {/* Question Type Badges */}

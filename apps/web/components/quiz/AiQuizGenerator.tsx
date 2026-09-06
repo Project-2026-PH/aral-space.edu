@@ -39,7 +39,52 @@ export interface AiQuizGeneratorProps {
   isModal?: boolean;
 }
 
-const EMPTY_SUBJECTS: Array<{ id: string; name: string; color?: string }> = [];
+interface AiQuizDraft {
+  version: 1;
+  updatedAt: string;
+  title: string;
+  selectedSubject: string;
+  inputMode: 'upload' | 'text';
+  text: string;
+  files: IngestedFileState[];
+}
+
+export const EMPTY_SUBJECTS: Array<{ id: string; name: string; color?: string }> = [];
+const AI_DRAFT_STORAGE_KEY = 'quiz-creator:ai-draft:v1';
+const AI_DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function parseAiQuizDraft(raw: string | null): AiQuizDraft | null {
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AiQuizDraft>;
+    const updatedAt = Date.parse(parsed.updatedAt || '');
+    if (
+      parsed.version !== 1 ||
+      !Number.isFinite(updatedAt) ||
+      Date.now() - updatedAt > AI_DRAFT_MAX_AGE_MS ||
+      typeof parsed.title !== 'string' ||
+      typeof parsed.selectedSubject !== 'string' ||
+      (parsed.inputMode !== 'upload' && parsed.inputMode !== 'text') ||
+      typeof parsed.text !== 'string' ||
+      !Array.isArray(parsed.files)
+    ) {
+      return null;
+    }
+
+    return {
+      version: 1,
+      updatedAt: parsed.updatedAt as string,
+      title: parsed.title,
+      selectedSubject: parsed.selectedSubject,
+      inputMode: parsed.inputMode,
+      text: parsed.text,
+      files: parsed.files as IngestedFileState[]
+    };
+  } catch {
+    return null;
+  }
+}
 
 export default function AiQuizGenerator({
   subjects = EMPTY_SUBJECTS,
@@ -68,6 +113,9 @@ export default function AiQuizGenerator({
   const [progressDetail, setProgressDetail] = useState('');
   const [tokensCount, setTokensCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [draftRecovery, setDraftRecovery] = useState<AiQuizDraft | null>(null);
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saved' | 'error'>('idle');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +154,69 @@ export default function AiQuizGenerator({
       isMounted = false;
     };
   }, [subjects]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setDraftHydrated(true);
+      return;
+    }
+
+    const draft = parseAiQuizDraft(window.localStorage.getItem(AI_DRAFT_STORAGE_KEY));
+    if (draft) {
+      setDraftRecovery(draft);
+    } else {
+      window.localStorage.removeItem(AI_DRAFT_STORAGE_KEY);
+      setDraftHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated || typeof window === 'undefined') return;
+
+    const hasContent = Boolean(title.trim() || text.trim() || files.length > 0);
+    if (!hasContent) return;
+
+    const timeout = window.setTimeout(() => {
+      try {
+        const draft: AiQuizDraft = {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          title,
+          selectedSubject,
+          inputMode,
+          text,
+          files
+        };
+        window.localStorage.setItem(AI_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+        setDraftStatus('saved');
+      } catch {
+        setDraftStatus('error');
+      }
+    }, 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [draftHydrated, title, selectedSubject, inputMode, text, files]);
+
+  function restoreDraft() {
+    if (!draftRecovery) return;
+    setTitle(draftRecovery.title);
+    setSelectedSubject(draftRecovery.selectedSubject);
+    setInputMode(draftRecovery.inputMode);
+    setText(draftRecovery.text);
+    setFiles(draftRecovery.files);
+    setDraftRecovery(null);
+    setDraftHydrated(true);
+    setDraftStatus('saved');
+  }
+
+  function discardDraft() {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(AI_DRAFT_STORAGE_KEY);
+    }
+    setDraftRecovery(null);
+    setDraftHydrated(true);
+    setDraftStatus('idle');
+  }
 
   const totalPagesCount = files.reduce((acc, f) => acc + (f.status === 'ready' ? f.pageCount : 0), 0);
 
@@ -432,6 +543,9 @@ export default function AiQuizGenerator({
       }
 
       if (finalQuizId) {
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(AI_DRAFT_STORAGE_KEY);
+        }
         if (onGenerated) {
           onGenerated(finalQuizId);
         } else {
@@ -447,6 +561,33 @@ export default function AiQuizGenerator({
 
   return (
     <div className="space-y-5">
+      {draftRecovery && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-bold text-foreground">Unsaved AI draft found</p>
+            <p className="mt-0.5 text-muted-foreground">
+              Restore your title, notes, and parsed source files to continue generating.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="rounded-xl px-3 py-1.5 font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              onClick={restoreDraft}
+              className="rounded-xl bg-primary px-3 py-1.5 font-bold text-white transition-colors hover:bg-primary/90"
+            >
+              Restore draft
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="flex items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs font-semibold text-destructive animate-in fade-in duration-200">
           <AlertCircle className="h-4 w-4 shrink-0" />
@@ -781,6 +922,12 @@ export default function AiQuizGenerator({
 
       {/* Actions */}
       <div className="flex items-center justify-end gap-2.5 pt-2">
+        {draftStatus === 'saved' && (
+          <span className="mr-auto text-[11px] font-semibold text-muted-foreground">Draft saved locally</span>
+        )}
+        {draftStatus === 'error' && (
+          <span className="mr-auto text-[11px] font-semibold text-amber-600 dark:text-amber-400">Draft could not be saved</span>
+        )}
         {onCancel && (
           <button
             type="button"

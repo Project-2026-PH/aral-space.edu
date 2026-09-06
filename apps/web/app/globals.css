@@ -221,8 +221,22 @@ body {
   box-shadow: 2px 2px 0px 0px #000000;
 }
 
+.shadow-brutal-xs {
+  box-shadow: 1.5px 1.5px 0px 0px #0f172a;
+}
+.dark .shadow-brutal-xs {
+  box-shadow: 1.5px 1.5px 0px 0px #000000;
+}
+
 .shadow-brutal-accent {
   box-shadow: 4px 4px 0px 0px #f97316;
+}
+
+/* Desktop 133% zoom scale simulation */
+@media (min-width: 1024px) {
+  .desktop-zoom-133 {
+    zoom: 1.33;
+  }
 }
 
 @keyframes landing-fade-up {

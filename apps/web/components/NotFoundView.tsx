@@ -529,7 +529,7 @@ export default function NotFoundView({
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
               <Link
-                href="/"
+                href="/library"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground hover:bg-card"
               >
                 <BookOpen className="h-3.5 w-3.5 text-primary" />

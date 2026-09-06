@@ -57,9 +57,9 @@ export default function QuizLibrary({
       </div>
 
       {loading ? (
-        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((index) => (
-            <div key={index} className="h-44 rounded-2xl border-2 border-slate-900/30 bg-muted/40 p-5 animate-pulse" />
+            <div key={index} className="h-36 sm:h-[148px] rounded-2xl border-2 border-slate-900/30 bg-muted/40 p-4 animate-pulse" />
           ))}
         </div>
       ) : quizzes.length === 0 ? (
@@ -71,7 +71,7 @@ export default function QuizLibrary({
           </p>
         </div>
       ) : (
-        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {quizzes.map((quiz) => {
             const subject = quiz.subject ?? subjects?.find((candidate) => candidate.id === quiz.subject_id);
             const subjectName = subject?.name;
@@ -79,7 +79,7 @@ export default function QuizLibrary({
             return (
               <article
                 key={quiz.id}
-                className="group flex min-h-44 flex-col justify-between rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card p-5 shadow-brutal transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_#0f172a]"
+                className="group flex min-h-36 sm:min-h-[148px] flex-col justify-between rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card p-4 sm:p-4.5 shadow-brutal transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_#0f172a]"
               >
                 <Link
                   href={`/review/${quiz.id}`}
@@ -132,7 +132,7 @@ export default function QuizLibrary({
                   ) : null}
                 </Link>
 
-                <div className="mt-4 flex items-center justify-between border-t-2 border-slate-900/20 dark:border-white/20 pt-4">
+                <div className="mt-3 flex items-center justify-between border-t-2 border-slate-900/20 dark:border-white/20 pt-3">
                   <Link
                     href={`/quizzes/${quiz.id}`}
                     className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
@@ -141,7 +141,7 @@ export default function QuizLibrary({
                   </Link>
                   <Link
                     href={`/practice/${quiz.id}`}
-                    className="flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-1.5 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                    className="flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary px-3 py-1 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                   >
                     <Play className="h-3 w-3 fill-current" />
                     <span>Practice</span>

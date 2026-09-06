@@ -84,13 +84,13 @@ export default function NewSubjectModal({
     >
       <form onSubmit={handleCreate} className="space-y-5">
         {error && (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-xs font-semibold text-destructive">
+          <div className="rounded-xl border-2 border-destructive bg-destructive/10 p-3 text-xs font-black text-destructive shadow-brutal-sm">
             {error}
           </div>
         )}
 
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+          <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
             Subject Name
           </label>
           <input
@@ -99,12 +99,12 @@ export default function NewSubjectModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus
-            className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
+            className="w-full rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-4 py-2.5 text-xs font-black text-foreground shadow-brutal-sm focus:border-primary focus:outline-none"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+          <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
             Select Color Tone
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -116,21 +116,21 @@ export default function NewSubjectModal({
                   type="button"
                   onClick={() => setSelectedColor(c)}
                   style={{ backgroundColor: c.hex }}
-                  className={`relative flex items-center justify-between px-3 py-2.5 rounded-2xl border transition-all cursor-pointer font-bold text-xs shadow-xs ${
+                  className={`relative flex items-center justify-between px-3 py-2.5 rounded-xl border-2 border-slate-900 shadow-brutal-sm transition-all cursor-pointer font-black text-xs ${
                     isSelected
-                      ? 'ring-2 ring-foreground/40 scale-[1.03] border-transparent'
-                      : 'border-black/5 hover:scale-[1.01] opacity-90 hover:opacity-100'
+                      ? 'scale-[1.03] shadow-[4px_4px_0px_#0f172a] ring-2 ring-slate-900'
+                      : 'hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none'
                   }`}
                 >
-                  <span style={{ color: c.textColor }} className="font-extrabold text-[11px] tracking-tight">
+                  <span style={{ color: c.textColor }} className="font-black text-[11px] tracking-tight">
                     {c.name}
                   </span>
                   {isSelected && (
                     <div
                       style={{ backgroundColor: c.textColor }}
-                      className="w-4 h-4 rounded-full flex items-center justify-center text-white shrink-0"
+                      className="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-white shrink-0 shadow-xs"
                     >
-                      <Check className="w-2.5 h-2.5" />
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
                     </div>
                   )}
                 </button>
@@ -140,14 +140,14 @@ export default function NewSubjectModal({
         </div>
 
         {/* Live Subject Badge Preview */}
-        <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground font-medium">Category Preview:</span>
+        <div className="rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-slate-50 dark:bg-slate-900/60 p-3.5 shadow-brutal-sm flex items-center justify-between">
+          <span className="text-xs font-bold text-muted-foreground">Category Preview:</span>
           <span
             style={{
               backgroundColor: selectedColor.hex,
               color: selectedColor.textColor
             }}
-            className="px-3 py-1 rounded-full text-xs font-extrabold shadow-2xs"
+            className="px-3.5 py-1.5 rounded-lg border-2 border-slate-900 text-xs font-black shadow-brutal-sm"
           >
             {name.trim() || 'Sample Subject'}
           </span>
@@ -157,7 +157,7 @@ export default function NewSubjectModal({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="rounded-xl px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+            className="rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
           >
             Cancel
           </button>

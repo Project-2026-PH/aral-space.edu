@@ -72,37 +72,75 @@ export default function DeleteSubjectModal({ open, onOpenChange, subject, review
       <div className="space-y-5 pt-2">
         {stage === 'acknowledge' ? (
           <>
-            <div className="rounded-2xl border border-destructive/25 bg-destructive/10 p-4">
+            <div className="rounded-2xl border-2 border-destructive bg-destructive/10 p-4 shadow-brutal-sm">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                <div className="space-y-2 text-xs leading-relaxed text-foreground">
-                  <p className="font-bold">Deleting this subject will also delete all subjects</p>
-                  <p>This permanently removes the reviewers and questions inside this subject. This action cannot be undone.</p>
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive stroke-[2.5]" />
+                <div className="space-y-1.5 text-xs leading-relaxed text-foreground">
+                  <p className="font-black text-destructive">Deleting this subject will remove its reviewers</p>
+                  <p className="font-medium text-muted-foreground">This permanently removes the reviewers and questions inside this subject. This action cannot be undone.</p>
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={() => onOpenChange(false)} className="rounded-xl px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted">Cancel</button>
-              <button type="button" onClick={acknowledge} disabled={secondsLeft > 0} className="inline-flex items-center gap-1.5 rounded-xl bg-destructive px-4 py-2.5 text-xs font-bold text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-40">
-                {secondsLeft > 0 ? `I agree (${secondsLeft})` : <><Check className="h-3.5 w-3.5" /> I agree</>}
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2.5 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={acknowledge}
+                disabled={secondsLeft > 0}
+                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-destructive px-4 py-2.5 text-xs font-black text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              >
+                {secondsLeft > 0 ? `I agree (${secondsLeft})` : <><Check className="h-3.5 w-3.5 stroke-[3]" /> I agree</>}
               </button>
             </div>
           </>
         ) : (
           <>
-            <div className="rounded-2xl border border-destructive/25 bg-destructive/10 p-4 text-xs leading-relaxed text-foreground">
-              <p className="font-bold">Final confirmation</p>
-              <p className="mt-1">Type the exact subject name to confirm permanent removal of {reviewerCount} {reviewerCount === 1 ? 'reviewer' : 'reviewers'} and their questions.</p>
+            <div className="rounded-2xl border-2 border-destructive bg-destructive/10 p-4 text-xs leading-relaxed text-foreground shadow-brutal-sm">
+              <p className="font-black text-destructive">Final confirmation</p>
+              <p className="mt-1 font-medium text-muted-foreground">Type the exact subject name to confirm permanent removal of {reviewerCount} {reviewerCount === 1 ? 'reviewer' : 'reviewers'} and their questions.</p>
             </div>
             <div className="space-y-2">
-              <label htmlFor="delete-subject-confirmation" className="text-xs font-bold text-foreground">Type <span className="font-mono text-destructive">{subject?.name}</span> to confirm</label>
-              <input id="delete-subject-confirmation" type="text" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} placeholder={subject?.name} autoComplete="off" autoFocus className="w-full rounded-2xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground outline-none transition focus:border-destructive focus:ring-2 focus:ring-destructive/20" />
+              <label htmlFor="delete-subject-confirmation" className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Type <span className="font-mono text-destructive underline">{subject?.name}</span> to confirm
+              </label>
+              <input
+                id="delete-subject-confirmation"
+                type="text"
+                value={confirmation}
+                onChange={(event) => setConfirmation(event.target.value)}
+                placeholder={subject?.name}
+                autoComplete="off"
+                autoFocus
+                className="w-full rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3.5 py-2.5 text-sm font-black text-foreground shadow-brutal-sm outline-none transition focus:border-destructive"
+              />
             </div>
-            {error && <p role="alert" className="rounded-2xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">{error}</p>}
+            {error && (
+              <p role="alert" className="rounded-xl border-2 border-destructive bg-destructive/10 p-3 text-xs font-black text-destructive shadow-brutal-sm">
+                {error}
+              </p>
+            )}
             <div className="flex justify-end gap-2 pt-1">
-              <button type="button" onClick={() => onOpenChange(false)} disabled={deleting} className="rounded-xl px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">Cancel</button>
-              <button type="button" onClick={handleDelete} disabled={!canDelete} className="inline-flex items-center gap-1.5 rounded-xl bg-destructive px-4 py-2.5 text-xs font-bold text-destructive-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
-                {deleting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                disabled={deleting}
+                className="rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2.5 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={!canDelete}
+                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-destructive px-4 py-2.5 text-xs font-black text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {deleting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 stroke-[2.5]" />}
                 {deleting ? 'Deleting...' : 'Delete permanently'}
               </button>
             </div>

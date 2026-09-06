@@ -10,6 +10,7 @@ interface ModalProps {
   description?: string;
   children: React.ReactNode;
   maxWidth?: string;
+  className?: string;
 }
 
 export default function Modal({
@@ -18,7 +19,8 @@ export default function Modal({
   title,
   description,
   children,
-  maxWidth = 'max-w-xl'
+  maxWidth = 'max-w-xl',
+  className = ''
 }: ModalProps) {
   useEffect(() => {
     if (open) {
@@ -39,17 +41,18 @@ export default function Modal({
         className="fixed inset-0 bg-background/80 backdrop-blur-md transition-opacity"
         onClick={() => onOpenChange(false)}
       />
-      <div className={`relative z-50 w-full ${maxWidth} rounded-3xl border border-border/80 bg-card p-6 shadow-2xl animate-fade-in`}>
-        <div className="flex items-start justify-between pb-4 border-b border-border/40">
+      <div className={`relative z-50 w-full ${maxWidth} rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] p-6 shadow-brutal animate-fade-in ${className}`}>
+        <div className="flex items-start justify-between pb-4 border-b-2 border-slate-900/20 dark:border-white/20">
           <div>
-            {title && <h3 className="text-lg font-bold text-foreground">{title}</h3>}
-            {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+            {title && <h3 className="text-lg font-black text-slate-900 dark:text-white">{title}</h3>}
+            {description && <p className="text-xs font-medium text-muted-foreground mt-0.5">{description}</p>}
           </div>
           <button
+            type="button"
             onClick={() => onOpenChange(false)}
-            className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4 stroke-[2.5]" />
           </button>
         </div>
         <div className="mt-4">{children}</div>

@@ -628,7 +628,7 @@ export default function ManualQuizCreator({
 
       <div className="flex items-center justify-between gap-3">
         <Link
-          href="/"
+          href="/library"
           className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />

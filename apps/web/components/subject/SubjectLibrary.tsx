@@ -45,14 +45,11 @@ export default function SubjectLibrary({
 
   return (
     <section className="space-y-4" aria-labelledby="subject-library-heading">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="home-section-eyebrow text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Your library</p>
-          <h2 id="subject-library-heading" className="home-section-title mt-1 text-lg font-extrabold tracking-tight text-foreground">
-            Subjects
-          </h2>
-        </div>
-        <span className="home-section-count rounded-full bg-muted px-3 py-1 text-[11px] font-bold text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="subject-library-heading" className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+          Subjects
+        </h2>
+        <span className="rounded-lg border-2 border-slate-900 bg-[#86efac] text-slate-900 px-3 py-1 text-xs font-black shadow-brutal-sm">
           {subjects.length} {subjects.length === 1 ? 'subject' : 'subjects'}
         </span>
       </div>
@@ -60,7 +57,7 @@ export default function SubjectLibrary({
       {loading ? (
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((item) => (
-            <Skeleton key={item} className="h-44 rounded-3xl border border-border/40 bg-muted/40" />
+            <div key={item} className="h-36 sm:h-[148px] rounded-2xl border-2 border-slate-900/30 dark:border-white/20 bg-muted/40 p-4 animate-pulse" />
           ))}
         </div>
       ) : (
@@ -95,47 +92,49 @@ export default function SubjectLibrary({
                   }
                 }}
                 style={{ animationDelay: `${index * 70}ms` }}
-                className={`home-library-card subject-card-enter group flex min-h-44 flex-col justify-between overflow-hidden rounded-3xl border border-border/80 bg-card shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-primary/30 ${canOpen ? 'cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md' : ''}`}
+                className={`subject-card-enter group flex min-h-36 sm:min-h-[148px] flex-col justify-between rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card p-4 sm:p-4.5 shadow-brutal transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_#0f172a] focus:outline-none focus:ring-2 focus:ring-primary/40 ${canOpen ? 'cursor-pointer' : ''}`}
               >
-                <div className="home-card-content p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
+                <div>
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex min-w-0 items-center gap-2.5">
                       <span
                         aria-hidden="true"
                         style={{ backgroundColor: subject.color }}
-                        className="home-card-color h-10 w-10 shrink-0 rounded-2xl border border-black/5 shadow-inner"
+                        className="h-9 w-9 shrink-0 rounded-xl border-2 border-slate-900 shadow-brutal-sm"
                       />
                       <div className="min-w-0">
-                        <h3 className="home-card-title truncate text-sm font-extrabold text-foreground">{subject.name}</h3>
-                        <p className="home-card-meta mt-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                        <h3 className="truncate text-sm font-black text-foreground transition-colors group-hover:text-primary">{subject.name}</h3>
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
                           <BookOpen className="h-3 w-3" />
                           {quizCount} {quizCount === 1 ? 'study set' : 'study sets'}
                         </p>
                       </div>
                     </div>
-                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${isPublic ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                      {isPublic ? <Link2 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                    <span className={`inline-flex shrink-0 items-center gap-1 rounded-md border-2 border-slate-900 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm ${isPublic ? 'bg-[#bfdbfe] text-slate-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}>
+                      {isPublic ? <Link2 className="h-3 w-3 stroke-[2.5]" /> : <Lock className="h-3 w-3 stroke-[2.5]" />}
                       {isPublic ? 'Link Active' : 'Private'}
                     </span>
                   </div>
                   {canOpen && (
-                    <p className="mt-5 text-[11px] font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100">
+                    <p className="mt-2 text-[11px] font-black text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100">
                       {canManage ? 'Click to manage subject' : canGeneratePublicLink ? 'Click to get a share link' : 'Click to view shared study sets'}
                     </p>
                   )}
                 </div>
 
-                <div className="home-card-footer flex items-center justify-between border-t border-border/40 px-5 py-3">
+                <div className="mt-3 flex items-center justify-between border-t-2 border-slate-900/20 dark:border-white/20 pt-3">
                   {subject.share_token && isPublic ? (
                     <Link
                       href={`/subjects/share/${subject.share_token}`}
                       target="_blank"
                       rel="noreferrer"
                       onClick={(event) => event.stopPropagation()}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                      className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
                     >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      View shared link
+                      <span className="inline-flex items-center gap-1">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        View link
+                      </span>
                     </Link>
                   ) : isPublic ? (
                     <button
@@ -144,12 +143,12 @@ export default function SubjectLibrary({
                         event.stopPropagation();
                         setSelectedSubject(subject);
                       }}
-                      className="text-[11px] font-semibold text-primary transition-colors hover:text-foreground"
+                      className="text-xs font-black text-primary transition-colors hover:text-foreground underline underline-offset-4 decoration-2 cursor-pointer"
                     >
                       Get share link
                     </button>
                   ) : (
-                    <span className="text-[11px] font-medium text-muted-foreground">Share link disabled</span>
+                    <span className="text-[11px] font-bold text-muted-foreground">Link disabled</span>
                   )}
                   {canManage ? (
                     <div className="flex items-center gap-1.5">
@@ -160,7 +159,7 @@ export default function SubjectLibrary({
                           event.stopPropagation();
                           setDeleteSubject(subject);
                         }}
-                        className="inline-flex items-center justify-center rounded-xl p-2 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive active:scale-95"
+                        className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-destructive hover:text-white hover:border-slate-900 hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -170,14 +169,14 @@ export default function SubjectLibrary({
                           event.stopPropagation();
                           setSelectedSubject(subject);
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-all hover:bg-primary hover:text-white active:scale-95"
+                        className="inline-flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary px-3 py-1 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none cursor-pointer"
                       >
                         <Share2 className="h-3.5 w-3.5" />
                         Share
                       </button>
                     </div>
                   ) : (
-                    <span className="text-[11px] font-medium text-muted-foreground">Read-only</span>
+                    <span className="text-[11px] font-bold text-muted-foreground">Read-only</span>
                   )}
                 </div>
               </article>

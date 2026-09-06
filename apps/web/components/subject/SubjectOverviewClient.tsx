@@ -50,37 +50,56 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
   }
 
   return (
-    <div className="space-y-8 pb-20">
-      <div className="flex flex-col gap-5 rounded-3xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
-        <Link href="/" className="inline-flex w-fit items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground">
-          <ArrowLeft className="h-3.5 w-3.5" /> Back to library
+    <div className="mx-auto max-w-5xl space-y-7 px-4 sm:px-6 lg:px-8 py-6 pb-24 desktop-zoom-133">
+      <div className="flex flex-col gap-5 rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-card p-4 sm:p-6 shadow-brutal">
+        <Link
+          href="/library"
+          className="inline-flex w-fit items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 stroke-[2.5]" /> Back to library
         </Link>
 
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
           <div className="flex min-w-0 items-start gap-4">
-            <span aria-hidden="true" style={{ backgroundColor: subject.color }} className="h-12 w-12 shrink-0 rounded-2xl border border-black/5 shadow-inner" />
+            <span aria-hidden="true" style={{ backgroundColor: subject.color }} className="h-14 w-14 shrink-0 rounded-2xl border-2 border-slate-900 shadow-brutal-sm" />
             <div className="min-w-0">
               {editing ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <input value={name} onChange={(event) => setName(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2 text-lg font-extrabold text-foreground outline-none focus:border-primary" />
-                  <input aria-label="Subject color" type="color" value={color} onChange={(event) => setColor(event.target.value)} className="h-9 w-10 cursor-pointer rounded-lg border-0 bg-transparent" />
+                  <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    className="rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3.5 py-2 text-xl font-black text-foreground shadow-brutal-sm outline-none focus:border-primary"
+                  />
+                  <input
+                    aria-label="Subject color"
+                    type="color"
+                    value={color}
+                    onChange={(event) => setColor(event.target.value)}
+                    className="h-10 w-12 cursor-pointer rounded-xl border-2 border-slate-900 shadow-brutal-sm bg-transparent"
+                  />
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="truncate text-2xl font-extrabold tracking-tight text-foreground">{subject.name}</h1>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold ${isPublic ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                    {isPublic ? <Link2 className="h-3 w-3" /> : <Lock className="h-3 w-3" />} {isPublic ? 'Link Active' : 'Link Disabled'}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="truncate text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">{subject.name}</h1>
+                  <span className={`inline-flex items-center gap-1 rounded-md border-2 border-slate-900 px-2.5 py-1 text-[10px] font-black shadow-brutal-sm ${isPublic ? 'bg-[#bfdbfe] text-slate-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}>
+                    {isPublic ? <Link2 className="h-3 w-3 stroke-[2.5]" /> : <Lock className="h-3 w-3 stroke-[2.5]" />} {isPublic ? 'Link Active' : 'Link Disabled'}
                   </span>
                 </div>
               )}
-              <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Layers className="h-3.5 w-3.5" /> {quizzes.length} {quizzes.length === 1 ? 'reviewer' : 'reviewers'} in this subject
-                {access.role === 'collaborator' && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600">Collaborator</span>}
-              </p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[11px] font-black text-slate-900 dark:text-white shadow-brutal-sm">
+                  <Layers className="h-3.5 w-3.5" /> {quizzes.length} {quizzes.length === 1 ? 'reviewer' : 'reviewers'}
+                </span>
+                {access.role === 'collaborator' && (
+                  <span className="rounded-md border-2 border-slate-900 bg-[#fde047] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
+                    Collaborator
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             {access.can_edit && (
               <>
                 {editing ? (
@@ -92,33 +111,53 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
                       setError(null);
                       setEditing(false);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted"
+                    className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
                   >
                     Cancel
                   </button>
                 ) : (
-                  <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted">
-                    <Pencil className="h-3.5 w-3.5" /> Edit subject
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+                  >
+                    <Pencil className="h-3.5 w-3.5 stroke-[2.5]" /> Edit subject
                   </button>
                 )}
-                <Link href={`/new?mode=manual&subjectId=${encodeURIComponent(subject.id)}`} className="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-2 text-xs font-bold text-primary hover:bg-primary hover:text-white">
-                  <Plus className="h-3.5 w-3.5" /> Add reviewer
+                <Link
+                  href={`/new?mode=manual&subjectId=${encodeURIComponent(subject.id)}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-2 text-xs font-black text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5 stroke-[2.5]" /> Add reviewer
                 </Link>
               </>
             )}
             {access.can_manage && (
-              <button type="button" onClick={() => setSharing(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => setSharing(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+              >
                 Share & collaborate
               </button>
             )}
             {subject.share_token && isPublic && (
-              <Link href={`/subjects/share/${subject.share_token}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground">
-                <ExternalLink className="h-3.5 w-3.5" /> Public page
+              <Link
+                href={`/subjects/share/${subject.share_token}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+              >
+                <ExternalLink className="h-3.5 w-3.5 stroke-[2.5]" /> Public page
               </Link>
             )}
           </div>
         </div>
-        {error && <p role="alert" className="rounded-2xl border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">{error}</p>}
+        {error && (
+          <p role="alert" className="rounded-xl border-2 border-destructive bg-destructive/10 p-3 text-xs font-black text-destructive shadow-brutal-sm">
+            {error}
+          </p>
+        )}
       </div>
 
       <QuizLibrary quizzes={quizzes} loading={false} />

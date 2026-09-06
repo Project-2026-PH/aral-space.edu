@@ -103,7 +103,7 @@ export default function QuizOverviewClient({
         method: 'DELETE'
       });
       if (res.ok) {
-        router.push('/');
+        router.push('/library');
       }
     } catch (err) {
       console.error('Delete quiz error:', err);
@@ -111,10 +111,10 @@ export default function QuizOverviewClient({
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20">
+    <div className="mx-auto max-w-5xl space-y-7 px-4 sm:px-6 lg:px-8 py-6 pb-24 desktop-zoom-133">
       <div className="flex items-center justify-between">
         <Link
-          href="/"
+          href="/library"
           className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />

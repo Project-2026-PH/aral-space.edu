@@ -155,18 +155,18 @@ export default function ShareSubjectModal({
         {loading ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12">
             <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-xs font-medium text-muted-foreground">Preparing public link...</p>
+            <p className="text-xs font-black text-muted-foreground">Preparing public link...</p>
           </div>
         ) : error ? (
-          <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-xs text-destructive">
+          <div className="rounded-xl border-2 border-destructive bg-destructive/10 p-4 text-xs font-black text-destructive shadow-brutal-sm">
             {error}
           </div>
         ) : (
           <>
             <div className="space-y-2">
-              <label className="flex items-center justify-between text-xs font-bold text-foreground">
+              <label className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
                 <span>Shared Subject Link</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Anyone with link</span>
+                <span className="rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black text-slate-900 dark:text-white shadow-brutal-sm">Anyone with link</span>
               </label>
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -175,77 +175,95 @@ export default function ShareSubjectModal({
                     readOnly
                     value={shareUrl}
                     onFocus={(event) => event.target.select()}
-                    className="w-full rounded-2xl border border-border/80 bg-background/50 px-3.5 py-2.5 pr-10 font-mono text-xs text-foreground shadow-inner outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/20 select-all"
+                    className="w-full rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3.5 py-2.5 pr-10 font-mono text-xs font-black text-foreground shadow-brutal-sm outline-none transition-colors focus:border-primary select-all"
                   />
-                  <Link2 className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Link2 className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-700 dark:text-slate-300" />
                 </div>
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl px-4 py-2.5 text-xs font-bold shadow-sm transition-all active:scale-95 ${
-                    copied ? 'bg-emerald-600 text-white' : 'bg-primary text-primary-foreground hover:opacity-90'
+                  className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 border-slate-900 px-4 py-2.5 text-xs font-black shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer ${
+                    copied ? 'bg-emerald-500 text-white' : 'bg-primary text-white'
                   }`}
                 >
-                  {copied ? <CopyCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied ? <CopyCheck className="h-3.5 w-3.5 stroke-[2.5]" /> : <Copy className="h-3.5 w-3.5 stroke-[2.5]" />}
                   <span>{copied ? 'Copied!' : 'Copy'}</span>
                 </button>
               </div>
             </div>
 
             {!readOnly && (
-              <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Access Permissions</h4>
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                    {isPublic ? <Globe className="h-3.5 w-3.5 text-primary" /> : <Lock className="h-3.5 w-3.5 text-amber-500" />}
-                    <span>{isPublic ? 'Link Enabled' : 'Link Disabled'}</span>
+              <div className="space-y-4 rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-slate-50 dark:bg-slate-900/60 p-4 shadow-brutal-sm">
+                <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">Access Permissions</h4>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-foreground">
+                      {isPublic ? <Globe className="h-3.5 w-3.5 text-primary" /> : <Lock className="h-3.5 w-3.5 text-amber-500" />}
+                      <span>{isPublic ? 'Link Enabled' : 'Link Disabled'}</span>
+                    </div>
+                    <p className="text-[11px] font-medium leading-relaxed text-muted-foreground">
+                      {isPublic ? 'Anyone with the link can see this subject and its shared study sets.' : 'The shared link is disabled until you enable it again.'}
+                    </p>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    {isPublic ? 'Anyone with the link can see this subject and its shared study sets.' : 'The shared link is disabled until you enable it again.'}
-                  </p>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isPublic}
+                    disabled={saving}
+                    onClick={() => updateConfig({ is_public: !isPublic })}
+                    className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 border-slate-900 shadow-brutal-sm transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${isPublic ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'}`}
+                  >
+                    <span className={`inline-block h-5 w-5 rounded-full border border-slate-900 bg-white shadow-sm transition-transform ${isPublic ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={isPublic}
-                  disabled={saving}
-                  onClick={() => updateConfig({ is_public: !isPublic })}
-                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${isPublic ? 'bg-primary' : 'bg-muted'}`}
-                >
-                  <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${isPublic ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
               </div>
-            </div>
             )}
 
             {!readOnly && (
-              <div className="space-y-4 rounded-2xl border border-primary/20 bg-primary/5 p-4">
-              <div className="flex items-center gap-2">
-                <UserPlus className="h-4 w-4 text-primary" />
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-primary">Collaborator link</h4>
-              </div>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">Create a single-use edit link. It becomes invalid as soon as someone accepts it.</p>
-              <div className="flex flex-wrap gap-2">
-                <select value={collaboratorExpiry} onChange={(event) => setCollaboratorExpiry(event.target.value)} className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-primary">
-                  <option value="1">Expires in 1 day</option>
-                  <option value="7">Expires in 7 days</option>
-                  <option value="30">Expires in 30 days</option>
-                  <option value="never">No expiry until accessed</option>
-                </select>
-                <button type="button" onClick={createCollaboratorLink} disabled={creatingCollaborator} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
-                  <UserPlus className="h-3.5 w-3.5" /> {creatingCollaborator ? 'Creating...' : 'Create link'}
-                </button>
-              </div>
-              {collaboratorUrl && (
+              <div className="space-y-4 rounded-2xl border-2 border-slate-900 bg-[#bfdbfe]/30 dark:bg-blue-950/40 p-4 shadow-brutal-sm">
                 <div className="flex items-center gap-2">
-                  <input readOnly value={collaboratorUrl} onFocus={(event) => event.target.select()} className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 font-mono text-[11px] text-foreground outline-none" />
-                  <button type="button" onClick={copyCollaboratorLink} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-primary/30 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/10">
-                    {collaboratorCopied ? <CopyCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {collaboratorCopied ? 'Copied' : 'Copy'}
+                  <UserPlus className="h-4 w-4 text-primary" />
+                  <h4 className="text-[11px] font-black uppercase tracking-wider text-primary">Collaborator link</h4>
+                </div>
+                <p className="text-[11px] font-medium leading-relaxed text-muted-foreground">Create a single-use edit link. It becomes invalid as soon as someone accepts it.</p>
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    value={collaboratorExpiry}
+                    onChange={(event) => setCollaboratorExpiry(event.target.value)}
+                    className="flex-1 rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3 py-2 text-xs font-black text-foreground shadow-brutal-sm outline-none focus:border-primary"
+                  >
+                    <option value="1">Expires in 1 day</option>
+                    <option value="7">Expires in 7 days</option>
+                    <option value="30">Expires in 30 days</option>
+                    <option value="never">No expiry until accessed</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={createCollaboratorLink}
+                    disabled={creatingCollaborator}
+                    className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-2 text-xs font-black text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    <UserPlus className="h-3.5 w-3.5 stroke-[2.5]" /> {creatingCollaborator ? 'Creating...' : 'Create link'}
                   </button>
                 </div>
-              )}
-            </div>
+                {collaboratorUrl && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={collaboratorUrl}
+                      onFocus={(event) => event.target.select()}
+                      className="min-w-0 flex-1 rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3 py-2 font-mono text-[11px] font-black text-foreground shadow-brutal-sm outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={copyCollaboratorLink}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+                    >
+                      {collaboratorCopied ? <CopyCheck className="h-3.5 w-3.5 stroke-[2.5]" /> : <Copy className="h-3.5 w-3.5 stroke-[2.5]" />} {collaboratorCopied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="flex items-center justify-between gap-3 pt-1">
@@ -254,16 +272,16 @@ export default function ShareSubjectModal({
                   type="button"
                   disabled={saving}
                   onClick={() => updateConfig({ reset_token: true })}
-                  className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer disabled:opacity-50"
                 >
-                  <Link2 className="h-3.5 w-3.5" />
+                  <Link2 className="h-3.5 w-3.5 stroke-[2.5]" />
                   Regenerate link
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="rounded-xl px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted"
+                className="rounded-xl border-2 border-slate-900 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-5 py-2 text-xs font-black uppercase tracking-wider shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
               >
                 Done
               </button>

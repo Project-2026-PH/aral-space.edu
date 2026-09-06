@@ -203,7 +203,7 @@ export default function NotesClient() {
     <div className="mx-auto max-w-6xl space-y-5 pb-24">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/" className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />Back to Library</Link>
+          <Link href="/library" className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />Back to Library</Link>
           <span className="h-5 w-px bg-border" />
           <div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">Workspace</p><h1 className="text-xl font-extrabold tracking-tight text-foreground">Notes</h1></div>
         </div>

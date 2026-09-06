@@ -29,19 +29,36 @@ export default function CollaboratorRedemptionPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-lg px-4 py-20 text-center">
-        <ShieldAlert className="mx-auto h-12 w-12 text-destructive" />
-        <h1 className="mt-5 text-2xl font-extrabold text-foreground">Link unavailable</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-        <Link href="/" className="mt-6 inline-flex rounded-2xl bg-primary px-5 py-3 text-xs font-bold text-white">Go to Quiz Hub</Link>
+        <div className="rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-card p-8 shadow-brutal space-y-5">
+          <div className="mx-auto inline-flex rounded-2xl border-2 border-slate-900 bg-destructive/10 p-4 text-destructive shadow-brutal-sm">
+            <ShieldAlert className="h-10 w-10 stroke-[2.5]" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white">Link unavailable</h1>
+          <p className="text-xs font-medium text-muted-foreground">{error}</p>
+          <div>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-900 bg-primary px-6 py-3 text-xs font-black text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+            >
+              Go to Quiz Hub
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-lg px-4 py-20 text-center">
-      <CheckCircle2 className="mx-auto h-12 w-12 animate-pulse text-primary" />
-      <h1 className="mt-5 text-2xl font-extrabold text-foreground">Joining subject...</h1>
-      <p className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="h-4 w-4 animate-spin" /> Activating your collaborator access</p>
+      <div className="rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-card p-8 shadow-brutal space-y-4">
+        <div className="mx-auto inline-flex rounded-2xl border-2 border-slate-900 bg-[#86efac] p-4 text-slate-900 shadow-brutal-sm">
+          <CheckCircle2 className="h-10 w-10 stroke-[2.5] animate-pulse" />
+        </div>
+        <h1 className="text-2xl font-black text-slate-900 dark:text-white">Joining subject...</h1>
+        <p className="flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground">
+          <LoaderCircle className="h-4 w-4 animate-spin stroke-[2.5]" /> Activating your collaborator access
+        </p>
+      </div>
     </div>
   );
 }

@@ -31,23 +31,27 @@ export default function FloatingBottomNav({
     initY: 0,
   });
 
-  // Show on the home library and subject/quiz detail routes.
-  const isHomeRoute = pathname === '/';
-  const isVisibleRoute = isHomeRoute
+  // Show on the library and subject/quiz detail routes.
+  const isLibraryRoute = pathname === '/library';
+  const isVisibleRoute = isLibraryRoute
     || pathname === '/subjects'
     || pathname.startsWith('/subjects/')
     || pathname === '/quizzes'
     || pathname.startsWith('/quizzes/')
-    || pathname === '/notes';
+    || pathname === '/notes'
+    || pathname === '/review'
+    || pathname.startsWith('/review/');
 
   const isNotesActive = pathname === '/notes' || pathname.startsWith('/notes/');
   const isReviewerActive = !isNotesActive && (
-    (isHomeRoute && activeTab === 'reviewers') ||
+    (isLibraryRoute && activeTab === 'reviewers') ||
     pathname === '/quizzes' ||
-    pathname.startsWith('/quizzes/')
+    pathname.startsWith('/quizzes/') ||
+    pathname === '/review' ||
+    pathname.startsWith('/review/')
   );
   const isSubjectsActive = !isNotesActive && !isReviewerActive && (
-    (isHomeRoute && activeTab === 'subjects') ||
+    (isLibraryRoute && activeTab === 'subjects') ||
     pathname === '/subjects' ||
     pathname.startsWith('/subjects/')
   );
@@ -83,9 +87,9 @@ export default function FloatingBottomNav({
     return () => window.removeEventListener('resize', updateDeviceMode);
   }, [updateDeviceMode]);
 
-  // Track active section via scroll position on home route
+  // Track active section via scroll position on the library route
   useEffect(() => {
-    if (!isHomeRoute) return;
+    if (!isLibraryRoute) return;
 
     const handleScroll = () => {
       const reviewersEl = document.getElementById('reviewers-section');
@@ -105,7 +109,7 @@ export default function FloatingBottomNav({
     window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isHomeRoute]);
+  }, [isLibraryRoute]);
 
   // Initialize tablet position to bottom center once mounted
   useEffect(() => {
@@ -213,8 +217,8 @@ export default function FloatingBottomNav({
     setActiveTab(tab);
     setShowQuickMenu(false);
 
-    if (!isHomeRoute) {
-      router.push(`/#${id}`);
+    if (!isLibraryRoute) {
+      router.push(`/library#${id}`);
       return;
     }
 
@@ -345,7 +349,7 @@ export default function FloatingBottomNav({
                     onClick={() => {
                       setShowQuickMenu(false);
                       if (onOpenAiModal) onOpenAiModal();
-                      else router.push('/');
+                      else router.push('/library');
                     }}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary active:scale-[0.98]"
                   >
@@ -363,7 +367,7 @@ export default function FloatingBottomNav({
                     onClick={() => {
                       setShowQuickMenu(false);
                       if (onOpenSubjectModal) onOpenSubjectModal();
-                      else router.push('/');
+                      else router.push('/library');
                     }}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary active:scale-[0.98]"
                   >

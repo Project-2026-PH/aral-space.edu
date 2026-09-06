@@ -22,22 +22,22 @@ function SectionHeading({
 
 function LibraryCardSkeleton({ subject = false }: { subject?: boolean }) {
   return (
-    <div className="flex min-h-44 flex-col justify-between overflow-hidden rounded-3xl border border-border/40 bg-card">
-      <div className="space-y-4 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            {subject && <Skeleton className="h-10 w-10 shrink-0 rounded-2xl" />}
+    <div className="flex min-h-36 sm:min-h-[148px] flex-col justify-between overflow-hidden rounded-2xl border-2 border-slate-900/20 dark:border-white/20 bg-card">
+      <div className="space-y-3 p-4">
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {subject && <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />}
             <div className="space-y-2">
               <Skeleton className="h-4 w-32 rounded-lg" />
-              <Skeleton className="h-3 w-20 rounded-full" />
+              <Skeleton className="h-3 w-20 rounded-lg" />
             </div>
           </div>
-          <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+          <Skeleton className="h-5 w-16 shrink-0 rounded-md" />
         </div>
-        {!subject && <Skeleton className="h-8 w-4/5 rounded-lg" />}
+        {!subject && <Skeleton className="h-7 w-4/5 rounded-lg" />}
       </div>
-      <div className="flex items-center justify-between border-t border-border/40 px-5 py-3">
-        <Skeleton className="h-4 w-20 rounded-full" />
+      <div className="flex items-center justify-between border-t-2 border-slate-900/10 dark:border-white/10 px-4 py-2.5">
+        <Skeleton className="h-4 w-20 rounded-md" />
         <Skeleton className="h-7 w-20 rounded-xl" />
       </div>
     </div>
@@ -56,10 +56,10 @@ function LibraryGrid({ subject = false }: { subject?: boolean }) {
 
 export default function HomeSkeleton() {
   return (
-    <div role="status" aria-label="Loading home" className="space-y-8 pb-20">
+    <div role="status" aria-label="Loading home" className="mx-auto max-w-5xl space-y-7 px-4 sm:px-6 lg:px-8 py-6 pb-24 desktop-zoom-133">
       <span className="sr-only">Loading your reviewers and subjects...</span>
 
-      <div className="flex flex-col justify-between gap-6 rounded-3xl border border-border/40 bg-card p-6 sm:p-8 md:flex-row md:items-center">
+      <div className="flex flex-col justify-between gap-4 rounded-3xl border-3 border-slate-900/20 dark:border-white/20 bg-card p-4 sm:p-6 md:flex-row md:items-center">
         <div className="w-full max-w-xl space-y-3">
           <Skeleton className="h-6 w-56 rounded-full bg-primary/10" />
           <Skeleton className="h-9 w-full max-w-md rounded-xl" />

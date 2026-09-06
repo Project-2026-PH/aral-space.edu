@@ -85,9 +85,9 @@ export default function QuizLibrary({
                 className="block space-y-2 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <div className="flex items-center justify-between gap-2 text-xs">
-                  {quiz.id === 'quiz-cognitive-mastery-sample' ? (
-                    <span className="rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-[11px] font-bold text-indigo-500">
-                      Cognitive Mastery Loop
+                  {quiz.id === 'b0000000-0000-4000-8000-000000000001' || quiz.share_token === 'kasaysayan-pilipinas-reviewer' ? (
+                    <span className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                      Sample Reviewer
                     </span>
                   ) : (
                     <span className="text-[11px] font-medium text-muted-foreground">Reviewer</span>

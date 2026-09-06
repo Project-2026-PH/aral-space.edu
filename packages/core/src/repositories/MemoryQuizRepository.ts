@@ -21,7 +21,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   private seedDefaultData() {
-    // Seed Sample Cognitive Mastery Quiz by default
+    // Seed Sample Filipino History Reviewer by default
     this.subjects.set(SAMPLE_SUBJECT.id, SAMPLE_SUBJECT);
     this.quizzes.set(SAMPLE_QUIZ.id, SAMPLE_QUIZ);
     SAMPLE_QUIZ_QUESTIONS.forEach(q => {

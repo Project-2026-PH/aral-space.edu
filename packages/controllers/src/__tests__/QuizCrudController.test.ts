@@ -2,28 +2,30 @@ import { describe, it, expect, vi } from 'vitest';
 import { QuizCrudController } from '../QuizCrudController';
 import { MasterySessionController } from '../MasterySessionController';
 import { MemorySessionRepository } from '@quiz-creator/core/repositories';
-import { SAMPLE_QUIZ_ID, SAMPLE_SUBJECT_ID } from '@quiz-creator/core/services';
+import { SAMPLE_QUIZ_ID } from '@quiz-creator/core/services';
 
-describe('QuizCrudController & MasterySessionController Sample Defaults', () => {
-  it('QuizCrudController prepends sample quiz and subject when repository is empty', async () => {
+describe('QuizCrudController & MasterySessionController', () => {
+  it('QuizCrudController delegates directly to repository without injecting hardcoded sample', async () => {
     const mockRepo: any = {
-      listQuizzes: vi.fn().mockResolvedValue([]),
-      listSubjects: vi.fn().mockResolvedValue([]),
-      getQuizById: vi.fn().mockResolvedValue(null),
-      getQuestionsByQuizId: vi.fn().mockResolvedValue([])
+      listQuizzes: vi.fn().mockResolvedValue([{ id: 'quiz-1', title: 'Test Quiz' }]),
+      listSubjects: vi.fn().mockResolvedValue([{ id: 'sub-1', name: 'Test Subject' }]),
+      getQuizById: vi.fn().mockResolvedValue({ id: 'quiz-1', title: 'Test Quiz' }),
+      getQuestionsByQuizId: vi.fn().mockResolvedValue([{ id: 'q-1', question_text: 'Q1' }])
     };
 
     const controller = new QuizCrudController(mockRepo);
-    const quizzes = await controller.listQuizzes();
-    expect(quizzes.some(q => q.id === SAMPLE_QUIZ_ID)).toBe(true);
+    const quizzes = await controller.listQuizzes('user-1');
+    expect(quizzes).toEqual([{ id: 'quiz-1', title: 'Test Quiz' }]);
+    expect(mockRepo.listQuizzes).toHaveBeenCalledWith('user-1');
 
-    const subjects = await controller.listSubjects();
-    expect(subjects.some(s => s.id === SAMPLE_SUBJECT_ID)).toBe(true);
+    const subjects = await controller.listSubjects('user-1');
+    expect(subjects).toEqual([{ id: 'sub-1', name: 'Test Subject' }]);
+    expect(mockRepo.listSubjects).toHaveBeenCalledWith('user-1');
 
-    const fullQuiz = await controller.getQuiz(SAMPLE_QUIZ_ID);
+    const fullQuiz = await controller.getQuiz('quiz-1', 'user-1');
     expect(fullQuiz).not.toBeNull();
-    expect(fullQuiz?.id).toBe(SAMPLE_QUIZ_ID);
-    expect(fullQuiz?.questions.length).toBe(8);
+    expect(fullQuiz?.id).toBe('quiz-1');
+    expect(fullQuiz?.questions.length).toBe(1);
   });
 
   it('MasterySessionController isolates sample quiz sessions in memory and delegates normal quizzes to sessionRepo', async () => {
@@ -50,8 +52,8 @@ describe('QuizCrudController & MasterySessionController Sample Defaults', () => 
     
     // 1. Starting sample quiz uses sampleSessionRepo without touching mockSessionRepo
     const sampleResult = await controller.getOrStartSession(SAMPLE_QUIZ_ID);
-    expect(sampleResult.questions.length).toBe(8);
-    expect(sampleResult.progress.length).toBe(8);
+    expect(sampleResult.questions.length).toBe(10);
+    expect(sampleResult.progress.length).toBe(10);
     expect(sampleResult.session.quiz_id).toBe(SAMPLE_QUIZ_ID);
     expect(sampleResult.session.id).toBeTruthy();
 

@@ -1,28 +1,26 @@
 import type { IQuizRepository } from '@quiz-creator/core/repositories';
-import { SAMPLE_QUIZ, SAMPLE_SUBJECT, SAMPLE_QUIZ_ID, SAMPLE_SUBJECT_ID, SAMPLE_QUIZ_QUESTIONS } from '@quiz-creator/core/services';
 import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto, UpdateSubjectShareConfigDto, UpdateSubjectDto } from '@quiz-creator/types';
 
 export class QuizCrudController {
   constructor(private quizRepo: IQuizRepository) {}
 
   async listQuizzes(userId?: string) {
-    const list = await this.quizRepo.listQuizzes(userId);
-    return list.some(q => q.id === SAMPLE_QUIZ_ID) ? list : [SAMPLE_QUIZ, ...list];
+    return this.quizRepo.listQuizzes(userId);
   }
 
   async listSubjects(userId?: string) {
-    const list = await this.quizRepo.listSubjects(userId);
-    return list.some(s => s.id === SAMPLE_SUBJECT_ID) ? list : [SAMPLE_SUBJECT, ...list];
+    return this.quizRepo.listSubjects(userId);
   }
 
   async listQuizzesAndSubjects(userId?: string) {
-    const result = this.quizRepo.listQuizzesAndSubjects
-      ? await this.quizRepo.listQuizzesAndSubjects(userId)
-      : await Promise.all([this.quizRepo.listQuizzes(userId), this.quizRepo.listSubjects(userId)]).then(([quizzes, subjects]) => ({ quizzes, subjects }));
-    return {
-      quizzes: result.quizzes.some(q => q.id === SAMPLE_QUIZ_ID) ? result.quizzes : [SAMPLE_QUIZ, ...result.quizzes],
-      subjects: result.subjects.some(s => s.id === SAMPLE_SUBJECT_ID) ? result.subjects : [SAMPLE_SUBJECT, ...result.subjects]
-    };
+    if (this.quizRepo.listQuizzesAndSubjects) {
+      return this.quizRepo.listQuizzesAndSubjects(userId);
+    }
+    const [quizzes, subjects] = await Promise.all([
+      this.quizRepo.listQuizzes(userId),
+      this.quizRepo.listSubjects(userId)
+    ]);
+    return { quizzes, subjects };
   }
 
   async createSubject(name: string, color: string, userId?: string) { return this.quizRepo.createSubject(name, color, userId); }
@@ -36,14 +34,10 @@ export class QuizCrudController {
   async updateSubjectShareConfig(subjectId: string, dto: UpdateSubjectShareConfigDto, userId?: string) { return this.quizRepo.updateSubjectShareConfig(subjectId, dto, userId); }
 
   async getSubjectByShareToken(shareToken: string) {
-    if (shareToken === SAMPLE_SUBJECT.share_token) {
-      return (await this.quizRepo.getSubjectByShareToken(shareToken)) || { ...SAMPLE_SUBJECT, quizzes: [] };
-    }
     return this.quizRepo.getSubjectByShareToken(shareToken);
   }
 
   async getQuiz(id: string, userId?: string) {
-    if (id === SAMPLE_QUIZ_ID) return { ...SAMPLE_QUIZ, questions: SAMPLE_QUIZ_QUESTIONS };
     const [quiz, questions] = await Promise.all([
       this.quizRepo.getQuizById(id, userId),
       this.quizRepo.getQuestionsByQuizId(id, userId)

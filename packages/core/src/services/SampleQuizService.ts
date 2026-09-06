@@ -1,26 +1,26 @@
 import { CreateQuestionDto, Quiz, QuizQuestion, Subject } from '@quiz-creator/types';
 
-export const SAMPLE_SUBJECT_ID = 'sub-cognitive-mastery';
-export const SAMPLE_QUIZ_ID = 'quiz-cognitive-mastery-sample';
-export const SAMPLE_SHARE_TOKEN = 'cognitive-mastery-sample';
+export const SAMPLE_SUBJECT_ID = 'a0000000-0000-4000-8000-000000000001';
+export const SAMPLE_QUIZ_ID = 'b0000000-0000-4000-8000-000000000001';
+export const SAMPLE_SHARE_TOKEN = 'kasaysayan-pilipinas-reviewer';
 
 export const SAMPLE_SUBJECT: Subject = {
   id: SAMPLE_SUBJECT_ID,
-  name: 'Cognitive Science & Mastery',
-  color: '#6366f1',
-  share_token: 'subject-cognitive-mastery',
+  name: 'Kasaysayan ng Pilipinas',
+  color: '#1d4ed8',
+  share_token: 'kasaysayan-pilipinas',
   is_public: true,
   created_at: '2026-01-01T00:00:00.000Z'
 };
 
 export const SAMPLE_QUIZ: Quiz = {
   id: SAMPLE_QUIZ_ID,
-  title: 'Cognitive Mastery Loop (Active Error Queue & Elaborative Feedback)',
-  description: 'Hands-on practice quiz testing the 7-item dynamic sliding window, 3-position Leitner reinsertion, 3-second pre-commitment delay, and Anti-Fatigue Struggle Pile.',
-  question_count: 8,
+  title: 'Pagsusulit sa Kasaysayan ng Pilipinas (1-10)',
+  description: 'Reviewer para sa mga pangunahing kaganapan, bayani, at labanan sa kasaysayan ng Pilipinas mula ika-16 na siglo hanggang sa kasalukuyan.',
+  question_count: 10,
   generated_at: '2026-01-01T00:00:00.000Z',
-  handout_name: 'Cognitive Mastery Loop Architecture Specification',
-  source_model: 'pedagogy_engine',
+  handout_name: 'Pangkalahatang Kasaysayan ng Pilipinas',
+  source_model: 'kasaysayan_reviewer',
   subject_id: SAMPLE_SUBJECT_ID,
   share_token: SAMPLE_SHARE_TOKEN,
   is_public: true,
@@ -31,180 +31,223 @@ export const SAMPLE_QUIZ: Quiz = {
 
 export const SAMPLE_QUESTIONS: CreateQuestionDto[] = [
   {
-    question_text: "What is the primary function of the 7-item dynamic sliding window in the active error queue?",
+    question_text: "1. Ano ang makasaysayang kaganapan noong Agosto 1896 kung saan pinunit ng mga Katipunero ang kanilang mga sedula bilang tanda ng paghihimagsik laban sa kolonyalismong Espanyol?",
     options: [
-      "Maintains focus within human working memory limits while steadily cycling active concepts",
-      "Forces every question in the entire quiz to be answered simultaneously",
-      "Limits the maximum number of questions a user can study per day",
-      "Randomly shuffles questions without tracking error frequency"
+      "Sigaw ng Pugad Lawin (o Balintawak)",
+      "Kasunduan sa Biak-na-Bato",
+      "Pagpapahayag ng Kasarinlan sa Kawit",
+      "Labanan sa Tirad Pass"
     ],
     correct_answer: 0,
-    explanation: "Miller's Law establishes that working memory can hold approximately 7 items. The sliding window keeps active review focused on this capacity.",
-    correct_explanation: "Working memory is biologically constrained to 7±2 chunks; restricting active queue size prevents cognitive overload while reinforcing error items.",
+    explanation: "Ang Sigaw ng Pugad Lawin / Balintawak ang naghudyat sa pagsisimula ng Himagsikang Pilipino laban sa pamamahala ng mga Espanyol noong Agosto 1896.",
+    correct_explanation: "Pinamunuan ni Andres Bonifacio ang pagpunit ng sedula bilang hayagang pagtanggi sa kapangyarihan at mapang-aping pagbubuwis ng Espanya.",
     distractor_explanations: {
-      1: "Presenting all questions simultaneously causes working memory thrashing and cognitive overload.",
-      2: "Daily study volume is unrestricted; the 7-item constraint only governs the concurrent active working buffer.",
-      3: "Random shuffling without tracking destroys the error-priority queue and invalidates spaced repetition."
+      1: "Ang Kasunduan sa Biak-na-Bato (1897) ay pansamantalang tigil-putukan sa pagitan ng mga Espanyol at rebolusyonaryo.",
+      2: "Ang deklarasyon sa Kawit ay naganap noong Hunyo 12, 1898 matapos ang unang yugto ng himagsikan.",
+      3: "Ang Labanan sa Tirad Pass ay naganap noong 1899 sa panahon ng Digmaang Pilipino-Amerikano."
     },
-    discriminatory_keywords: ["working memory capacity", "sliding window", "cognitive load", "buffer"],
-    concept_tags: ["working-memory", "sliding-window", "cognitive-load"],
+    discriminatory_keywords: ["pagpunit ng sedula", "Sigaw ng Pugad Lawin", "1896", "Andres Bonifacio", "Katipunan"],
+    concept_tags: ["himagsikan", "katipunan", "pugad-lawin"],
     source_pages: [1],
     order_index: 0
   },
   {
-    question_text: "In Leitner-style reinsertion, how does the engine position a question immediately after an incorrect answer?",
+    question_text: "2. Kailan at saan pormal na ipinahayag ni Heneral Emilio Aguinaldo ang Kasarinlan ng Pilipinas mula sa pananakop ng Espanya?",
     options: [
-      "Reinserts the card 3–4 positions ahead in the active queue",
-      "Pushes the card to the very end of the entire quiz deck",
-      "Permanently deletes the question from the practice session",
-      "Immediately repeats the question on the very next screen without spacing"
+      "Hunyo 12, 1898 sa Kawit, Cavite",
+      "Hulyo 4, 1946 sa Luneta, Maynila",
+      "Agosto 23, 1896 sa Balintawak",
+      "Enero 23, 1899 sa Malolos, Bulacan"
     ],
     correct_answer: 0,
-    explanation: "Reinserting 3–4 positions ahead provides an optimal delay for working memory to clear while enabling timely retrieval practice.",
-    correct_explanation: "Immediate re-testing triggers perceptual recognition rather than true memory retrieval; spacing 3 positions ahead forces semantic recall.",
+    explanation: "Noong Hunyo 12, 1898 sa balkonahe ng tahanan ni Emilio Aguinaldo sa Kawit, Cavite unang iwinagayway ang bandila ng Pilipinas at pinatugtog ang Marcha Nacional Filipina.",
+    correct_explanation: "Ang Hunyo 12, 1898 ang opisyal na Araw ng Kalayaan ng Pilipinas kung saan ipinahayag ang paglaya sa mahigit 300 taong pananakop ng Espanya.",
     distractor_explanations: {
-      1: "Sending a missed card to the very back of a large deck delays review too long, causing complete forgetting.",
-      2: "Deleting the card abandons the concept instead of achieving mastery.",
-      3: "Immediate repetition without intermediate items merely tests short-term sensory echo rather than long-term semantic retrieval."
+      1: "Ang Hulyo 4, 1946 ay ang pagkilala ng Estados Unidos sa kalayaan ng Pilipinas matapos ang Ikalawang Digmaang Pandaigdig.",
+      2: "Ang Agosto 1896 ay ang pagsisimula ng rebolusyon ng Katipunan.",
+      3: "Ang Enero 23, 1899 ay ang pagpapasinaya ng Unang Republika ng Pilipinas sa Malolos."
     },
-    discriminatory_keywords: ["spaced reinsertion", "retrieval spacing", "recognition heuristic", "Leitner"],
-    concept_tags: ["spaced-repetition", "leitner-spacing", "retrieval-practice"],
+    discriminatory_keywords: ["Hunyo 12, 1898", "Kawit, Cavite", "Emilio Aguinaldo", "Marcha Nacional Filipina"],
+    concept_tags: ["kasarinlan", "kawit-cavite", "watawat"],
     source_pages: [1],
     order_index: 1
   },
   {
-    question_text: "Why does the practice runner enforce a 3-second pre-commitment delay ('Think First') before revealing multiple-choice options?",
+    question_text: "3. Aling nobela ni Dr. Jose Rizal ang nalimbag sa Berlin noong 1887 na naglantad sa mga katiwalian at pang-aabuso ng mga prayle sa lipunang kolonyal?",
     options: [
-      "Forces semantic memory retrieval before scanning distractors to prevent the passive recognition heuristic",
-      "Compensates for slow network latency from the server database",
-      "Prevents fast readers from completing quizzes too quickly",
-      "Allows background sound effects to finish playing"
+      "Noli Me Tangere",
+      "El Filibusterismo",
+      "Sucesos de las Islas Filipinas",
+      "A La Juventud Filipina"
     ],
     correct_answer: 0,
-    explanation: "The pre-commitment delay forces active recall from long-term memory before options can provide unintended recognition cues.",
-    correct_explanation: "When options appear instantly, learners scan for familiar words (recognition heuristic); a 3-second delay forces internal memory generation.",
+    explanation: "Ang Noli Me Tangere ('Huwag Mo Akong Salingin') ang unang nobelang panlipunan ni Rizal na inilimbag sa Berlin noong Marso 1887 sa tulong ni Dr. Maximo Viola.",
+    correct_explanation: "Inilarawan sa Noli Me Tangere ang kanser ng lipunan at panunupil ng pamahalaang kolonyal at mga prayle gamit ang mga karakter tulad nina Crisostomo Ibarra at Maria Clara.",
     distractor_explanations: {
-      1: "The delay is an intentional pedagogical technique, completely independent of network latency.",
-      2: "The objective is cognitive depth and memory retention, not arbitrary pacing or slowing down reading speed.",
-      3: "Audio effects are asynchronous and do not dictate the retrieval pedagogical timer."
+      1: "Ang El Filibusterismo ang ikalawang nobela na inilimbag sa Ghent, Belgium noong 1891 na may temang pulitikal at rebolusyonaryo.",
+      2: "Ang Sucesos de las Islas Filipinas ay aklat pangkasaysayan ni Antonio de Morga na nilagyan ni Rizal ng mga paliwanag.",
+      3: "Ang A La Juventud Filipina ay tulang isinulat ni Rizal noong siya ay kabataang mag-aaral."
     },
-    discriminatory_keywords: ["pre-commitment", "forced retrieval", "recognition heuristic", "semantic memory"],
-    concept_tags: ["pre-commitment-delay", "recognition-heuristic", "retrieval-practice"],
+    discriminatory_keywords: ["Noli Me Tangere", "Berlin 1887", "kanser ng lipunan", "Crisostomo Ibarra"],
+    concept_tags: ["jose-rizal", "propaganda", "noli-me-tangere"],
     source_pages: [2],
     order_index: 2
   },
   {
-    question_text: "What trigger activates the Anti-Fatigue Guardrail ('Struggle Pile') for a card during an active session?",
+    question_text: "4. Sino ang magiting na pinunong Pilipino mula sa Mactan na tumangging pasakop sa mga dayuhan at tinalo ang ekspedisyon ni Ferdinand Magellan noong Abril 27, 1521?",
     options: [
-      "Failing the same card 3 times in a single session",
-      "Taking longer than 60 seconds to answer any single question",
-      "Answering 5 consecutive questions correctly",
-      "Exiting the session before the full mastery queue is complete"
+      "Lapu-Lapu",
+      "Rajah Humabon",
+      "Rajah Sulayman",
+      "Datu Zula"
     ],
     correct_answer: 0,
-    explanation: "After 3 consecutive or accumulated misses on a single card, continuing to loop it causes cognitive exhaustion and rage-quitting.",
-    correct_explanation: "A 3-attempt ceiling prevents repetitive failure loops and extracts persistent problem cards into a dedicated Struggle Pile for later targeted review.",
+    explanation: "Si Lapu-Lapu ang datu ng Mactan na nagtanggol sa kanyang pulo laban sa mga Kastila at nagbunga sa pagkamatay ni Ferdinand Magellan sa Labanan sa Mactan.",
+    correct_explanation: "Itinuturing si Lapu-Lapu bilang pinakaunang pambansang bayaning Pilipino na lumaban at nagtagumpay laban sa kolonyalismong Kanluranin.",
     distractor_explanations: {
-      1: "Response latency does not trigger escalation; only repeated failure attempts trigger the struggle guardrail.",
-      2: "Consecutive correct answers advance mastery and lock questions rather than escalating to struggle.",
-      3: "Exiting a session pauses or preserves state, but does not move cards to the Struggle Pile."
+      1: "Si Rajah Humabon ang pinuno ng Cebu na nakiisa at nagpabinyag sa mga Espanyol.",
+      2: "Si Rajah Sulayman ang magiting na pinuno ng Maynila na lumaban noong 1570-1571 laban kina Legazpi at Goiti.",
+      3: "Si Datu Zula ang karibal ni Lapu-Lapu sa Mactan na humingi ng saklolo kay Magellan."
     },
-    discriminatory_keywords: ["attempt cap", "struggle pile", "fatigue guardrail", "burnout prevention"],
-    concept_tags: ["anti-fatigue", "struggle-pile", "cognitive-load"],
+    discriminatory_keywords: ["Lapu-Lapu", "Labanan sa Mactan", "Abril 27, 1521", "Ferdinand Magellan"],
+    concept_tags: ["mactan", "lapu-lapu", "sinaunang-kasaysayan"],
     source_pages: [2],
     order_index: 3
   },
   {
-    question_text: "How does Elaborative Feedback differ from simple correctness confirmation in multiple-choice quizzes?",
+    question_text: "5. Ang pagbitay sa tatlong paring sekular (GOMBURZA) sa Bagumbayan noong Pebrero 17, 1872 ay gumising sa damdaming makabayan ng mga Pilipino. Sinu-sino sila?",
     options: [
-      "Explains specific conceptual fallacies for distractors and highlights discriminatory keywords separating options",
-      "Only shows a green checkmark or red X without explaining reasons",
-      "Provides hints before the question is answered",
-      "Decreases the difficulty of subsequent questions automatically"
+      "Mariano Gomez, Jose Burgos, at Jacinto Zamora",
+      "Pedro Pelaez, Jose Burgos, at Mariano Gomez",
+      "Mariano Gomez, Jacinto Zamora, at Emilio Jacinto",
+      "Jose Burgos, Antonio Luna, at Pedro Paterno"
     ],
     correct_answer: 0,
-    explanation: "Elaborative feedback decomposes why distractors are plausible misconceptions and identifies the decisive technical keywords.",
-    correct_explanation: "Deep conceptual discrimination requires explaining why near-miss distractors fail and highlighting defining keywords.",
+    explanation: "Sina Padres Mariano Gomez, Jose Burgos, at Jacinto Zamora ay binitay sa pamamagitan ng garote dahil sa maling paratang ng sedisyon kaugnay ng Pag-aalsa sa Cavite noong 1872.",
+    correct_explanation: "Ang martiryo ng Gomburza ang nagbigay-sigla sa Kilusang Propaganda at naging dahilan kung bakit inialay ni Jose Rizal ang kanyang nobelang El Filibusterismo sa kanila.",
     distractor_explanations: {
-      1: "Simple binary right/wrong confirmation provides minimal pedagogical learning signal.",
-      2: "Hints prior to answering diminish retrieval effort and weaken active recall pathways.",
-      3: "Adjusting question difficulty dynamically is adaptive testing, not elaborative conceptual feedback."
+      1: "Si Padre Pedro Pelaez ang unang tagapagtanggol ng sekularisasyon ng mga parokya bago siya nasawi noong 1863.",
+      2: "Si Emilio Jacinto ay heneral at manunulat ng Katipunan, hindi paring sekular.",
+      3: "Sina Antonio Luna at Pedro Paterno ay mga prominenteng lider sa panahon ng Digmaang Pilipino-Amerikano at Himagsikan."
     },
-    discriminatory_keywords: ["elaborative feedback", "distractor fallacies", "discriminatory keywords", "conceptual discrimination"],
-    concept_tags: ["elaborative-feedback", "conceptual-discrimination", "feature-contrast"],
+    discriminatory_keywords: ["GOMBURZA", "Gomez", "Burgos", "Zamora", "garote 1872", "sekularisasyon"],
+    concept_tags: ["gomburza", "nasyonalismo", "1872"],
     source_pages: [3],
     order_index: 4
   },
   {
-    question_text: "When does the mastery queue achieve its completion criteria?",
+    question_text: "6. Anong kasunduan ang nilagdaan noong Disyembre 10, 1898 kung saan isinuko ng Espanya ang pamamahala sa Pilipinas sa Estados Unidos sa halagang $20 milyon?",
     options: [
-      "When every card has been answered correctly or moved to the Struggle Pile",
-      "As soon as 50% of the questions have been attempted once",
-      "When the countdown timer for the entire session reaches zero",
-      "Only after answering all questions 5 times in a row without a single error"
+      "Kasunduan sa Paris (Treaty of Paris)",
+      "Kasunduan sa Biak-na-Bato",
+      "Kasunduang Bates",
+      "Kasunduang Tordesillas"
     ],
     correct_answer: 0,
-    explanation: "A mastery round concludes when the active working queue is emptied by either achieving correct retrieval or escalating cards to the Struggle Pile.",
-    correct_explanation: "The full quiz is served through a continuous queue; completion depends on resolving every card, not on fixed batches.",
+    explanation: "Sa Kasunduan sa Paris (1898), opisyal na ipinasa ng Espanya ang teritoryo ng Pilipinas, Guam, at Puerto Rico sa Estados Unidos kapalit ng $20,000,000.",
+    correct_explanation: "Ang pagwawalang-bahala ng Amerika sa sariling deklarasyon ng kalayaan ng mga Pilipino ang nagbunsod sa pagsiklab ng Digmaang Pilipino-Amerikano noong Pebrero 1899.",
     distractor_explanations: {
-      1: "Partial attempts leave unresolved errors uncorrected in working memory.",
-      2: "The loop is governed by mastery completion, not a strict countdown time limit.",
-      3: "Requiring 5 error-free repeats causes overlearning and excessive cognitive fatigue."
+      1: "Ang Kasunduan sa Biak-na-Bato (1897) ay paktong nilagdaan sa pagitan ng pamahalaang rebolusyonaryo at Espanya.",
+      2: "Ang Kasunduang Bates (1899) ay kasunduan ng Estados Unidos sa Sultan ng Sulu.",
+      3: "Ang Kasunduang Tordesillas (1494) ay paghahati ng mga bagong lupaing tutuklasin sa pagitan ng Espanya at Portugal."
     },
-    discriminatory_keywords: ["mastery criteria", "queue resolution", "continuous queue", "active queue exhaustion"],
-    concept_tags: ["mastery-criteria", "queue-resolution", "sliding-window"],
+    discriminatory_keywords: ["Kasunduan sa Paris", "Disyembre 10, 1898", "$20 milyon", "Digmaang Espanyol-Amerikano"],
+    concept_tags: ["treaty-of-paris", "digmaang-pilipino-amerikano", "kasaysayan"],
     source_pages: [3],
     order_index: 5
   },
   {
-    question_text: "What happens when a question in the Struggle Pile is reviewed after the main session finishes?",
+    question_text: "7. Sino ang tinaguriang 'Bayani ng Pasong Tirad' na nagbuwis ng buhay noong Disyembre 2, 1899 upang harangin ang mga sundalong Amerikano at makatakas si Pangulong Aguinaldo?",
     options: [
-      "It enters a focused targeted review round with a fresh attempt counter",
-      "It is permanently archived and can never be practiced again",
-      "It is automatically counted as 100% mastered without review",
-      "The user's entire quiz score is reset to zero"
+      "Heneral Gregorio del Pilar",
+      "Heneral Antonio Luna",
+      "Heneral Miguel Malvar",
+      "Heneral Artemio Ricarte"
     ],
     correct_answer: 0,
-    explanation: "The Struggle Pile enables targeted deliberate practice on the specific concepts that caused difficulty during the main session.",
-    correct_explanation: "Segregating struggle cards allows learners to rest, recover, and then tackle hard concepts with isolated focus.",
+    explanation: "Si Heneral Gregorio del Pilar, sa gulang na 24, ang namuno sa 60 kawal na nagtanggol sa Tirad Pass laban sa 33rd Infantry Regiment ng Estados Unidos.",
+    correct_explanation: "Kinilala siya bilang pinakabatang heneral ng hukbong rebolusyonaryo na nagpakita ng sukdulang katapangan upang ipagtanggol ang liderato ng republika.",
     distractor_explanations: {
-      1: "Struggle cards are highlighted for targeted study, not deleted or archived.",
-      2: "Mastery requires active demonstration; cards cannot be marked mastered without correct retrieval.",
-      3: "Prior mastered cards remain locked and scored; only the struggle cards are re-queued."
+      1: "Si Heneral Antonio Luna ang punong heneral ng sandatahang lakas na pinaslang sa Cabanatuan noong Hunyo 1899.",
+      2: "Si Heneral Miguel Malvar ang isa sa mga huling heneral na sumuko sa mga Amerikano sa Batangas noong 1902.",
+      3: "Si Heneral Artemio Ricarte ('Vibora') ay kilala sa hindi pagsuko o panunumpa sa bandila ng Amerika kailanman."
     },
-    discriminatory_keywords: ["targeted review", "deliberate practice", "struggle review", "isolated focus"],
-    concept_tags: ["struggle-pile", "targeted-review", "retrieval-practice"],
+    discriminatory_keywords: ["Gregorio del Pilar", "Pasong Tirad", "Tirad Pass", "Disyembre 2, 1899"],
+    concept_tags: ["tirad-pass", "gregorio-del-pilar", "mga-bayani"],
     source_pages: [4],
     order_index: 6
   },
   {
-    question_text: "Which cognitive principle underlies the discriminatory keywords feature in question feedback?",
+    question_text: "8. Sino ang kinikilalang 'Utak ng Katipunan' na sumulat ng Kartilya ng Katipunan at naging pinagkakatiwalaang tagapayo ni Andres Bonifacio?",
     options: [
-      "Feature contrast: identifying the critical semantic boundaries that distinguish a target concept from similar alternatives",
-      "Rote memorization: repeating dictionary definitions verbatim until stored",
-      "Subliminal priming: flashing keywords to encourage subconscious guessing",
-      "Confirmation bias: reinforcing whatever option the student initially guessed"
+      "Emilio Jacinto",
+      "Apolinario Mabini",
+      "Marcelo H. del Pilar",
+      "Graciano Lopez Jaena"
     ],
     correct_answer: 0,
-    explanation: "Expert knowledge is characterized by fine-grained feature contrast that quickly distinguishes confusing concepts.",
-    correct_explanation: "Discriminatory keywords highlight the boundary conditions and critical attributes separating correct principles from distractors.",
+    explanation: "Si Emilio Jacinto ang tinawag na 'Utak ng Katipunan' at may-akda ng Kartilya na naging gabay sa moralidad at tungkulin ng bawat kasapi ng KKK.",
+    correct_explanation: "Samantalang si Emilio Jacinto ang 'Utak ng Katipunan', si Apolinario Mabini naman ang kinilalang 'Utak ng Himagsikan' at 'Dakilang Lumpo'.",
     distractor_explanations: {
-      1: "Rote memorization lacks conceptual discrimination and fails in applied or transfer scenarios.",
-      2: "Subliminal priming is pseudoscientific and does not foster semantic comprehension.",
-      3: "Confirmation bias impedes error correction; feedback must challenge false assumptions."
+      1: "Si Apolinario Mabini ang 'Utak ng Himagsikan' at naging unang Punong Ministro ng pamahalaang rebolusyonaryo.",
+      2: "Si Marcelo H. del Pilar (Plaridel) ang patnugot ng La Solidaridad sa Espanya.",
+      3: "Si Graciano Lopez Jaena ang tagapagtatag ng La Solidaridad at kilalang orador ng kilusang reporma."
     },
-    discriminatory_keywords: ["feature contrast", "semantic boundary", "boundary conditions", "conceptual discrimination"],
-    concept_tags: ["feature-contrast", "conceptual-discrimination", "semantic-boundary"],
+    discriminatory_keywords: ["Emilio Jacinto", "Utak ng Katipunan", "Kartilya", "Andres Bonifacio"],
+    concept_tags: ["emilio-jacinto", "kartilya", "katipunan"],
     source_pages: [4],
     order_index: 7
+  },
+  {
+    question_text: "9. Anong mapayapang rebolusyon noong Pebrero 22–25, 1986 ang nagwakas sa diktadurang rehimen at nagpanumbalik ng demokrasya sa Pilipinas?",
+    options: [
+      "People Power Revolution (EDSA I)",
+      "First Quarter Storm",
+      "EDSA Dos (People Power II)",
+      "Sigaw ng Pugad Lawin"
+    ],
+    correct_answer: 0,
+    explanation: "Ang People Power Revolution sa EDSA noong Pebrero 1986 ay mapayapang demonstrasyon ng milyun-milyong Pilipino na nagpatalsik kay Ferdinand Marcos Sr. at nagluklok kay Corazon Aquino.",
+    correct_explanation: "Kinilala sa buong daigdig ang EDSA Revolution bilang inspirasyon ng mapayapang pagkilos gamit ang panalangin, bulaklak, at pagkakaisa laban sa awtoritaryanismo.",
+    distractor_explanations: {
+      1: "Ang First Quarter Storm noong 1970 ay serye ng malalaking protesta ng mga estudyante bago ang Batas Militar.",
+      2: "Ang EDSA Dos noong Enero 2001 ang nagpatalsik kay Pangulong Joseph Estrada.",
+      3: "Ang Sigaw ng Pugad Lawin ay naganap noong 1896 laban sa mga Kastila."
+    },
+    discriminatory_keywords: ["People Power Revolution", "EDSA 1986", "Corazon Aquino", "Pebrero 22-25"],
+    concept_tags: ["edsa", "people-power", "makabagong-kasaysayan"],
+    source_pages: [5],
+    order_index: 8
+  },
+  {
+    question_text: "10. Saang makasaysayang simbahan sa Bulacan pinagtibay ang Konstitusyon ng Malolos at pinasinayaan ang Unang Republika ng Pilipinas noong Enero 23, 1899?",
+    options: [
+      "Simbahan ng Barasoain sa Malolos, Bulacan",
+      "Katedral ng Maynila sa Intramuros",
+      "Simbahan ng San Agustin sa Intramuros",
+      "Simbahan ng Paoay sa Ilocos Norte"
+    ],
+    correct_answer: 0,
+    explanation: "Ang Simbahan ng Barasoain sa Malolos, Bulacan ang naging luklukan ng Kongreso ng Malolos na bumalangkas sa kauna-unahang konstitusyong demokratiko sa buong Asya.",
+    correct_explanation: "Sa Simbahan ng Barasoain pormal na pinasinayaan ang Unang Republika ng Pilipinas kung saan nanumpa si Emilio Aguinaldo bilang unang Pangulo ng bansa.",
+    distractor_explanations: {
+      1: "Ang Katedral ng Maynila ay ang sentro ng Arkidiyosesis ng Maynila ngunit hindi dito itinatag ang unang republika.",
+      2: "Ang Simbahan ng San Agustin ang pinakamatandang simbahang bato kung saan nilagdaan ang pagsuko ng Espanya sa Amerika noong 1898.",
+      3: "Ang Simbahan ng Paoay ay kilalang UNESCO World Heritage Baroque church sa Ilocos Norte."
+    },
+    discriminatory_keywords: ["Simbahan ng Barasoain", "Malolos, Bulacan", "Enero 23, 1899", "Unang Republika ng Pilipinas"],
+    concept_tags: ["barasoain", "malolos-republic", "konstitusyon"],
+    source_pages: [5],
+    order_index: 9
   }
 ];
 
 export const SAMPLE_QUIZ_QUESTIONS: QuizQuestion[] = SAMPLE_QUESTIONS.map((q, idx) => {
   const options = q.options || [];
   const correctAnswer = q.correct_answer ?? 0;
+  const questionId = `c0000000-0000-4000-8000-${String(idx + 1).padStart(12, '0')}`;
   return {
-    id: `q-cognitive-mastery-${idx + 1}`,
+    id: questionId,
     quiz_id: SAMPLE_QUIZ_ID,
     question_text: q.question_text,
     answer_text: options[correctAnswer] || '',

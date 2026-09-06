@@ -46,7 +46,7 @@ export class MasterySessionController {
   }
 
   async getOrStartSession(quizId: string, sessionType: SessionType = 'initial', userId?: string, providedQuestions?: QuizQuestion[]) {
-    if (!isUuid(quizId)) {
+    if (!isUuid(quizId) || quizId === SAMPLE_QUIZ_ID) {
       const sessionPromise = MasterySessionController.sampleSessionRepo.getActiveSession(quizId, userId);
       const questionsPromise = providedQuestions
         ? Promise.resolve(providedQuestions)

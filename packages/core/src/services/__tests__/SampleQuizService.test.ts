@@ -11,18 +11,20 @@ import { MemoryQuizRepository } from '../../repositories/MemoryQuizRepository';
 import { LocalFirstQuizRepository } from '../../repositories/LocalFirstQuizRepository';
 
 describe('SampleQuizService & Default Loading', () => {
-  it('provides a complete 8-question Cognitive Mastery sample quiz dataset', () => {
+  it('provides a complete 10-question Filipino History sample quiz dataset', () => {
     const data = SampleQuizService.getSampleData();
     expect(data.quiz.id).toBe(SAMPLE_QUIZ_ID);
-    expect(data.quiz.question_count).toBe(8);
+    expect(data.quiz.question_count).toBe(10);
     expect(data.subject.id).toBe(SAMPLE_SUBJECT_ID);
-    expect(data.questions.length).toBe(8);
-    expect(data.quizQuestions.length).toBe(8);
+    expect(data.subject.name).toBe('Kasaysayan ng Pilipinas');
+    expect(data.questions.length).toBe(10);
+    expect(data.quizQuestions.length).toBe(10);
   });
 
   it('guarantees elaborative feedback fields on all sample questions', () => {
     SAMPLE_QUIZ_QUESTIONS.forEach((q, idx) => {
-      expect(q.id).toBe(`q-cognitive-mastery-${idx + 1}`);
+      const expectedId = `c0000000-0000-4000-8000-${String(idx + 1).padStart(12, '0')}`;
+      expect(q.id).toBe(expectedId);
       expect(q.correct_explanation).toBeTruthy();
       expect(typeof q.correct_explanation).toBe('string');
       expect(q.distractor_explanations).toBeDefined();
@@ -40,15 +42,16 @@ describe('SampleQuizService & Default Loading', () => {
     const quizzes = await repo.listQuizzes();
     const sampleQuiz = quizzes.find(q => q.id === SAMPLE_QUIZ_ID);
     expect(sampleQuiz).toBeDefined();
-    expect(sampleQuiz?.title).toContain('Cognitive Mastery Loop');
+    expect(sampleQuiz?.title).toContain('Kasaysayan ng Pilipinas');
 
     const questions = await repo.getQuestionsByQuizId(SAMPLE_QUIZ_ID);
-    expect(questions.length).toBe(8);
+    expect(questions.length).toBe(10);
     expect(questions[0].correct_explanation).toBeTruthy();
 
     const subjects = await repo.listSubjects();
     const sampleSubject = subjects.find(s => s.id === SAMPLE_SUBJECT_ID);
     expect(sampleSubject).toBeDefined();
+    expect(sampleSubject?.name).toBe('Kasaysayan ng Pilipinas');
   });
 
   it('LocalFirstQuizRepository seeds sample quiz by default', async () => {
@@ -56,8 +59,9 @@ describe('SampleQuizService & Default Loading', () => {
     const quizzes = await repo.listQuizzes();
     const sampleQuiz = quizzes.find(q => q.id === SAMPLE_QUIZ_ID);
     expect(sampleQuiz).toBeDefined();
+    expect(sampleQuiz?.title).toContain('Kasaysayan ng Pilipinas');
 
     const questions = await repo.getQuestionsByQuizId(SAMPLE_QUIZ_ID);
-    expect(questions.length).toBe(8);
+    expect(questions.length).toBe(10);
   });
 });

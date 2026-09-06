@@ -74,7 +74,7 @@ describe('QuizGenerationController - pipelineMode', () => {
     await controller.handleStreamingGeneration(
       {
         title: 'Sample-derived Quiz',
-        subjectId: 'sub-cognitive-mastery',
+        subjectId: 'non-uuid-sample-subject',
         text: 'Sample notes',
         pipelineMode: 'two_stage'
       },

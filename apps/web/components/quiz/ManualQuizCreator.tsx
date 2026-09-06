@@ -70,11 +70,9 @@ const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentTy
 ];
 
 export default function ManualQuizCreator({
-  subjects,
-  onSwitchToAi
+  subjects
 }: {
   subjects?: Array<{ id: string; name: string; color?: string }>;
-  onSwitchToAi?: () => void;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState('');
@@ -623,16 +621,6 @@ export default function ManualQuizCreator({
           Back to Hub
         </Link>
         <div className="flex items-center gap-2.5">
-          {onSwitchToAi && (
-            <button
-              type="button"
-              onClick={onSwitchToAi}
-              className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-              <span>Generate with AI</span>
-            </button>
-          )}
           {draftStatus === 'saved' && (
             <span className="text-[11px] font-semibold text-muted-foreground">Draft saved locally</span>
           )}

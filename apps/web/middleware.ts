@@ -15,10 +15,12 @@ export async function middleware(request: NextRequest) {
 
   const newSessionValue = await createAnonymousSessionValue();
   request.cookies.set(ANON_COOKIE_NAME, newSessionValue);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('cookie', request.cookies.toString());
 
   const response = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: requestHeaders,
     },
   });
 

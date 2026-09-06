@@ -23,7 +23,7 @@ export class NeonSessionRepository implements ISessionRepository {
     return rows as QuizSession[];
   }
   async getSessionById(sessionId: string, userId?: string) {
-    const rows = userId ? await this.sql`SELECT * FROM quiz_sessions WHERE id = ${sessionId} AND user_id = ${userId} LIMIT 1` : await this.sql`SELECT * FROM quiz_sessions WHERE id = ${sessionId} LIMIT 1`;
+    const rows = userId ? await this.sql`SELECT * FROM quiz_sessions WHERE id = ${sessionId} AND (user_id = ${userId} OR user_id IS NULL) LIMIT 1` : await this.sql`SELECT * FROM quiz_sessions WHERE id = ${sessionId} LIMIT 1`;
     return rows[0] as QuizSession || null;
   }
   async createSession(quizId: string, sessionType: SessionType, availableAt?: string, userId?: string) {
@@ -39,18 +39,18 @@ export class NeonSessionRepository implements ISessionRepository {
     return rows[0] as QuizSession;
   }
   async getProgressForSession(sessionId: string, userId?: string) {
-    const rows = userId ? await this.sql`SELECT p.* FROM quiz_question_progress p JOIN quiz_sessions s ON s.id = p.session_id WHERE p.session_id = ${sessionId} AND s.user_id = ${userId}` : await this.sql`SELECT * FROM quiz_question_progress WHERE session_id = ${sessionId}`;
+    const rows = userId ? await this.sql`SELECT p.* FROM quiz_question_progress p JOIN quiz_sessions s ON s.id = p.session_id WHERE p.session_id = ${sessionId} AND (s.user_id = ${userId} OR s.user_id IS NULL)` : await this.sql`SELECT * FROM quiz_question_progress WHERE session_id = ${sessionId}`;
     return rows as QuestionProgress[];
   }
   private async assertProgressAccess(progress: QuestionProgress, userId?: string): Promise<void> {
     if (!userId) return;
-    const rows = await this.sql`SELECT 1 FROM quiz_sessions s JOIN quiz_questions q ON q.quiz_id = s.quiz_id WHERE s.id = ${progress.session_id} AND s.user_id = ${userId} AND q.id = ${progress.question_id} LIMIT 1`;
+    const rows = await this.sql`SELECT 1 FROM quiz_sessions s JOIN quiz_questions q ON q.quiz_id = s.quiz_id WHERE s.id = ${progress.session_id} AND (s.user_id = ${userId} OR s.user_id IS NULL) AND q.id = ${progress.question_id} LIMIT 1`;
     if (!rows.length) throw new Error('Session or question access is restricted');
   }
   async saveQuestionProgress(progress: QuestionProgress, userId?: string) {
     await this.assertProgressAccess(progress, userId);
     if (progress.id) {
-      const rows = userId ? await this.sql`UPDATE quiz_question_progress p SET streak_count = ${progress.streak_count}, has_missed = ${progress.has_missed}, locked = ${progress.locked}, locked_at = ${progress.locked_at || null} WHERE p.id = ${progress.id} AND EXISTS (SELECT 1 FROM quiz_sessions s WHERE s.id = p.session_id AND s.user_id = ${userId}) RETURNING p.*` : await this.sql`UPDATE quiz_question_progress SET streak_count = ${progress.streak_count}, has_missed = ${progress.has_missed}, locked = ${progress.locked}, locked_at = ${progress.locked_at || null} WHERE id = ${progress.id} RETURNING *`;
+      const rows = userId ? await this.sql`UPDATE quiz_question_progress p SET streak_count = ${progress.streak_count}, has_missed = ${progress.has_missed}, locked = ${progress.locked}, locked_at = ${progress.locked_at || null} WHERE p.id = ${progress.id} AND EXISTS (SELECT 1 FROM quiz_sessions s WHERE s.id = p.session_id AND (s.user_id = ${userId} OR s.user_id IS NULL)) RETURNING p.*` : await this.sql`UPDATE quiz_question_progress SET streak_count = ${progress.streak_count}, has_missed = ${progress.has_missed}, locked = ${progress.locked}, locked_at = ${progress.locked_at || null} WHERE id = ${progress.id} RETURNING *`;
       if (!rows.length) throw new Error('Progress not found or access is restricted');
       return rows[0] as QuestionProgress;
     }

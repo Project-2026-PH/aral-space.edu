@@ -118,6 +118,52 @@ export class QuizTransformService {
   }
 
   /**
+   * Rephrases a definition for an identification question without exposing its answer term.
+   *
+   * Definitions copied from reference material often begin with the answer, for example:
+   * `The 802.11 (Wi-Fi) standard applies to WLANs...`. Replacing only the exact term
+   * keeps the useful definition while preventing the answer from being shown in the prompt.
+   */
+  static phraseIdentificationPrompt(definition: string, term: string): string {
+    let cleanDefinition = definition.trim();
+    const cleanTerm = term.trim();
+    if (!cleanDefinition || !cleanTerm) return cleanDefinition;
+
+    const escapedTerm = cleanTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const leadingTermPattern = new RegExp(
+      `^The\\s+${escapedTerm}(?:\\s+(\\([^)]*\\)))?\\s+([a-z][\\w-]*)`,
+      'i'
+    );
+    const leadingTerm = cleanDefinition.match(leadingTermPattern);
+
+    if (leadingTerm) {
+      const descriptor = leadingTerm[1] ? ` ${leadingTerm[1].trim()}` : '';
+      const remainder = cleanDefinition.slice(leadingTerm[0].length);
+      const nounOrVerb = leadingTerm[2];
+      const verbLed = /^(?:is|are|was|were|has|have|had|does|do|did|can|could|will|would|may|might|must|refers|means|includes|consists|focuses|allows|provides|uses|applies|supports|describes|involves)$/i.test(nounOrVerb);
+
+      cleanDefinition = verbLed
+        ? `This${descriptor} ${nounOrVerb}${remainder}`
+        : `This is the ${nounOrVerb}${descriptor}${remainder ? ` that${remainder}` : ''}`;
+    }
+
+    const contextualPatterns: Array<[RegExp, string]> = [
+      [new RegExp(`\\bthe\\s+${escapedTerm}\\s+(specifications?)`, 'gi'), 'these $1'],
+      [new RegExp(`\\bthe\\s+${escapedTerm}\\s+(standard|amendment|process|method|system)`, 'gi'), 'this $1']
+    ];
+    for (const [pattern, replacement] of contextualPatterns) {
+      cleanDefinition = cleanDefinition.replace(pattern, replacement);
+    }
+
+    // Match the complete term, not a prefix of a related term such as `802.11a`.
+    const termPattern = new RegExp(
+      `(^|[^A-Za-z0-9])${escapedTerm}(?![A-Za-z0-9])`,
+      'gi'
+    );
+    return cleanDefinition.replace(termPattern, '$1this concept').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
    * Paraphrases a question or definition into a declarative statement for a given term.
    */
   static paraphraseToStatement(questionText: string, term: string): string {

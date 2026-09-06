@@ -217,3 +217,180 @@ When author selects **True or False** (or when running True/False practice mode)
 * **Options:** `['True', 'False']`
 * **Correct Answer:** `1` (`False`)
 * **Feedback:** *"False. This statement actually describes \"Stage 1:New Processes\", not \"Stage 2:New Marketplace\"."*
+
+
+## 6. Reviewer Export Contract
+
+The quiz detail page exposes an **Export** menu immediately beside **Share**. Export behavior is implemented in [`apps/web/lib/quizExport.ts`](file:///c:/Users/User/IntelliJ/quiz-creator/apps/web/lib/quizExport.ts) and [`apps/web/components/quiz/QuizExportMenu.tsx`](file:///c:/Users/User/IntelliJ/quiz-creator/apps/web/components/quiz/QuizExportMenu.tsx).
+
+### 6.1 JSON
+
+JSON uses a versioned, source-grounded document shape designed for deterministic local re-import:
+
+```json
+{
+  "format": "quiz-creator-reviewer",
+  "version": 1,
+  "title": "Wireless Networks",
+  "description": "",
+  "questions": [
+    {
+      "question_text": "...",
+      "answer_text": "Unauthorized Association",
+      "question_type": "typed_answer",
+      "options": ["Unauthorized Association"],
+      "explanation": "",
+      "source_pages": []
+    }
+  ]
+}
+```
+
+### 6.2 CSV
+
+CSV contains one question per row with these headers:
+
+```text
+question_text,answer_text,question_type,options,explanation,source_pages
+```
+
+`options` is JSON-encoded inside the CSV cell and `source_pages` is pipe-delimited. Fields are quoted and escaped when they contain commas, quotes, or line breaks.
+
+### 6.3 PDF
+
+PDF export is browser-based: the app opens a print-ready answer-key document containing the title, each question, options, answer, and explanation. The user selects **Save as PDF** in the browser print dialog. This avoids adding a client-side PDF dependency while keeping the text selectable for a future local parser.
+
+## 7. Compound Handout Entries and Nested Concepts
+
+A handout block may have one primary term but several important subordinate concepts. The parser should model this as a parent concept with explicitly detected children, rather than splitting every technical phrase into a separate card.
+
+### 7.1 Detection Rules
+
+Nested extraction should be attempted only when the source provides strong structural evidence:
+
+1. A primary `Term: definition` or `Term — definition` heading has already been detected.
+2. The definition contains an explicit cardinality or grouping cue, such as `two forms`, `three types`, `categories include`, or `classified as`.
+3. The subordinate names are repeated or introduced using recognizable labels, such as `accidental association involves...` and `malicious association...`, a numbered list, bullets, or separate `Term: definition` lines.
+4. A child definition must contain meaningful descriptive text and must be tied to the parent block.
+
+Do **not** create child cards merely because a paragraph contains capitalized words or technical nouns. This would turn incidental references such as `soft APs`, `Trojans`, and `wired network` into noisy false concepts.
+
+### 7.2 Proposed Internal Representation
+
+The existing `single_pair` and `bulk_terms` results remain backward-compatible. A future compound result can add optional metadata rather than changing the meaning of existing fields:
+
+```typescript
+interface CompoundConcept {
+  term: string;
+  definition: string;
+  children: Array<{
+    term: string;
+    definition: string;
+    relation: 'form' | 'type' | 'component' | 'step';
+    confidence: number;
+  }>;
+}
+```
+
+The parent remains the source of truth. Child cards should carry `parentTerm` / `relation` metadata when persisted so the UI can present them as a group and exports can preserve the hierarchy.
+
+### 7.3 Unauthorized Association Example
+
+The current parser sees the opening `Unauthorized Association:` delimiter and produces one parent pair. The full wrapped paragraph remains the definition, including the phrases `accidental association` and `malicious association`.
+
+The intended future output is:
+
+**Parent identification card**
+
+- **Prompt:** `A major threat to wireless networks involving two forms that can create unauthorized access to an enterprise network. What is this threat?`
+- **Answer:** `Unauthorized Association`
+
+**Enumeration card**
+
+- **Prompt:** `What are the two forms of Unauthorized Association?`
+- **Answer:** `accidental association; malicious association`
+
+**Child identification card: malicious association**
+
+- **Prompt:** `An attacker uses soft APs instead of corporate APs, infects a victim machine, and activates the soft APs to allow an unauthorized connection to the enterprise network. What form of unauthorized association is this?`
+- **Answer:** `malicious association`
+
+**Child identification card: accidental association**
+
+- **Prompt:** `A device connects to a target network's access point from a neighboring organization's overlapping network without the victim's knowledge. What form of unauthorized association is this?`
+- **Answer:** `accidental association`
+
+The local algorithm should first create the parent card, then create the enumeration card, and finally create child cards only when the child-specific definition can be isolated with sufficient confidence. If child boundaries are ambiguous, it is safer to retain the terms inside the parent definition and create only the parent card than to invent unsupported questions.
+
+### 7.4 Recommended Processing Pipeline
+
+```text
+Raw handout block
+  -> detect primary term and full definition
+  -> normalize wrapped lines
+  -> detect explicit group cue (e.g. "two forms")
+  -> locate subordinate labels and their sentence spans
+  -> score child extraction confidence
+  -> emit parent card
+  -> emit enumeration card when all child labels are known
+  -> emit child cards only above the confidence threshold
+```
+
+This preserves the deterministic, offline behavior of the local generator while supporting the richer structure commonly found in Philippine college handouts.
+
+
+## 8. Naming-Relation Definitions
+
+Not every handout entry has a visible `Term: Definition` heading. A common academic format describes a phenomenon first and then names it with a sentence such as:
+
+```text
+Users who regularly connect to multiple WLANs may connect to the rogue AP. Such APs mounted by attackers are called “honeypot” APs.
+```
+
+### 8.1 Correct Interpretation
+
+The answer is the phrase after the naming relation:
+
+```text
+Term: honeypot APs
+Definition: rogue APs mounted by attackers that users may unknowingly connect to
+Relation: called
+```
+
+A suitable multiple-choice question from the local generator is:
+
+```text
+Users who connect to multiple WLANs may unknowingly connect to rogue APs mounted by attackers. What are such APs called?
+```
+
+The correct option is `honeypot APs`. The answer term must be removed from the question stem, while the source wording remains the basis for the explanation and `correct_explanation`.
+
+### 8.2 Detection Rule
+
+This should be a dedicated naming-relation extractor evaluated before the generic `is / are` sentence splitter:
+
+```text
+[descriptive subject] is|are called [quoted or unquoted term]
+[descriptive subject] is|are known as [term]
+[descriptive subject] is|are referred to as [term]
+```
+
+The extractor should:
+
+1. Join soft-wrapped lines into normalized sentence text.
+2. Match the relation phrase (`called`, `known as`, or `referred to as`).
+3. Treat the phrase after the relation as the answer term.
+4. Use the descriptive subject and nearby context as the definition.
+5. Remove quotes and trailing sentence punctuation from the answer term.
+6. Redact the answer term from the generated question.
+7. Require a short, label-shaped answer (for example, `honeypot APs`) and meaningful descriptive context.
+
+The generic sentence splitter must not process `Such APs mounted by attackers are called...` first. If it does, it may incorrectly infer `Such APs mounted by attackers` as the term and leave `honeypot APs` in the definition.
+
+### 8.3 Conservative Fallback
+
+If the relation phrase is ambiguous, the answer contains a full sentence, or no useful context can be isolated, keep the source as an ordinary definition block instead of guessing. The parser should never create cards for incidental nouns such as `WLANs`, `rogue AP`, or `attackers` unless the source explicitly names them through a supported relation.
+
+### 8.4 Current Implementation Status
+
+The current `LocalQuizGenerator` supports delimiter, sentence, wrapped, and compound-form concepts, but it does not yet implement naming-relation extraction. For the supplied soft-wrapped example, the current parser can return no concept because the fragment does not match its existing term-definition patterns. If the naming sentence is isolated, the generic splitter can instead incorrectly identify `Such APs mounted by attackers` as the term because it sees `are` before `called`. Adding a naming-relation stage before `splitSentenceDefinition` is the required implementation step.

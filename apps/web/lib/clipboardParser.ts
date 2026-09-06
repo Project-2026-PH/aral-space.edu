@@ -9,8 +9,8 @@ const BULLET_PREFIX = /^(?:[•▪‣◦●○*]|[-–—]|\(?\d+[.)]|[oO][.)]?(
 /** Splits a line into `term <delimiter> rest`, taking the earliest delimiter. */
 const TERM_DELIMITER = /^(.{2,80}?)(?:\s*:(?:\s+|$)|\s+[–—](?:\s+|$)|\s+-(?:\s+|$))([\s\S]*)$/;
 
-/** A term looks like a short label, not a sentence: no commas, no periods. */
-const TERM_SHAPE = /^[A-Z0-9][A-Za-z0-9\s\-_/()&'’]*$/;
+/** A term looks like a short label, not a sentence: no commas or sentence punctuation. */
+const TERM_SHAPE = /^[A-Z0-9][A-Za-z0-9\s.\-_/()&'’]*$/;
 
 /** Finite verbs — their presence means a clause is a statement, not a term label. */
 const FINITE_VERB =

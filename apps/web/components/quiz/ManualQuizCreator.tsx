@@ -208,7 +208,7 @@ export default function ManualQuizCreator({
       next[qIdx] = {
         ...next[qIdx],
         type: 'identification',
-        question_text: parsed.definition,
+        question_text: QuizTransformService.phraseIdentificationPrompt(parsed.definition, parsed.term),
         options: [parsed.term],
         correct_answer: 0
       };
@@ -233,7 +233,7 @@ export default function ManualQuizCreator({
       next[qIdx] = {
         ...next[qIdx],
         type: 'identification',
-        question_text: parsed.definition,
+        question_text: QuizTransformService.phraseIdentificationPrompt(parsed.definition, parsed.term),
         options: [parsed.term],
         correct_answer: 0
       };
@@ -268,7 +268,7 @@ export default function ManualQuizCreator({
     if (pendingImport.type === 'bulk_terms') {
       const newCards: QuestionDraft[] = pendingImport.items.map((item) => ({
         type: 'identification',
-        question_text: item.definition,
+        question_text: QuizTransformService.phraseIdentificationPrompt(item.definition, item.term),
         options: [item.term],
         correct_answer: 0,
         explanation: ''

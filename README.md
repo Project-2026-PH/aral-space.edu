@@ -156,3 +156,41 @@ To apply database schema to Neon or PostgreSQL:
 
 - **[Clipboard Parser & Transformation Flow](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md)**: Comprehensive architectural flow and algorithms for clipboard parsing, definition-to-question conversion, and True/False paraphrasing with the Term Swap Rule.
 - **[Infisical Secrets Setup](INFISICAL.md)**: Secrets management, KMS encryption, and environment variables.
+
+
+## 📤 Reviewer Export and Local Re-import Contract
+
+Quiz detail pages (`/quizzes/[quizId]`) provide an **Export** menu beside **Share**:
+
+- **JSON** downloads the stable `quiz-creator-reviewer` format (`version: 1`) with the quiz title, description, and question records.
+- **CSV** downloads one row per question with explicit `question_text`, `answer_text`, `question_type`, `options`, `explanation`, and `source_pages` columns.
+- **PDF** opens a print-ready answer-key document; choose **Save as PDF** in the browser print dialog.
+
+These formats are intentionally source-grounded and deterministic. A future local clipboard importer can recognize the JSON/CSV field names or the PDF's repeated `Question` / `Answer` structure without sending the content to an AI provider. The export implementation is in [`apps/web/lib/quizExport.ts`](apps/web/lib/quizExport.ts), with the menu in [`apps/web/components/quiz/QuizExportMenu.tsx`](apps/web/components/quiz/QuizExportMenu.tsx).
+
+## 🧩 Compound Handout Entries
+
+College handouts often use one primary term followed by a paragraph containing important subordinate concepts. The local parser should preserve the primary entry and only create subordinate cards when the source provides explicit structure. For example, an `Unauthorized Association` entry can produce:
+
+1. A parent identification card whose answer is **Unauthorized Association**.
+2. An enumeration card asking for its two forms: **accidental association** and **malicious association**.
+3. Optional child identification cards for **malicious association** and **accidental association**, using only the sentences that explicitly define each form.
+
+The parser must not promote every technical noun in a paragraph to a new card. Child extraction should require evidence such as a phrase like `two forms`, a numbered/bulleted list, a repeated `Term: definition` pattern, or an explicit definition verb. This avoids noisy cards and keeps the parent-child relationship available for later review and export.
+
+
+## 🏷️ Naming-Relation Handout Entries
+
+Some handouts define a term indirectly with a naming sentence instead of a `Term: Definition` heading. For example:
+
+```text
+Users who regularly connect to multiple WLANs may connect to the rogue AP. Such APs mounted by attackers are called “honeypot” APs.
+```
+
+The local parser should interpret this as:
+
+- **Answer term:** `honeypot APs`
+- **Source definition:** rogue APs mounted by attackers that users may unknowingly connect to
+- **Question:** `Users who connect to multiple WLANs may unknowingly connect to rogue APs mounted by attackers. What are such APs called?`
+
+The answer must not appear in the question stem. Naming relations should be recognized only for explicit patterns such as `is called`, `are called`, `known as`, or `referred to as`. The parser should normalize soft-wrapped lines before applying the rule and should not promote the descriptive subject before `are called` to a term. See the detailed strategy in [CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md).

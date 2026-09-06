@@ -6,6 +6,7 @@ import QuizQuestionList from './QuizQuestionList';
 import QuizQuestionFormModal from './QuizQuestionFormModal';
 import QuizStartConfigModal from './QuizStartConfigModal';
 import ShareQuizModal from './ShareQuizModal';
+import QuizExportMenu from './QuizExportMenu';
 import ConfirmModal from '../ui/ConfirmModal';
 import { Play, Plus, Edit, Trash2, ArrowLeft, Share2 } from 'lucide-react';
 import Link from 'next/link';
@@ -95,6 +96,7 @@ export default function QuizOverviewClient({
           >
             <Trash2 className="h-4 w-4" />
           </button>
+          <QuizExportMenu quiz={quiz} questions={questions} />
           <button
             onClick={() => setShowShareModal(true)}
             className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"

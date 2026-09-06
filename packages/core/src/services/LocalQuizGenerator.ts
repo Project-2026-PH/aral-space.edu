@@ -6,16 +6,22 @@ export interface LocalConcept {
   sourcePages: number[];
   chapter?: string;
   confidence: number;
-  evidence: 'delimiter' | 'sentence' | 'wrapped';
+  evidence: 'delimiter' | 'sentence' | 'wrapped' | 'compound' | 'naming';
+  parentTerm?: string;
+  relation?: 'form' | 'type' | 'component' | 'step';
+  namingRelation?: 'called' | 'known_as' | 'referred_to_as';
+  namingSubject?: string;
+  namingContext?: string;
 }
 
 interface ConceptCandidate extends LocalConcept {
   order: number;
 }
 
-const TERM_SHAPE = /^[A-Z0-9][A-Za-z0-9\s\-_/()&'’]*$/;
+const TERM_SHAPE = /^[A-Z0-9][A-Za-z0-9\s.\-_/()&'’]*$/;
 const BULLET_PREFIX = /^(?:[•▪‣◦●○*]|[-–—]|\(?\d+[.)]|[a-zA-Z][.)])\s+/;
 const SENTENCE_VERB = /^(?:is|are|was|were|refers to|means|describes|defines|consists of|includes|allows|provides|represents|denotes)\s+/i;
+const NAMING_RELATION = /\b(?:is|are|was|were)\s+(called|known as|referred to as)\b/i;
 const STOP_WORDS = new Set([
   'a', 'an', 'and', 'as', 'at', 'be', 'by', 'for', 'from', 'in', 'into', 'is', 'it',
   'of', 'on', 'or', 'that', 'the', 'their', 'this', 'to', 'used', 'with'
@@ -83,6 +89,59 @@ function splitSentenceDefinition(value: string): { term: string; definition: str
   return definition.length > 8 ? { term: normalizeTerm(match[1]), definition } : null;
 }
 
+interface NamingConceptPair {
+  term: string;
+  definition: string;
+  subject: string;
+  context?: string;
+  relation: 'called' | 'known_as' | 'referred_to_as';
+}
+
+function cleanNamingTerm(value: string): string {
+  return value
+    .replace(/[.!?]+$/, '')
+    .replace(/^["“'‘]+|["”'’]+$/g, '')
+    .replace(/["“”'‘’]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function splitNamingDefinition(value: string, previousSentence?: string): NamingConceptPair | null {
+  const body = stripBullet(value).replace(/[.!?]+$/, '').trim();
+  const match = body.match(/^(.{2,160}?)\s+(?:is|are|was|were)\s+(called|known as|referred to as)\s+(.+)$/i);
+  if (!match) return null;
+
+  const term = cleanNamingTerm(match[3]);
+  const subject = normalizeWhitespace(match[1]).replace(/^(?:such|these|those)\s+/i, '').trim();
+  if (!isNestedTerm(term) || subject.length < 5 || subject.length > 140) return null;
+
+  const relation = match[2].toLowerCase() === 'called'
+    ? 'called'
+    : match[2].toLowerCase() === 'known as'
+      ? 'known_as'
+      : 'referred_to_as';
+  const context = /^(?:such|these|those)\b/i.test(match[1]) && previousSentence
+    ? cleanDefinition(previousSentence)
+    : undefined;
+  const definition = cleanDefinition([context, `${subject}.`].filter(Boolean).join(' '));
+
+  return definition.length > 8 ? { term, definition, subject, context, relation } : null;
+}
+
+function extractNamingDefinitions(value: string): NamingConceptPair[] {
+  const sentences = splitSentences(normalizeWhitespace(value));
+  const pairs: NamingConceptPair[] = [];
+
+  for (let index = 0; index < sentences.length; index++) {
+    const pair = splitNamingDefinition(sentences[index], sentences[index - 1]);
+    if (pair && !pairs.some((existing) => existing.term.toLowerCase() === pair.term.toLowerCase())) {
+      pairs.push(pair);
+    }
+  }
+
+  return pairs;
+}
+
 function looksLikeStandaloneTerm(value: string): boolean {
   const term = stripBullet(value);
   return isValidTerm(term) && !/[,:;.!?]$/.test(term) && term.split(/\s+/).length <= 8;
@@ -90,6 +149,156 @@ function looksLikeStandaloneTerm(value: string): boolean {
 
 function conceptKey(term: string, definition: string): string {
   return `${normalizeTerm(term).toLowerCase()}|${definition.toLowerCase()}`;
+}
+
+interface CompoundConceptGroup {
+  parent: LocalConcept;
+  children: LocalConcept[];
+  relation: 'form' | 'type' | 'component' | 'step';
+}
+
+const COMPOUND_GROUP_CUE = /\b(?:has|have|contains?|includes?)\s+(two|three|four|five|\d+)\s*(?:\(\s*\d+\s*\)\s*)?(forms?|types?|categories?|kinds?|stages?)\s*:\s*([^.!?]+)/i;
+const COMPOUND_COUNT_WORDS: Record<string, number> = {
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5
+};
+const NESTED_TERM_SHAPE = /^[A-Za-z0-9][A-Za-z0-9\s\-_/()&'’]*$/;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isNestedTerm(value: string): boolean {
+  const term = normalizeWhitespace(value).replace(/^(?:a|an|the)\s+/i, '').trim();
+  if (!NESTED_TERM_SHAPE.test(term) || term.length < 3 || term.length > 60) return false;
+  if (term.split(/\s+/).length > 6) return false;
+  return !/\b(?:is|are|was|were|involves|refers|means|includes|consists|provides)\b/i.test(term);
+}
+
+function splitCompoundLabels(value: string, expectedCount: number): string[] {
+  return value
+    .replace(/\s+/g, ' ')
+    .replace(/[.;]+$/, '')
+    .split(/\s*(?:,|;|\band\b|\bor\b)\s*/i)
+    .map((part) => part.trim())
+    .filter((part) => isNestedTerm(part))
+    .slice(0, expectedCount);
+}
+
+function splitSentences(value: string): string[] {
+  return value.match(/[^.!?]+(?:[.!?]+|$)/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [];
+}
+
+function containsExactTerm(value: string, term: string): boolean {
+  const pattern = new RegExp(`(^|[^A-Za-z0-9])${escapeRegExp(term)}(?![A-Za-z0-9])`, 'i');
+  return pattern.test(value);
+}
+
+function redactTerm(value: string, term: string): string {
+  const escapedTerm = escapeRegExp(term);
+  const replacement = /association$/i.test(term) ? 'this type of association' : 'this concept';
+  const withArticle = new RegExp(`\\b(?:a|an|the)\\s+${escapedTerm}(?![A-Za-z0-9])`, 'gi');
+  const exactTerm = new RegExp(`(^|[^A-Za-z0-9])${escapedTerm}(?![A-Za-z0-9])`, 'gi');
+  return value
+    .replace(withArticle, replacement)
+    .replace(exactTerm, '$1' + replacement)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractCompoundGroup(parent: LocalConcept): CompoundConceptGroup | null {
+  const match = parent.definition.match(COMPOUND_GROUP_CUE);
+  if (!match) return null;
+
+  const expectedCount = COMPOUND_COUNT_WORDS[match[1].toLowerCase()] || Number(match[1]);
+  if (!Number.isFinite(expectedCount) || expectedCount < 2) return null;
+
+  const childTerms = splitCompoundLabels(match[3], expectedCount);
+  if (childTerms.length < 2 || childTerms.length !== expectedCount) return null;
+
+  const sentences = splitSentences(parent.definition);
+  const cueSentenceIndex = sentences.findIndex((sentence) => COMPOUND_GROUP_CUE.test(sentence));
+  if (cueSentenceIndex < 0) return null;
+
+  const anchorIndices = childTerms.map((term) => sentences.findIndex(
+    (sentence, index) => index > cueSentenceIndex && containsExactTerm(sentence, term)
+  ));
+  if (anchorIndices.some((index) => index < 0) || new Set(anchorIndices).size !== anchorIndices.length) return null;
+
+  const children = childTerms.map((term, index) => {
+    const start = anchorIndices[index];
+    const end = anchorIndices
+      .filter((anchor) => anchor > start)
+      .sort((a, b) => a - b)[0] ?? sentences.length;
+    const definition = sentences
+      .slice(start, end)
+      .join(' ')
+      .replace(/^(?:on the other hand|however|in contrast),?\s*/i, '')
+      .trim();
+
+    if (definition.length <= term.length + 12) return null;
+
+    return {
+      term,
+      definition,
+      sourcePages: parent.sourcePages,
+      chapter: parent.chapter,
+      confidence: Math.min(0.94, parent.confidence * 0.95),
+      evidence: 'compound' as const,
+      parentTerm: parent.term,
+      relation: 'form' as const
+    };
+  });
+
+  if (children.some((child) => child === null)) return null;
+  return { parent, children: children as LocalConcept[], relation: 'form' };
+}
+
+function compoundQuestionStem(concept: LocalConcept): string {
+  const definition = redactTerm(concept.definition, concept.term).replace(/[.!?]+$/, '');
+  return `Which concept is described by: ${lowerFirst(definition)}?`;
+}
+
+function namingQuestionStem(concept: LocalConcept): string {
+  const context = redactTerm(concept.namingContext || concept.definition, concept.term).replace(/[.!?]+$/, '');
+  const subject = concept.namingSubject || 'these items';
+  return `${context}. What are ${subject} called?`;
+}
+
+function buildEnumerationQuestion(
+  group: CompoundConceptGroup,
+  allConcepts: LocalConcept[]
+): RawAiQuestion {
+  const childTerms = group.children.map((child) => child.term);
+  const correct = childTerms.join(', ');
+  const otherTerms = allConcepts
+    .filter((concept) => !childTerms.some((term) => term.toLowerCase() === concept.term.toLowerCase()))
+    .map((concept) => concept.term);
+  const alternatives = [
+    childTerms.slice().reverse().join(', '),
+    `${childTerms[0]}, ${otherTerms[0] || 'an unrelated concept'}`,
+    `${childTerms[1]}, ${otherTerms[1] || 'another unrelated concept'}`
+  ];
+  const options: string[] = [];
+  for (const option of [correct, ...alternatives, ...SAFE_FALLBACK_DISTRACTORS]) {
+    if (!options.some((existing) => existing.toLowerCase() === option.toLowerCase())) {
+      options.push(option);
+    }
+    if (options.length === 4) break;
+  }
+
+  return {
+    question: 'Which pair lists the two forms of this threat?',
+    options,
+    correct_answer: options.findIndex((option) => option.toLowerCase() === correct.toLowerCase()),
+    explanation: `The two forms of ${group.parent.term} are ${correct}.`,
+    correct_explanation: `The source identifies ${correct} as the two forms of ${group.parent.term}.`,
+    source_pages: group.parent.sourcePages,
+    chapter: group.parent.chapter,
+    discriminatory_keywords: childTerms
+  };
 }
 
 function chapterName(chapter?: string): string | undefined {
@@ -117,6 +326,33 @@ function addCandidate(
     chapter: chapterName(page.chapterTitle),
     confidence: evidence === 'delimiter' ? 0.98 : evidence === 'sentence' ? 0.9 : 0.8,
     evidence,
+    order
+  });
+}
+
+function addNamingCandidate(
+  candidates: ConceptCandidate[],
+  pair: NamingConceptPair,
+  page: HandoutPage,
+  order: number
+): void {
+  const term = normalizeWhitespace(pair.term);
+  const definition = cleanDefinition(pair.definition);
+  if (!isNestedTerm(term) || definition.length <= 8) return;
+  if (candidates.some((candidate) => conceptKey(candidate.term, candidate.definition) === conceptKey(term, definition))) {
+    return;
+  }
+
+  candidates.push({
+    term,
+    definition,
+    sourcePages: [page.pageNumber],
+    chapter: chapterName(page.chapterTitle),
+    confidence: 0.95,
+    evidence: 'naming',
+    namingRelation: pair.relation,
+    namingSubject: pair.subject,
+    namingContext: pair.context,
     order
   });
 }
@@ -207,6 +443,11 @@ export class LocalQuizGenerator {
     let order = 0;
 
     for (const page of pages) {
+      const namingPairs = extractNamingDefinitions(page.text);
+      for (const pair of namingPairs) {
+        addNamingCandidate(candidates, pair, page, order++);
+      }
+
       const lines = page.text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
       let current: { term: string; parts: string[]; evidence: LocalConcept['evidence'] } | null = null;
 
@@ -224,6 +465,11 @@ export class LocalQuizGenerator {
         if (delimited) {
           flush();
           current = { term: delimited.term, parts: [delimited.definition], evidence: 'delimiter' };
+          continue;
+        }
+
+        if (NAMING_RELATION.test(line)) {
+          flush();
           continue;
         }
 
@@ -260,14 +506,27 @@ export class LocalQuizGenerator {
     targetCount?: number;
     subjectName?: string;
   }): RawAiQuestion[] {
-    const concepts = this.extractConcepts(options.handoutPages);
-    if (concepts.length === 0) return [this.buildNoConceptQuestion(options.handoutPages)];
+    const baseConcepts = this.extractConcepts(options.handoutPages);
+    if (baseConcepts.length === 0) return [this.buildNoConceptQuestion(options.handoutPages)];
+
+    const compoundGroups = baseConcepts
+      .map((concept) => extractCompoundGroup(concept))
+      .filter((group): group is CompoundConceptGroup => Boolean(group));
+    const groupByParent = new Map(
+      compoundGroups.map((group) => [group.parent.term.toLowerCase(), group])
+    );
+    const concepts = baseConcepts.flatMap((concept) => {
+      const group = groupByParent.get(concept.term.toLowerCase());
+      return group ? [concept, ...group.children] : [concept];
+    });
 
     const targetCount = Math.max(1, options.targetCount || 10);
     const questions: RawAiQuestion[] = [];
     const selected = concepts.slice(0, targetCount);
 
     for (let index = 0; index < selected.length; index++) {
+      if (questions.length >= targetCount) break;
+
       const concept = {
         ...selected[index],
         chapter: selected[index].chapter || options.subjectName
@@ -277,8 +536,13 @@ export class LocalQuizGenerator {
       const built = buildOptions(concept, distractors, index);
       if (built.options.length !== 4 || built.correctAnswer < 0) continue;
 
+      const isCompound = Boolean(groupByParent.has(concept.term.toLowerCase()) || concept.parentTerm);
       questions.push({
-        question: questionStem(concept, index),
+        question: concept.namingRelation
+          ? namingQuestionStem(concept)
+          : isCompound
+            ? compoundQuestionStem(concept)
+            : questionStem(concept, index),
         options: built.options,
         correct_answer: built.correctAnswer,
         explanation: `According to the source material, ${concept.term} is ${lowerFirst(concept.definition)}.`,
@@ -287,6 +551,11 @@ export class LocalQuizGenerator {
         chapter: concept.chapter,
         discriminatory_keywords: tokenize(concept.definition).slice(0, 5)
       });
+
+      const group = groupByParent.get(concept.term.toLowerCase());
+      if (group && questions.length < targetCount) {
+        questions.push(buildEnumerationQuestion(group, concepts));
+      }
     }
 
     return questions.length > 0 ? questions : [this.buildNoConceptQuestion(options.handoutPages)];

@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest';
+import {
+  parseCreateQuestion,
+  parseSessionAnswer,
+  parseUpdateQuestion
+} from '../request-validation';
+
+describe('request validation boundaries', () => {
+  it('parses a create-question DTO without exposing raw request data', () => {
+    expect(parseCreateQuestion({
+      question_text: 'What is ATP?',
+      options: ['Energy', 'Protein'],
+      correct_answer: 0
+    })).toEqual({
+      question_text: 'What is ATP?',
+      options: ['Energy', 'Protein'],
+      correct_answer: 0
+    });
+  });
+
+  it('rejects an empty question update', () => {
+    expect(() => parseUpdateQuestion({})).toThrow('At least one question field is required');
+  });
+
+  it('allows answer submissions to omit the client-derived correctness value', () => {
+    expect(parseSessionAnswer({
+      questionId: 'question-1',
+      selectedOptionId: 2
+    })).toMatchObject({
+      questionId: 'question-1',
+      selectedOptionId: 2,
+      isCorrect: false
+    });
+  });
+
+  it('preserves legacy correctness-only session events', () => {
+    expect(parseSessionAnswer({
+      questionId: 'question-1',
+      isCorrect: true
+    })).toEqual({
+      questionId: 'question-1',
+      isCorrect: true,
+      selectedOptionId: undefined,
+      answerText: undefined,
+      answerMode: undefined
+    });
+  });
+
+  it('requires either a submitted answer or the legacy correctness value', () => {
+    expect(() => parseSessionAnswer({ questionId: 'question-1' })).toThrow(
+      'Either an answer or isCorrect is required'
+    );
+  });
+});

@@ -11,6 +11,7 @@ import {
   RequestSecurityError
 } from '@/lib/request-security';
 import { SECURITY_LIMITS } from '@/lib/security-config';
+import { parseCreateQuestion } from '@/lib/request-validation';
 import { revalidatePublicQuizTag, revalidateQuizTag } from '@/lib/cached-queries';
 
 function errorResponse(error: any): NextResponse {
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ qui
     const controller = new QuizCrudController(quizRepo);
     const accessibleQuiz = await controller.getQuiz(quizId, userId);
     if (!accessibleQuiz) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
-    const created = await controller.addQuestion(quizId, body as any, userId);
+    const created = await controller.addQuestion(quizId, parseCreateQuestion(body), userId);
     if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);
     return NextResponse.json(created, { status: 201 });

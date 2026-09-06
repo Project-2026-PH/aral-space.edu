@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ScrollView, StatusBar } from 'react-native';
-import { Quiz, QuizQuestion, QuizSession, QuestionProgress } from '@quiz-creator/types';
-import { RepositoryFactory, MasteryEngineService, QuizShuffleService } from '@quiz-creator/core';
+import { Quiz, QuizQuestion } from '@quiz-creator/types';
+import { RepositoryFactory } from '@quiz-creator/core';
 
 export default function App() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -14,7 +14,7 @@ export default function App() {
   useEffect(() => {
     async function loadQuizzes() {
       // Uses the local-first/memory repository from @quiz-creator/core
-      const repo = RepositoryFactory.createQuizRepository();
+      const repo = RepositoryFactory.createLocalFirstQuizRepository();
       const list = await repo.listQuizzes();
       setQuizzes(list);
     }

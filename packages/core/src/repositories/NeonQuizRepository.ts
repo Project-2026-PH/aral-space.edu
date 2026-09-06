@@ -35,21 +35,14 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async listSubjects(userId?: string): Promise<Subject[]> {
-    if (userId) {
-      const rows = await this.sql`
-        SELECT * FROM subjects 
-        WHERE user_id = ${userId}
-           OR user_id IS NULL
-           OR EXISTS (
-             SELECT 1 FROM subject_collaborators sc
-             WHERE sc.subject_id = subjects.id AND sc.user_id = ${userId}
-           )
-        ORDER BY name ASC
-      `;
-      return rows as Subject[];
-    }
+    if (!userId) return [];
     const rows = await this.sql`
       SELECT * FROM subjects 
+      WHERE user_id = ${userId}
+         OR EXISTS (
+           SELECT 1 FROM subject_collaborators sc
+           WHERE sc.subject_id = subjects.id AND sc.user_id = ${userId}
+         )
       ORDER BY name ASC
     `;
     return rows as Subject[];
@@ -263,35 +256,25 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async listQuizzes(userId?: string): Promise<Quiz[]> {
-    const rows = userId
-      ? await this.sql`
-          SELECT 
-            q.*,
-            CASE 
-              WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
-              ELSE NULL 
-            END AS subject
-          FROM quizzes q
-          LEFT JOIN subjects s ON q.subject_id = s.id
-          WHERE q.user_id = ${userId}
-             OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId})
-          ORDER BY q.generated_at DESC
-        `
-      : await this.sql`
-          SELECT 
-            q.*,
-            CASE 
-              WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
-              ELSE NULL 
-            END AS subject
-          FROM quizzes q
-          LEFT JOIN subjects s ON q.subject_id = s.id
-          ORDER BY q.generated_at DESC
-        `;
+    if (!userId) return [];
+    const rows = await this.sql`
+      SELECT 
+        q.*,
+        CASE 
+          WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
+          ELSE NULL 
+        END AS subject
+      FROM quizzes q
+      LEFT JOIN subjects s ON q.subject_id = s.id
+      WHERE q.user_id = ${userId}
+         OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId})
+      ORDER BY q.generated_at DESC
+    `;
     return rows as Quiz[];
   }
 
   async listQuizzesAndSubjects(userId?: string): Promise<{ quizzes: Quiz[]; subjects: Subject[] }> {
+    if (!userId) return { quizzes: [], subjects: [] };
     const [quizzes, subjects] = await Promise.all([
       this.listQuizzes(userId),
       this.listSubjects(userId)
@@ -333,45 +316,52 @@ export class NeonQuizRepository implements IQuizRepository {
 
   async createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz> {
     await this.requireSubjectAssignment(dto.subject_id, userId);
-    const quizRows = await this.sql`
-      INSERT INTO quizzes (
-        title,
-        description,
-        question_count,
-        handout_name,
-        source_model,
-        subject_id,
-        share_token,
-        is_public,
-        allow_cloning,
-        user_id
-      )
-      VALUES (
-        ${dto.title},
-        ${dto.description || null},
-        ${dto.questions.length},
-        ${dto.handout_name || null},
-        ${dto.source_model || 'manual'},
-        ${dto.subject_id || null},
-        ${generateShareToken()},
-        true,
-        true,
-        ${userId || null}
-      )
-      RETURNING *
-    `;
+    const questionPayload = JSON.stringify(dto.questions.map((question, order_index) => {
+      const fields = normalizeQuestionFields(question);
+      return {
+        question_text: question.question_text,
+        answer_text: fields.answer_text,
+        question_type: fields.question_type,
+        options: fields.options,
+        correct_answer: fields.correct_answer,
+        explanation: question.explanation || null,
+        correct_explanation: fields.correct_explanation || null,
+        distractor_explanations: fields.distractor_explanations,
+        discriminatory_keywords: fields.discriminatory_keywords,
+        source_pages: question.source_pages || null,
+        order_index
+      };
+    }));
 
-    const createdQuiz = quizRows[0] as Quiz;
-
-    for (let idx = 0; idx < dto.questions.length; idx++) {
-      const q = dto.questions[idx];
-      const fields = normalizeQuestionFields(q);
-      const optionsJson = JSON.stringify(fields.options);
-      const sourcePagesJson = q.source_pages ? JSON.stringify(q.source_pages) : null;
-      const distractorExpJson = fields.distractor_explanations ? JSON.stringify(fields.distractor_explanations) : null;
-      const discriminatoryKwJson = fields.discriminatory_keywords ? JSON.stringify(fields.discriminatory_keywords) : null;
-
-      await this.sql`
+    const rows = await this.sql`
+      WITH created_quiz AS (
+        INSERT INTO quizzes (
+          title,
+          description,
+          question_count,
+          handout_name,
+          source_model,
+          subject_id,
+          share_token,
+          is_public,
+          allow_cloning,
+          user_id
+        )
+        VALUES (
+          ${dto.title},
+          ${dto.description || null},
+          ${dto.questions.length},
+          ${dto.handout_name || null},
+          ${dto.source_model || 'manual'},
+          ${dto.subject_id || null},
+          ${generateShareToken()},
+          true,
+          true,
+          ${userId || null}
+        )
+        RETURNING *
+      ),
+      created_questions AS (
         INSERT INTO quiz_questions (
           quiz_id,
           question_text,
@@ -386,24 +376,42 @@ export class NeonQuizRepository implements IQuizRepository {
           source_pages,
           order_index
         )
-        VALUES (
-          ${createdQuiz.id},
-          ${q.question_text},
-          ${fields.answer_text},
-          ${fields.question_type},
-          ${optionsJson}::jsonb,
-          ${fields.correct_answer},
-          ${q.explanation || null},
-          ${fields.correct_explanation || null},
-          ${distractorExpJson ? this.sql`${distractorExpJson}::jsonb` : null},
-          ${discriminatoryKwJson ? this.sql`${discriminatoryKwJson}::jsonb` : null},
-          ${sourcePagesJson ? this.sql`${sourcePagesJson}::jsonb` : null},
-          ${idx}
+        SELECT
+          created_quiz.id,
+          question.question_text,
+          question.answer_text,
+          question.question_type,
+          question.options,
+          question.correct_answer,
+          question.explanation,
+          question.correct_explanation,
+          question.distractor_explanations,
+          question.discriminatory_keywords,
+          question.source_pages,
+          question.order_index
+        FROM created_quiz
+        CROSS JOIN LATERAL jsonb_to_recordset(${questionPayload}::jsonb) AS question(
+          question_text text,
+          answer_text text,
+          question_type text,
+          options jsonb,
+          correct_answer integer,
+          explanation text,
+          correct_explanation text,
+          distractor_explanations jsonb,
+          discriminatory_keywords jsonb,
+          source_pages jsonb,
+          order_index integer
         )
-      `;
-    }
+        RETURNING quiz_id
+      )
+      SELECT created_quiz.*
+      FROM created_quiz
+      LEFT JOIN (SELECT DISTINCT quiz_id FROM created_questions) inserted_questions
+        ON inserted_questions.quiz_id = created_quiz.id
+    `;
 
-    return createdQuiz;
+    return rows[0] as Quiz;
   }
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {

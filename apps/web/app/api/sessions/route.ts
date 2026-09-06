@@ -7,13 +7,13 @@ import {
   assertAllowedOrigin,
   assertPlainObject,
   boundedArray,
-  boundedBoolean,
   boundedInteger,
   boundedString,
   enforceRateLimit,
   readJsonBody,
   RequestSecurityError
 } from '@/lib/request-security';
+import { parseSessionAnswer } from '@/lib/request-validation';
 import { SECURITY_LIMITS } from '@/lib/security-config';
 
 const SESSION_TYPES = new Set<SessionType>([
@@ -84,20 +84,25 @@ export async function POST(req: NextRequest) {
     const controller = new MasterySessionController(sessionRepo, quizRepo);
 
     if (action === 'answer') {
-      const questionId = boundedString(body.questionId, 'questionId', 128, true)!;
-      const isCorrect = boundedBoolean(body.isCorrect, 'isCorrect', true)!;
-      const selectedOptionId = boundedInteger(body.selectedOptionId, 'selectedOptionId', 0, 100);
-      const answerText = boundedString(body.answerText, 'answerText', 2_000);
-      const answerModeValue = boundedString(body.answerMode, 'answerMode', 32);
-      if (answerModeValue !== undefined && answerModeValue !== 'learn' && answerModeValue !== 'identification') {
-        throw new RequestSecurityError(400, 'answerMode is invalid');
-      }
-      const submittedAnswer = selectedOptionId !== undefined || answerText !== undefined
-        ? { selectedOptionId, answerText, answerMode: answerModeValue as 'learn' | 'identification' | undefined }
+      const parsedAnswer = parseSessionAnswer(body);
+      const submittedAnswer = parsedAnswer.selectedOptionId !== undefined || parsedAnswer.answerText !== undefined
+        ? {
+            selectedOptionId: parsedAnswer.selectedOptionId,
+            answerText: parsedAnswer.answerText,
+            answerMode: parsedAnswer.answerMode
+          }
         : undefined;
       const sessionType = parseSessionType(body.sessionType);
       const latencyMs = boundedInteger(body.latencyMs, 'latencyMs', 0, 300_000);
-      const progress = await controller.recordAnswer(sessionId, questionId, isCorrect, sessionType, userId, latencyMs, submittedAnswer);
+      const progress = await controller.recordAnswer(
+        sessionId,
+        parsedAnswer.questionId,
+        parsedAnswer.isCorrect,
+        sessionType,
+        userId,
+        latencyMs,
+        submittedAnswer
+      );
       return NextResponse.json(progress);
     }
 

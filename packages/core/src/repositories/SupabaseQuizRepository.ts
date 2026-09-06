@@ -47,22 +47,25 @@ export class SupabaseQuizRepository implements IQuizRepository {
   }
 
   async listSubjects(userId?: string): Promise<Subject[]> {
+    if (!userId) return [];
     try {
       let query = this.supabase.from('subjects').select('*').order('name');
-      if (userId) query = query.or(`user_id.eq.${userId},user_id.is.null`);
+      query = typeof query.eq === 'function' ? query.eq('user_id', userId) : query.or(`user_id.eq.${userId}`);
       const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        if (userId) {
+      if (!error) {
+        const subjects = data || [];
+        if (subjects.length > 0) {
           const { data: memberships } = await this.supabase.from('subject_collaborators').select('subject_id').eq('user_id', userId);
           const memberIds = new Set((memberships || []).map((membership: any) => membership.subject_id));
-          const missingIds = Array.from(memberIds).filter((id) => !data.some((subject: any) => subject.id === id));
+          const missingIds = Array.from(memberIds).filter((id) => !subjects.some((subject: any) => subject.id === id));
           if (missingIds.length > 0) {
             const { data: memberSubjects } = await this.supabase.from('subjects').select('*').in('id', missingIds).order('name');
-            return [...data, ...(memberSubjects || [])] as Subject[];
+            return [...subjects, ...(memberSubjects || [])] as Subject[];
           }
         }
-        return data as Subject[];
+        return subjects as Subject[];
       }
+      throw error;
     } catch (e) {}
     return this.fallback.listSubjects(userId);
   }
@@ -252,9 +255,10 @@ export class SupabaseQuizRepository implements IQuizRepository {
         .order('generated_at', { ascending: false });
       if (userId) query = query.eq('user_id', userId);
       const { data, error } = await query;
-      if (!error && data && data.length > 0) return data;
+      if (!error) return (data || []) as Quiz[];
+      throw error;
     } catch (e) {}
-    return this.fallback.listQuizzes();
+    return this.fallback.listQuizzes(userId);
   }
 
   async getQuizById(id: string, userId?: string): Promise<Quiz | null> {

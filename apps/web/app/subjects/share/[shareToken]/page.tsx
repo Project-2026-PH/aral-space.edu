@@ -110,11 +110,11 @@ export default function SharedSubjectPage() {
             <div>
               <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
                 <Layers className="h-3.5 w-3.5" />
-                Public Subject Library
+                Shared Subject Library
               </p>
               <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">{subject.name}</h1>
               <p className="mt-1 text-xs text-muted-foreground">
-                {quizzes.length} {quizzes.length === 1 ? 'public study set' : 'public study sets'}
+                {quizzes.length} {quizzes.length === 1 ? 'study set' : 'study sets'}
               </p>
             </div>
           </div>
@@ -131,9 +131,9 @@ export default function SharedSubjectPage() {
       {quizzes.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center">
           <BookOpen className="mx-auto h-8 w-8 text-muted-foreground" />
-          <h2 className="mt-4 text-sm font-bold text-foreground">No public study sets yet</h2>
+          <h2 className="mt-4 text-sm font-bold text-foreground">No study sets in this subject yet</h2>
           <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-            The subject is public, but its study sets have not been shared publicly.
+            No study sets have been added or shared under this subject yet.
           </p>
         </div>
       ) : (

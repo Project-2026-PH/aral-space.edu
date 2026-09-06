@@ -51,4 +51,24 @@ describe('RepositoryFactory & Supabase Serverless Guards', () => {
       /\[Serverless Guard\] Supabase query failed: In-memory fallback is disabled in production/
     );
   });
+
+  it('preserves the production guard when Supabase is created through the factory', async () => {
+    process.env.NODE_ENV = 'production';
+
+    const mockSupabase: any = {
+      from: () => ({
+        select: () => ({
+          order: () => ({
+            or: () => Promise.resolve({ data: null, error: new Error('Network connection timeout') }),
+          }),
+        }),
+      }),
+    };
+
+    const repo = RepositoryFactory.createQuizRepository({ supabase: mockSupabase, enableCache: false });
+
+    await expect(repo.listSubjects('anon_123')).rejects.toThrow(
+      /\[Serverless Guard\] Supabase query failed: In-memory fallback is disabled in production/
+    );
+  });
 });

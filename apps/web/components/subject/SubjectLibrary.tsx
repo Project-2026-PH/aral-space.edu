@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Quiz, Subject } from '@quiz-creator/types';
-import { BookOpen, ExternalLink, Globe, Layers, Share2, Trash2 } from 'lucide-react';
+import { BookOpen, ExternalLink, Layers, Link2, Lock, Share2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ShareSubjectModal from './ShareSubjectModal';
@@ -66,7 +66,7 @@ export default function SubjectLibrary({
           </div>
           <h3 className="mt-4 text-sm font-bold text-foreground">No subjects yet</h3>
           <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-            Create a subject to organize your study sets and share a public subject library.
+            Create a subject to organize your study sets and share them via link.
           </p>
         </div>
       ) : (
@@ -120,13 +120,13 @@ export default function SubjectLibrary({
                       </div>
                     </div>
                     <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${isPublic ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                      <Globe className="h-3 w-3" />
-                      {isPublic ? 'Public' : 'Private'}
+                      {isPublic ? <Link2 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                      {isPublic ? 'Link Active' : 'Private'}
                     </span>
                   </div>
                   {canOpen && (
                     <p className="mt-5 text-[11px] font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100">
-                      {canManage ? 'Click to manage subject' : canGeneratePublicLink ? 'Click to create a public link' : 'Click to view your public reviewers'}
+                      {canManage ? 'Click to manage subject' : canGeneratePublicLink ? 'Click to get a share link' : 'Click to view shared study sets'}
                     </p>
                   )}
                 </div>
@@ -141,7 +141,7 @@ export default function SubjectLibrary({
                       className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
-                      Open public page
+                      View shared link
                     </Link>
                   ) : isPublic ? (
                     <button
@@ -152,10 +152,10 @@ export default function SubjectLibrary({
                       }}
                       className="text-[11px] font-semibold text-primary transition-colors hover:text-foreground"
                     >
-                      Create public link
+                      Get share link
                     </button>
                   ) : (
-                    <span className="text-[11px] font-medium text-muted-foreground">Public page disabled</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">Share link disabled</span>
                   )}
                   {canManage ? (
                     <div className="flex items-center gap-1.5">

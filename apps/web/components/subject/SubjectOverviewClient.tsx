@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ExternalLink, Globe, Layers, Pencil, Plus, Save } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Layers, Link2, Lock, Pencil, Plus, Save } from 'lucide-react';
 import { Quiz, Subject, SubjectAccess } from '@quiz-creator/types';
 import QuizLibrary from '@/components/quiz/QuizLibrary';
 import ShareSubjectModal from './ShareSubjectModal';
@@ -67,7 +67,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="truncate text-2xl font-extrabold tracking-tight text-foreground">{subject.name}</h1>
                   <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold ${isPublic ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                    <Globe className="h-3 w-3" /> {isPublic ? 'Public' : 'Private'}
+                    {isPublic ? <Link2 className="h-3 w-3" /> : <Lock className="h-3 w-3" />} {isPublic ? 'Link Active' : 'Link Disabled'}
                   </span>
                 </div>
               )}

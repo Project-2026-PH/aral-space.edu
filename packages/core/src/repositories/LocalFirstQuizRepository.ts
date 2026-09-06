@@ -98,7 +98,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
 
   async listSubjects(userId?: string): Promise<Subject[]> {
     const list = Array.from(this.inMemorySubjects.values());
-    return userId ? list.filter(s => !s.user_id || s.user_id === userId || this.collaborators.get(s.id)?.has(userId)) : list;
+    return userId ? list.filter(s => s.user_id === userId || this.collaborators.get(s.id)?.has(userId)) : list;
   }
 
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {

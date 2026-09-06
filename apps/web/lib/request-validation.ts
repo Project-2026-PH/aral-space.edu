@@ -88,6 +88,46 @@ export function parseQuestionInput(value: unknown, field = 'question', partial =
   return result as CreateQuestionDto | UpdateQuestionDto;
 }
 
+export function parseCreateQuestion(value: unknown): CreateQuestionDto {
+  return parseQuestionInput(value, 'question') as CreateQuestionDto;
+}
+
+export function parseUpdateQuestion(value: unknown): UpdateQuestionDto {
+  const result = parseQuestionInput(value, 'question', true) as UpdateQuestionDto;
+  if (!Object.keys(result).length) throw new RequestSecurityError(400, 'At least one question field is required');
+  return result;
+}
+
+export function parseSessionAnswer(value: Record<string, unknown>): {
+  questionId: string;
+  isCorrect: boolean;
+  selectedOptionId?: number;
+  answerText?: string;
+  answerMode?: 'learn' | 'identification';
+} {
+  const questionId = boundedString(value.questionId, 'questionId', 128, true)!;
+  const legacyIsCorrect = boundedBoolean(value.isCorrect, 'isCorrect');
+  const selectedOptionId = boundedInteger(value.selectedOptionId, 'selectedOptionId', 0, 100);
+  const answerText = boundedString(value.answerText, 'answerText', 2_000);
+  const answerModeValue = boundedString(value.answerMode, 'answerMode', 32);
+  if (answerModeValue !== undefined && answerModeValue !== 'learn' && answerModeValue !== 'identification') {
+    throw new RequestSecurityError(400, 'answerMode is invalid');
+  }
+
+  const hasSubmittedAnswer = selectedOptionId !== undefined || answerText !== undefined;
+  if (legacyIsCorrect === undefined && !hasSubmittedAnswer) {
+    throw new RequestSecurityError(400, 'Either an answer or isCorrect is required');
+  }
+
+  return {
+    questionId,
+    isCorrect: legacyIsCorrect ?? false,
+    selectedOptionId,
+    answerText,
+    answerMode: answerModeValue as 'learn' | 'identification' | undefined
+  };
+}
+
 export function parseCreateQuiz(value: unknown): CreateQuizDto {
   const object = assertPlainObject(value);
   const title = boundedString(object.title, 'title', 200, true)!;

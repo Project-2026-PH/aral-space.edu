@@ -27,11 +27,7 @@ export async function runMigration(databaseUrl?: string): Promise<void> {
   console.log(`[Neon Migration] Running ${statements.length} SQL statements...`);
 
   for (const statement of statements) {
-    try {
-      await (sql as any)(statement);
-    } catch (err: any) {
-      console.warn(`[Neon Migration Warning]:`, err.message);
-    }
+    await (sql as any)(statement);
   }
 
   console.log('[Neon Migration] Schema migration applied successfully!');

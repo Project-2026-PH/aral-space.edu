@@ -58,7 +58,7 @@ export async function getCachedQuizzesAndSubjects(
     async (currentUid: string) => {
       const repo = await getQuizRepository(true);
       const controller = new QuizCrudController(repo);
-      return controller.listQuizzesAndSubjects(currentUid === 'anon' ? undefined : currentUid);
+      return controller.listQuizzesAndSubjects(currentUid);
     },
     ['user-quizzes-subjects', uid],
     {

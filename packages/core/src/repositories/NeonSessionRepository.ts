@@ -58,10 +58,69 @@ export class NeonSessionRepository implements ISessionRepository {
     return rows[0] as QuestionProgress;
   }
   async batchSaveQuestionProgress(progressList: QuestionProgress[], userId?: string) {
-    if (userId) return Promise.all(progressList.map((progress) => this.saveQuestionProgress(progress, userId)));
     if (!progressList.length) return [];
-    const payload = JSON.stringify(progressList.map((p) => ({ session_id: p.session_id, question_id: p.question_id, streak_count: p.streak_count, has_missed: p.has_missed, locked: p.locked, locked_at: p.locked_at || null })));
-    const rows = await this.sql`INSERT INTO quiz_question_progress (session_id, question_id, streak_count, has_missed, locked, locked_at) SELECT p.session_id, p.question_id, p.streak_count, p.has_missed, p.locked, p.locked_at FROM jsonb_to_recordset(${payload}::jsonb) AS p(session_id uuid, question_id uuid, streak_count integer, has_missed boolean, locked boolean, locked_at timestamptz) ON CONFLICT (session_id, question_id) DO UPDATE SET streak_count = EXCLUDED.streak_count, has_missed = EXCLUDED.has_missed, locked = EXCLUDED.locked, locked_at = EXCLUDED.locked_at RETURNING *`;
+    if (userId && progressList.some((progress) => progress.id)) {
+      return Promise.all(progressList.map((progress) => this.saveQuestionProgress(progress, userId)));
+    }
+
+    const payload = JSON.stringify(progressList.map((progress) => ({
+      session_id: progress.session_id,
+      question_id: progress.question_id,
+      streak_count: progress.streak_count,
+      has_missed: progress.has_missed,
+      locked: progress.locked,
+      locked_at: progress.locked_at || null
+    })));
+
+    const rows = userId
+      ? await this.sql`
+          INSERT INTO quiz_question_progress (session_id, question_id, streak_count, has_missed, locked, locked_at)
+          SELECT p.session_id, p.question_id, p.streak_count, p.has_missed, p.locked, p.locked_at
+          FROM jsonb_to_recordset(${payload}::jsonb) AS p(
+            session_id uuid,
+            question_id uuid,
+            streak_count integer,
+            has_missed boolean,
+            locked boolean,
+            locked_at timestamptz
+          )
+          WHERE EXISTS (
+            SELECT 1
+            FROM quiz_sessions s
+            JOIN quiz_questions q ON q.quiz_id = s.quiz_id
+            WHERE s.id = p.session_id
+              AND s.user_id = ${userId}
+              AND q.id = p.question_id
+          )
+          ON CONFLICT (session_id, question_id) DO UPDATE
+            SET streak_count = EXCLUDED.streak_count,
+                has_missed = EXCLUDED.has_missed,
+                locked = EXCLUDED.locked,
+                locked_at = EXCLUDED.locked_at
+          RETURNING *
+        `
+      : await this.sql`
+          INSERT INTO quiz_question_progress (session_id, question_id, streak_count, has_missed, locked, locked_at)
+          SELECT p.session_id, p.question_id, p.streak_count, p.has_missed, p.locked, p.locked_at
+          FROM jsonb_to_recordset(${payload}::jsonb) AS p(
+            session_id uuid,
+            question_id uuid,
+            streak_count integer,
+            has_missed boolean,
+            locked boolean,
+            locked_at timestamptz
+          )
+          ON CONFLICT (session_id, question_id) DO UPDATE
+            SET streak_count = EXCLUDED.streak_count,
+                has_missed = EXCLUDED.has_missed,
+                locked = EXCLUDED.locked,
+                locked_at = EXCLUDED.locked_at
+          RETURNING *
+        `;
+
+    if (userId && rows.length !== progressList.length) {
+      throw new Error('Session or question access is restricted');
+    }
     return rows as QuestionProgress[];
   }
 }

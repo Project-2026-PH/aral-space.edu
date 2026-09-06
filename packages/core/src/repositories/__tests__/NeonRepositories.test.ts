@@ -44,6 +44,52 @@ describe('Neon Repositories Unit Tests', () => {
     expect(session?.status).toBe('in_progress');
   });
 
+  it('creates a quiz and its questions in one SQL statement', async () => {
+    const createdQuiz = {
+      id: 'quiz-1',
+      title: 'Atomic Biology Quiz',
+      question_count: 1,
+      source_model: 'manual',
+      generated_at: new Date().toISOString()
+    };
+    const mockSql: any = vi.fn().mockResolvedValue([createdQuiz]);
+    const repo = new NeonQuizRepository(mockSql);
+
+    const quiz = await repo.createQuiz({
+      title: 'Atomic Biology Quiz',
+      subject_id: null,
+      questions: [{
+        question_text: 'What is ATP?',
+        options: ['Energy', 'Protein'],
+        correct_answer: 0
+      }]
+    });
+
+    expect(quiz).toEqual(createdQuiz);
+    expect(mockSql).toHaveBeenCalledTimes(1);
+  });
+
+  it('initializes user-scoped progress in one atomic upsert', async () => {
+    const inputProgress = [{
+      session_id: 'session-1',
+      question_id: 'question-1',
+      streak_count: 0,
+      has_missed: false,
+      locked: false
+    }];
+    const savedProgress = [{
+      id: 'progress-1',
+      ...inputProgress[0]
+    }];
+    const mockSql: any = vi.fn().mockResolvedValue(savedProgress);
+    const repo = new NeonSessionRepository(mockSql);
+
+    const progress = await repo.batchSaveQuestionProgress(inputProgress, 'user-1');
+
+    expect(progress).toEqual(savedProgress);
+    expect(mockSql).toHaveBeenCalledTimes(1);
+  });
+
   it('RepositoryFactory instantiates Neon repositories when databaseUrl is provided', () => {
     const fakeUrl = 'postgresql://user:pass@ep-cool-sample.us-east-2.aws.neon.tech/neondb?sslmode=require';
     const quizRepo = RepositoryFactory.createQuizRepository({ databaseUrl: fakeUrl, enableCache: false });

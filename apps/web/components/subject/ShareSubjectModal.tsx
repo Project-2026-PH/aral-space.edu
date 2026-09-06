@@ -165,7 +165,7 @@ export default function ShareSubjectModal({
           <>
             <div className="space-y-2">
               <label className="flex items-center justify-between text-xs font-bold text-foreground">
-                <span>Public Subject Link</span>
+                <span>Shared Subject Link</span>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Anyone with link</span>
               </label>
               <div className="flex items-center gap-2">
@@ -202,7 +202,7 @@ export default function ShareSubjectModal({
                     <span>{isPublic ? 'Link Enabled' : 'Link Disabled'}</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    {isPublic ? 'Anyone with the link can see this subject and its public study sets.' : 'The public link is disabled until you enable it again.'}
+                    {isPublic ? 'Anyone with the link can see this subject and its shared study sets.' : 'The shared link is disabled until you enable it again.'}
                   </p>
                 </div>
                 <button

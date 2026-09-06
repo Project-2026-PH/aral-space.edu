@@ -50,13 +50,15 @@ export class RepositoryFactory {
       if (opts.databaseUrl) {
         repo = new NeonQuizRepository(opts.databaseUrl);
       } else if (opts.supabase) {
-        repo = new SupabaseQuizRepository(opts.supabase, sharedMemoryQuizRepo);
+        // Let the adapter select its environment-appropriate fallback. In production
+        // it must fail rather than silently diverging into process-local state.
+        repo = new SupabaseQuizRepository(opts.supabase);
       } else {
         assertPersistentStoreInProduction('QuizRepository');
         repo = sharedMemoryQuizRepo;
       }
     } else if (source) {
-      repo = new SupabaseQuizRepository(source as SupabaseClient, sharedMemoryQuizRepo);
+      repo = new SupabaseQuizRepository(source as SupabaseClient);
     } else {
       assertPersistentStoreInProduction('QuizRepository');
       repo = sharedMemoryQuizRepo;

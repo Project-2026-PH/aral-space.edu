@@ -9,6 +9,7 @@ import {
   RequestSecurityError
 } from '@/lib/request-security';
 import { SECURITY_LIMITS } from '@/lib/security-config';
+import { parseUpdateQuestion } from '@/lib/request-validation';
 import { revalidatePublicQuizTag, revalidateQuizTag } from '@/lib/cached-queries';
 
 function errorResponse(error: any): NextResponse {
@@ -28,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ qu
     const controller = new QuizCrudController(quizRepo);
     const accessibleQuiz = await controller.getQuiz(quizId, userId);
     if (!accessibleQuiz) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
-    const updated = await controller.updateQuestion(quizId, questionId, body as any, userId);
+    const updated = await controller.updateQuestion(quizId, questionId, parseUpdateQuestion(body), userId);
     if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);
     return NextResponse.json(updated);

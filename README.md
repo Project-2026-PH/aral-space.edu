@@ -21,7 +21,7 @@ quiz-creator/
 
 - **`packages/types`**: Pure TypeScript contracts and data structures (`Quiz`, `QuizQuestion`, `QuizSession`, `QuestionProgress`, `Batch`, `QuizMode`, DTOs). Zero dependencies.
 - **`packages/core`**:
-  - **Services**: `QuizGenerationService`, `MasteryEngineService`, `PdfExtractionService`, `QuizShuffleService`, `QuizTransformService`, `QuizRenamingService`.
+  - **Services**: `QuizGenerationService`, `MasteryEngineService`, `PdfExtractionService`, `QuizShuffleService`, `QuizTransformService`, `QuizRenamingService`, `NotesReviewerBuilder`.
   - **Repositories**: `NeonQuizRepository`, `NeonSessionRepository`, `SupabaseQuizRepository`, `SupabaseSessionRepository`, `LocalFirstQuizRepository`, `MemoryQuizRepository`.
   - **Caching**: `LRUCache`, `CachedQuizRepository` with TTL eviction.
   - **Factory**: `RepositoryFactory` for dynamic backend instantiation.
@@ -49,6 +49,11 @@ quiz-creator/
   - **Copy-Paste Import**: Paste notes directly from PDFs, slides, websites, or spreadsheets. The app automatically separates terms and definitions, even from messy bulleted lists.
   - **Instant Study Modes**: Turns single definition-answer pairs into flashcards, 4-option multiple-choice quizzes, or reverse-prompt questions without extra typing.
   - **Natural True or False Cards**: Rewrites definitions into natural statements, swapping in concepts from other cards to generate realistic False questions (see [CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md)).
+- **Deterministic Notes Reviewers**:
+  - **Notes Workspace Conversion**: `Save as reviewer` uses the pure `NotesReviewerBuilder` to turn structured notes into source-grounded reviewer questions without requiring an AI provider.
+  - **Concept Cleanup**: Merges wrapped definition lines, ignores section headings, filters attribute labels from ordinary cards, and deduplicates expanded terms with acronym-only entries.
+  - **Bounded Question Generation**: Produces at most one typed identification card and one multiple-choice reinforcement card per terminology concept, with timeline entries kept separate.
+  - **Source Preservation**: Retains the normalized source definition as the answer explanation and correct explanation. Service Desk/Helpdesk attribute labels may be used in comparison questions instead of becoming standalone cards.
 - **Flexible Multi-Backend Storage**:
   - **Neon Serverless Postgres**: Cloud PostgreSQL via `@neondatabase/serverless` with pooled HTTP queries and migration script.
   - **Supabase**: Direct Supabase client integration.
@@ -155,10 +160,25 @@ To apply database schema to Neon or PostgreSQL:
 
 ## 📚 Technical Documentation
 
-- **[Clipboard Parser & Transformation Flow](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md)**: Comprehensive architectural flow and algorithms for clipboard parsing, definition-to-question conversion, and True/False paraphrasing with the Term Swap Rule.
+- **[Clipboard Parser & Transformation Flow](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md)**: Comprehensive architectural flow and algorithms for clipboard parsing, Notes workspace reviewer generation, definition-to-question conversion, and True/False paraphrasing with the Term Swap Rule.
 - **[Local Adaptive Authoring Preferences](docs/LOCAL_ADAPTIVE_AUTHORING_PREFERENCES.md)**: Aggregate local preference learning, event capture, confidence rules, request validation, privacy boundaries, and extension guidance.
 - **[Infisical Secrets Setup](INFISICAL.md)**: Secrets management, KMS encryption, and environment variables.
 
+
+## 📝 Notes Workspace Reviewer Generation
+
+The Notes workspace stores rich-text notes locally and can convert the selected note into a reviewer through **Save as reviewer**. This path is separate from clipboard paste into the Manual Quiz Creator and uses the deterministic [`NotesReviewerBuilder`](packages/core/src/services/NotesReviewerBuilder.ts):
+
+```text
+Plain note text
+   -> normalize and merge wrapped lines
+   -> classify headings, terminology, comparison attributes, and timeline entries
+   -> deduplicate expanded terms and acronym aliases
+   -> emit typed identification and bounded reinforcement questions
+   -> POST source-grounded questions to /api/quizzes
+```
+
+The builder is subject-agnostic for explicit structures such as `Term - Definition`, `Term: Definition`, and a term followed by a wrapped definition. It ignores section headings, keeps date-based entries in a separate timeline group, preserves source definitions in explanations, and emits no more than one identification plus one reinforcement question for each terminology concept. Attribute labels are not ordinary cards; the current comparison adapter uses Service Desk/Helpdesk attributes in comparison questions when both groups are present. Notes without recognizable structure are not saved as empty reviewers.
 
 ## 📤 Reviewer Export and Local Re-import Contract
 

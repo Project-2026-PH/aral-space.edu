@@ -10,7 +10,7 @@ import QuizExportMenu from './QuizExportMenu';
 import ConfirmModal from '../ui/ConfirmModal';
 import StickyActionDock from '../ui/StickyActionDock';
 import FloatingBottomNav from '../navigation/FloatingBottomNav';
-import { Play, Plus, Edit, Trash2, ArrowLeft, Share2, Save } from 'lucide-react';
+import { Play, Plus, Edit, Trash2, ArrowLeft, Share2, Save, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -31,6 +31,9 @@ export default function QuizOverviewClient({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(quiz.title);
   const [savingTitle, setSavingTitle] = useState(false);
+  const [isEditingDesc, setIsEditingDesc] = useState(false);
+  const [descInput, setDescInput] = useState(quiz.description || '');
+  const [savingDesc, setSavingDesc] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
   const [showStartModal, setShowStartModal] = useState(false);
@@ -62,12 +65,35 @@ export default function QuizOverviewClient({
       if (res.ok) {
         const updated = await res.json();
         setQuiz(updated);
+        setTitleInput(updated.title);
         setIsEditingTitle(false);
       }
     } catch (err) {
       console.error('Title save error:', err);
     } finally {
       setSavingTitle(false);
+    }
+  }
+
+  async function handleSaveDescription() {
+    setSavingDesc(true);
+    const trimmed = descInput.slice(0, 200).trim();
+    try {
+      const res = await fetch(`/api/quizzes/${quiz.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: trimmed })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setQuiz(updated);
+        setDescInput(updated.description || '');
+        setIsEditingDesc(false);
+      }
+    } catch (err) {
+      console.error('Description save error:', err);
+    } finally {
+      setSavingDesc(false);
     }
   }
 
@@ -130,11 +156,32 @@ export default function QuizOverviewClient({
                   type="text"
                   value={titleInput}
                   onChange={(e) => setTitleInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveTitle();
+                    if (e.key === 'Escape') {
+                      setTitleInput(quiz.title);
+                      setIsEditingTitle(false);
+                    }
+                  }}
                   className="rounded-xl border border-primary bg-background px-3 py-1.5 text-lg font-bold text-foreground focus:outline-none flex-1"
+                  autoFocus
                 />
                 <button
-                  onClick={() => setIsEditingTitle(false)}
-                  className="rounded-xl px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+                  type="button"
+                  onClick={handleSaveTitle}
+                  disabled={savingTitle || !titleInput.trim()}
+                  className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-50"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTitleInput(quiz.title);
+                    setIsEditingTitle(false);
+                  }}
+                  className="rounded-xl px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted"
                 >
                   Cancel
                 </button>
@@ -143,7 +190,10 @@ export default function QuizOverviewClient({
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-extrabold text-foreground truncate">{quiz.title}</h1>
                 <button
+                  type="button"
                   onClick={() => setIsEditingTitle(true)}
+                  title="Edit title"
+                  aria-label="Edit title"
                   className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
                 >
                   <Edit className="h-3.5 w-3.5" />
@@ -165,10 +215,78 @@ export default function QuizOverviewClient({
                 <span>Source: {quiz.handout_name}</span>
               )}
             </div>
-            {quiz.description && (
-              <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-                {quiz.description}
-              </p>
+            {isEditingDesc ? (
+              <div className="mt-2 space-y-1.5 max-w-2xl">
+                <textarea
+                  value={descInput}
+                  onChange={(e) => setDescInput(e.target.value.slice(0, 200))}
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveDescription();
+                    }
+                    if (e.key === 'Escape') {
+                      setDescInput(quiz.description || '');
+                      setIsEditingDesc(false);
+                    }
+                  }}
+                  maxLength={200}
+                  rows={2}
+                  placeholder="Add a brief description (up to 200 characters)..."
+                  className="w-full resize-none rounded-xl border border-primary bg-background px-3 py-2 text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none"
+                  autoFocus
+                />
+                <div className="flex items-center justify-between">
+                  <span className={`text-[11px] font-medium ${descInput.length >= 190 ? 'text-amber-500 font-bold' : 'text-muted-foreground'}`}>
+                    {descInput.length}/200 characters
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDescInput(quiz.description || '');
+                        setIsEditingDesc(false);
+                      }}
+                      className="rounded-xl px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveDescription}
+                      disabled={savingDesc}
+                      className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      {savingDesc ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="group mt-2 flex items-start gap-2 max-w-2xl">
+                {quiz.description ? (
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {quiz.description}
+                  </p>
+                ) : (
+                  <p className="text-xs italic text-muted-foreground/60">
+                    No description. Click edit to add one.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDescInput(quiz.description || '');
+                    setIsEditingDesc(true);
+                  }}
+                  title="Edit description"
+                  aria-label="Edit description"
+                  className="rounded-lg p-1 text-muted-foreground opacity-60 hover:opacity-100 hover:bg-muted transition-all"
+                >
+                  <Edit className="h-3 w-3" />
+                </button>
+              </div>
             )}
           </div>
         </div>

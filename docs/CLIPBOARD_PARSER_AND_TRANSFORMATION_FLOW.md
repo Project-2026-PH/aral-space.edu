@@ -99,6 +99,41 @@ Raw Text
   > *"the marketplace, the physical world for people and things, and the marketspace, a virtual world of information."*
 * Pairs alternating noun phrases and descriptive clauses with strict length and verb validation.
 
+### 2.3 Notes Workspace Reviewer Builder
+
+The Notes workspace has a separate deterministic path from clipboard paste. When the user selects **Save as reviewer**, `apps/web/components/notes/NotesClient.tsx` converts the note's rich text to plain text and passes it to [`NotesReviewerBuilder`](../packages/core/src/services/NotesReviewerBuilder.ts).
+
+```text
+Plain note text
+   -> normalize and merge wrapped lines
+   -> classify terminology, headings, comparison attributes, and timeline entries
+   -> deduplicate expanded terms and acronym aliases
+   -> build source-grounded reviewer questions
+   -> POST typed_answer / multiple_choice records to /api/quizzes
+```
+
+The builder is generic for explicit term-definition structures such as:
+
+```text
+Term - Definition
+Term: Definition
+Term
+Wrapped definition on the following lines
+```
+
+Its deterministic rules are:
+
+1. **Heading filtering:** Section headings such as `Benefits`, `History`, `Requirements`, `Software`, `Service Desk`, and `Helpdesk` are context markers, not terminology cards.
+2. **Wrapped definitions:** Continuation lines are joined into one source definition until the next recognized entry or section.
+3. **Acronym deduplication:** An expanded term such as `Information Technology Service Management (ITSM)` and an acronym-only entry such as `ITSM` are represented as one concept.
+4. **Attribute handling:** Short labels such as `Business-centric`, `Proactive Service`, or `Task-Oriented` are not emitted as ordinary cards. Service Desk/Helpdesk attributes can be used in comparison questions when both groups are present.
+5. **Bounded repetition:** Each terminology concept receives at most one typed identification card and one multiple-choice reinforcement card. Reinforcement is emitted only when enough distinct concepts exist to provide three distractors.
+6. **Timeline separation:** Date entries such as `1989–1996:` and `2019:` become timeline questions appended after terminology and comparison questions.
+7. **Source preservation:** The normalized source wording is retained in `answer_text`, `explanation`, and `correct_explanation`; the builder does not paraphrase definitions.
+8. **Safety bound:** The builder emits no more than 100 API question records. Notes with no recognizable structure are not saved as empty reviewers.
+
+This builder does not require Gemini, Groq, or another AI provider. It is implemented as a pure core service and is covered by deterministic unit tests in `packages/core/src/services/__tests__/NotesReviewerBuilder.test.ts`.
+
 ---
 
 ## 3. Changing Pasted Definitions into Question Formats
@@ -393,4 +428,4 @@ If the relation phrase is ambiguous, the answer contains a full sentence, or no 
 
 ### 8.4 Current Implementation Status
 
-The current `LocalQuizGenerator` supports delimiter, sentence, wrapped, and compound-form concepts, but it does not yet implement naming-relation extraction. For the supplied soft-wrapped example, the current parser can return no concept because the fragment does not match its existing term-definition patterns. If the naming sentence is isolated, the generic splitter can instead incorrectly identify `Such APs mounted by attackers` as the term because it sees `are` before `called`. Adding a naming-relation stage before `splitSentenceDefinition` is the required implementation step.
+The current `LocalQuizGenerator` supports delimiter, sentence, wrapped, compound-form, and naming-relation concepts. Naming relations are extracted before generic sentence definitions so phrases such as `are called “honeypot” APs` produce `honeypot APs` as the answer rather than promoting the descriptive subject to a term. The Notes workspace uses the separate `NotesReviewerBuilder`. It currently prioritizes explicit delimited pairs and standalone term-plus-wrapped-definition entries, while also handling headings, acronym deduplication, comparison attributes, and timeline entries. Naming-relation extraction remains part of the local handout-generation path and is not currently emitted by the Notes workspace builder. Ambiguous or unsupported note prose is conservatively ignored instead of being promoted to a card.

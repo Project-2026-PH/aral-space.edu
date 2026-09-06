@@ -1,9 +1,27 @@
 export const EMPTY_RICH_TEXT = '<p><br></p>';
 
 const ALLOWED_TAGS = new Set([
-  'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'DEL',
-  'CODE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'A', 'BR', 'HR'
+  'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'DEL',
+  'CODE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'LI', 'A', 'BR', 'HR', 'SPAN', 'FONT'
 ]);
+
+const BLOCK_TAGS = new Set([
+  'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'BLOCKQUOTE',
+  'UL', 'OL', 'LI', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN'
+]);
+
+export function isValidCssColor(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 50) return false;
+  if (/url|expression|javascript|;|"|'/i.test(trimmed)) return false;
+  return (
+    /^#([0-9a-fA-F]{3,8})$/.test(trimmed) ||
+    /^rgba?\([^)]+\)$/i.test(trimmed) ||
+    /^hsla?\([^)]+\)$/i.test(trimmed) ||
+    /^[a-zA-Z]+$/.test(trimmed)
+  );
+}
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -43,17 +61,27 @@ export function sanitizeRichTextHtml(value: string): string {
         const cleanChild = cleanNode(child);
         if (cleanChild) fragment.appendChild(cleanChild);
       });
+      if (BLOCK_TAGS.has(element.tagName)) {
+        fragment.appendChild(document.createElement('br'));
+      }
       return fragment;
     }
 
-    const clean = document.createElement(element.tagName.toLowerCase());
-    if (element.tagName === 'A') {
+    const tagName = element.tagName.toUpperCase();
+    const targetTag = tagName === 'FONT' ? 'span' : tagName.toLowerCase();
+    const clean = document.createElement(targetTag);
+    if (tagName === 'A') {
       const href = element.getAttribute('href') || '';
       if (/^(https?:|mailto:)/i.test(href)) {
         clean.setAttribute('href', href);
         clean.setAttribute('target', '_blank');
         clean.setAttribute('rel', 'noreferrer noopener');
       }
+    }
+
+    const rawColor = element.style.color || element.getAttribute('color');
+    if (rawColor && isValidCssColor(rawColor)) {
+      clean.style.color = rawColor.trim();
     }
     Array.from(element.childNodes).forEach((child) => {
       const cleanChild = cleanNode(child);
@@ -76,7 +104,7 @@ export function richTextToPlainText(value: string | null | undefined): string {
     return value
       .replace(/<br\s*\/?\s*>/gi, '\n')
       .replace(/<hr\s*\/?\s*>/gi, '\n')
-      .replace(/<\/(p|h[1-6]|li|pre|blockquote)>/gi, '\n')
+      .replace(/<\/(p|div|h[1-6]|li|pre|blockquote|section|article|header|footer|main)>/gi, '\n')
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
       .trim();
@@ -85,7 +113,7 @@ export function richTextToPlainText(value: string | null | undefined): string {
   const text = document.body.innerHTML
     .replace(/<br\s*\/?\s*>/gi, '\n')
     .replace(/<hr\s*\/?\s*>/gi, '\n')
-    .replace(/<\/(p|h[1-6]|li|pre|blockquote)>/gi, '\n');
+    .replace(/<\/(p|div|h[1-6]|li|pre|blockquote|section|article|header|footer|main)>/gi, '\n');
   const parsed = new DOMParser().parseFromString(text, 'text/html');
   return (parsed.body.textContent || '').replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }

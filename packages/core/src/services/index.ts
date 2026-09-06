@@ -1,6 +1,7 @@
 export * from './AnswerValidationService';
 export * from './AnswerValidationService';
 export * from './LocalQuizGenerator';
+export * from './NotesReviewerBuilder';
 export * from './QuizGenerationService';
 export * from './ai/AiModelConfig';
 export * from './ai/GeminiExtractor';

@@ -69,7 +69,7 @@ export function createRangeFromOffsets(
 
   const rawTarget = expectedText?.trim();
 
-  // 1. If expectedText is provided, locate text in DOM Text nodes (exact, then case-insensitive, with \u00a0 normalized)
+  // If expectedText is provided, locate text in DOM Text nodes (exact, then case-insensitive, with \u00a0 normalized)
   if (rawTarget && rawTarget.length > 0) {
     let bestRange: Range | null = null;
     let minDiff = Infinity;

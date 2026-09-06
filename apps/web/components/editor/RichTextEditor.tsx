@@ -29,6 +29,10 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
 
   function updateSelectionToolbar() {
     if (!floatingToolbar || typeof window === 'undefined') return;
+    if (window.matchMedia('(max-width: 1023px)').matches || ('ontouchstart' in window && navigator.maxTouchPoints > 0)) {
+      hideSelectionToolbar();
+      return;
+    }
 
     const editor = editorRef.current;
     const selection = window.getSelection();
@@ -110,33 +114,124 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
     const selection = window.getSelection();
     if (!editor || !selection || selection.rangeCount === 0 || !selection.isCollapsed) return false;
 
-    const anchorElement = selection.anchorNode?.nodeType === Node.ELEMENT_NODE
-      ? selection.anchorNode as HTMLElement
-      : selection.anchorNode?.parentElement;
-    const block = anchorElement?.closest('p,div,h1,h2,h3,h4,h5,h6,blockquote,pre') as HTMLElement | null;
-    if (!block || block === editor || !editor.contains(block) || block.closest('li') || block.textContent?.trim() !== '-') {
+    const anchorNode = selection.anchorNode;
+    const anchorElement = anchorNode?.nodeType === Node.ELEMENT_NODE
+      ? anchorNode as HTMLElement
+      : anchorNode?.parentElement;
+    if (!anchorElement || !editor.contains(anchorElement)) return false;
+
+    const li = anchorElement.closest('li') as HTMLElement | null;
+    if (li && editor.contains(li)) {
+      const rawText = (li.textContent || '').replace(/\u00a0/g, ' ').trim();
+      const matchBullet = rawText.match(/^[-*]\s*(.*)$/);
+      if (matchBullet) {
+        const remainingText = matchBullet[1];
+        if (remainingText) {
+          li.textContent = remainingText;
+        } else {
+          li.innerHTML = '<br>';
+        }
+        const range = document.createRange();
+        range.selectNodeContents(li);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand('indent');
+        handleInput();
+        return true;
+      }
       return false;
     }
 
-    const list = document.createElement('ul');
-    const item = document.createElement('li');
-    item.appendChild(document.createElement('br'));
-    list.appendChild(item);
-    block.replaceWith(list);
+    const block = anchorElement.closest('p,div,h1,h2,h3,h4,h5,h6,blockquote,pre') as HTMLElement | null;
+    if (!block || block === editor || !editor.contains(block)) {
+      return false;
+    }
 
-    const range = document.createRange();
-    range.selectNodeContents(item);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    handleInput();
-    return true;
+    const rawText = (block.textContent || '').replace(/\u00a0/g, ' ').trim();
+    const matchBullet = rawText.match(/^[-*]\s*(.*)$/);
+    if (matchBullet) {
+      const remainingText = matchBullet[1];
+      if (remainingText) {
+        block.textContent = remainingText;
+      } else {
+        block.innerHTML = '<br>';
+      }
+      const range = document.createRange();
+      range.selectNodeContents(block);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand('insertUnorderedList');
+      handleInput();
+      return true;
+    }
+
+    const matchOrdered = rawText.match(/^1[.)]\s*(.*)$/);
+    if (matchOrdered) {
+      const remainingText = matchOrdered[1];
+      if (remainingText) {
+        block.textContent = remainingText;
+      } else {
+        block.innerHTML = '<br>';
+      }
+      const range = document.createRange();
+      range.selectNodeContents(block);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.execCommand('insertOrderedList');
+      handleInput();
+      return true;
+    }
+
+    return false;
   }
 
   function handleShortcut(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === ' ' && handleAutoBullet()) {
       event.preventDefault();
       return;
+    }
+
+    if (event.key === 'Tab') {
+      const selection = window.getSelection();
+      const anchorNode = selection?.anchorNode;
+      const anchorElement = anchorNode?.nodeType === Node.ELEMENT_NODE
+        ? anchorNode as HTMLElement
+        : anchorNode?.parentElement;
+      const li = anchorElement?.closest('li');
+      if (li && editorRef.current?.contains(li)) {
+        event.preventDefault();
+        if (event.shiftKey) {
+          document.execCommand('outdent');
+        } else {
+          document.execCommand('indent');
+        }
+        handleInput();
+        return;
+      }
+    }
+
+    if (event.key === 'Backspace') {
+      const selection = window.getSelection();
+      if (selection && selection.isCollapsed && selection.rangeCount > 0) {
+        const anchorNode = selection.anchorNode;
+        const anchorElement = anchorNode?.nodeType === Node.ELEMENT_NODE
+          ? anchorNode as HTMLElement
+          : anchorNode?.parentElement;
+        const li = anchorElement?.closest('li');
+        if (li && editorRef.current?.contains(li)) {
+          const isNested = Boolean(li.parentElement?.closest('li'));
+          const text = (li.textContent || '').replace(/\u00a0/g, ' ').trim();
+          if (isNested && text === '') {
+            event.preventDefault();
+            document.execCommand('outdent');
+            handleInput();
+            return;
+          }
+        }
+      }
     }
 
     const hasCtrl = event.ctrlKey && !event.metaKey;
@@ -194,6 +289,11 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
         onInput={handleInput}
         onBlur={handleInput}
         onSelect={floatingToolbar ? updateSelectionToolbar : undefined}
+        onContextMenu={(event) => {
+          if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            event.preventDefault();
+          }
+        }}
         onKeyDown={handleShortcut}
         onPaste={props.onPaste}
         className="rich-text-editor rich-text-content px-4 py-3 text-sm font-medium text-foreground outline-none"

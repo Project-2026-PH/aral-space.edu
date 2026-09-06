@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Bold, Italic, Strikethrough, Code2, Link2, ChevronDown, List, ListOrdered, Pilcrow, Minus } from 'lucide-react';
+import { Bold, Italic, Strikethrough, Code2, Link2, ChevronDown, List, ListOrdered, Pilcrow, Minus, IndentIncrease, IndentDecrease } from 'lucide-react';
 
 interface RichTextToolbarProps {
   editorRef: React.RefObject<HTMLDivElement | null>;
@@ -135,6 +135,9 @@ export default function RichTextToolbar({ editorRef, selectionRef, floating = fa
         {listOpen && <div className="absolute left-0 top-9 z-30 min-w-60 rounded-xl border border-border bg-card p-1.5 shadow-xl">
           <MenuItem label="Bullet list" shortcut="Ctrl+Shift+8" icon={<List className="h-3.5 w-3.5" />} onClick={() => { runEditorCommand('insertUnorderedList'); closeMenus(); }} />
           <MenuItem label="Numbered list" shortcut="Ctrl+Shift+7" icon={<ListOrdered className="h-3.5 w-3.5" />} onClick={() => { runEditorCommand('insertOrderedList'); closeMenus(); }} />
+          <div className="my-1 border-t border-border/70" aria-hidden="true" />
+          <MenuItem label="Indent / Sub-bullet" shortcut="Tab" icon={<IndentIncrease className="h-3.5 w-3.5" />} onClick={() => { runEditorCommand('indent'); closeMenus(); }} />
+          <MenuItem label="Outdent" shortcut="Shift+Tab" icon={<IndentDecrease className="h-3.5 w-3.5" />} onClick={() => { runEditorCommand('outdent'); closeMenus(); }} />
         </div>}
       </div>
 

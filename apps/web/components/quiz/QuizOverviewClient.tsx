@@ -9,6 +9,7 @@ import ShareQuizModal from './ShareQuizModal';
 import QuizExportMenu from './QuizExportMenu';
 import ConfirmModal from '../ui/ConfirmModal';
 import StickyActionDock from '../ui/StickyActionDock';
+import FloatingBottomNav from '../navigation/FloatingBottomNav';
 import { Play, Plus, Edit, Trash2, ArrowLeft, Share2, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -244,6 +245,7 @@ export default function QuizOverviewClient({
         destructive
         confirmText="Delete Quiz"
       />
+      <FloatingBottomNav />
     </div>
   );
 }

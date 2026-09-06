@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { BookOpen, Layers, Plus, Sparkles, GripVertical, GripHorizontal, FilePlus2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -15,6 +15,7 @@ export default function FloatingBottomNav({
   onOpenSubjectModal,
 }: FloatingBottomNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'subjects' | 'reviewers'>('subjects');
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -30,8 +31,13 @@ export default function FloatingBottomNav({
     initY: 0,
   });
 
-  // Strict route visibility: only at root "/"
-  const isVisibleRoute = pathname === '/';
+  // Show on the home library and subject/quiz detail routes.
+  const isHomeRoute = pathname === '/';
+  const isVisibleRoute = isHomeRoute
+    || pathname === '/subjects'
+    || pathname.startsWith('/subjects/')
+    || pathname === '/quizzes'
+    || pathname.startsWith('/quizzes/');
 
   // Responsive device classification
   const updateDeviceMode = useCallback(() => {
@@ -193,6 +199,12 @@ export default function FloatingBottomNav({
   const scrollToSection = (id: string, tab: 'subjects' | 'reviewers') => {
     setActiveTab(tab);
     setShowQuickMenu(false);
+
+    if (!isHomeRoute) {
+      router.push(`/#${id}`);
+      return;
+    }
+
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -212,7 +224,7 @@ export default function FloatingBottomNav({
           top: `${position.y}px`,
           transform: 'none',
           touchAction: 'none',
-          zIndex: 30,
+          zIndex: showQuickMenu ? 50 : 30,
         }
       : {};
 
@@ -236,7 +248,7 @@ export default function FloatingBottomNav({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         style={tabletStyle}
-        className={`fixed z-30 select-none block lg:hidden ${
+        className={`fixed ${showQuickMenu ? 'z-50' : 'z-30'} select-none block lg:hidden ${
           !isTablet
             ? 'bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2'
             : isDragging
@@ -319,7 +331,8 @@ export default function FloatingBottomNav({
                     type="button"
                     onClick={() => {
                       setShowQuickMenu(false);
-                      onOpenAiModal?.();
+                      if (onOpenAiModal) onOpenAiModal();
+                      else router.push('/');
                     }}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary active:scale-[0.98]"
                   >
@@ -336,7 +349,8 @@ export default function FloatingBottomNav({
                     type="button"
                     onClick={() => {
                       setShowQuickMenu(false);
-                      onOpenSubjectModal?.();
+                      if (onOpenSubjectModal) onOpenSubjectModal();
+                      else router.push('/');
                     }}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary active:scale-[0.98]"
                   >

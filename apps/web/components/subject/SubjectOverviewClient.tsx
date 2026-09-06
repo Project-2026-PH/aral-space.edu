@@ -7,6 +7,7 @@ import { Quiz, Subject, SubjectAccess } from '@quiz-creator/types';
 import QuizLibrary from '@/components/quiz/QuizLibrary';
 import ShareSubjectModal from './ShareSubjectModal';
 import StickyActionDock from '@/components/ui/StickyActionDock';
+import FloatingBottomNav from '@/components/navigation/FloatingBottomNav';
 
 interface SubjectOverviewClientProps {
   subject: Subject;
@@ -132,6 +133,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
         />
       )}
       <ShareSubjectModal open={sharing} onOpenChange={setSharing} subject={subject} onUpdated={(config) => setSubject((current) => ({ ...current, ...config }))} />
+      <FloatingBottomNav />
     </div>
   );
 }

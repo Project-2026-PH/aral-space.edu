@@ -19,15 +19,21 @@ const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentTy
 
 function detectQuestionType(question: QuizQuestion): QuestionType {
   const options = question.options || [];
-  if (question.question_type === 'typed_answer' || (options.length === 0 && question.answer_text)) {
-    return 'typed_answer';
-  }
   if (
     options.length === 2 &&
     options[0]?.toLowerCase() === 'true' &&
     options[1]?.toLowerCase() === 'false'
   ) {
     return 'true_false';
+  }
+  if (question.question_type === 'typed_answer') {
+    return 'typed_answer';
+  }
+  if (question.question_type === 'multiple_choice') {
+    return 'multiple_choice';
+  }
+  if (options.length === 0 && question.answer_text) {
+    return 'typed_answer';
   }
   if (options.length === 1) {
     return 'identification';
@@ -72,9 +78,14 @@ export default function QuizQuestionFormModal({
         detected === 'typed_answer'
           ? []
           : detected === 'multiple_choice'
-            ? question.options.length === 4
-              ? question.options
-              : [...question.options, '', '', '', ''].slice(0, 4)
+            ? (() => {
+                const padded = [...question.options, '', '', '', ''].slice(0, 4);
+                const correctIndex = Math.min(Math.max(question.correct_answer, 0), 3);
+                if (!padded[correctIndex] && question.answer_text?.trim()) {
+                  padded[correctIndex] = question.answer_text.trim();
+                }
+                return padded;
+              })()
             : question.options
       );
       setCorrectAnswer(question.correct_answer);
@@ -102,6 +113,9 @@ export default function QuizQuestionFormModal({
         newOptions = newOptions.slice(0, 4);
       }
       newCorrect = Math.min(newCorrect, 3);
+      if (!newOptions.some((option) => option.trim()) && answerText.trim()) {
+        newOptions[newCorrect] = answerText.trim();
+      }
     } else if (newType === 'typed_answer') {
       setAnswerText(answerText || options[correctAnswer] || '');
       newOptions = [];
@@ -141,11 +155,15 @@ export default function QuizQuestionFormModal({
     let cleanedAnswer = answerText.trim();
 
     if (type === 'multiple_choice') {
-      if (!cleanedOptions[cleanedCorrect]) {
-        setError('Please fill in the selected correct option. Other options may be left blank.');
+      if (cleanedOptions[cleanedCorrect]) {
+        cleanedAnswer = cleanedOptions[cleanedCorrect];
+      } else if (!cleanedAnswer) {
+        setError('Please provide the correct answer or fill in the selected option. Other options may be left blank.');
         return;
+      } else {
+        // Keep sparse multiple-choice cards valid; review mode can add distractors later.
+        cleanedCorrect = 0;
       }
-      cleanedAnswer = cleanedOptions[cleanedCorrect];
     } else if (type === 'typed_answer') {
       if (!cleanedAnswer) {
         setError('Please enter the typed answer.');
@@ -276,11 +294,15 @@ export default function QuizQuestionFormModal({
                 return (
                   <div
                     key={idx}
-                    onClick={() => setCorrectAnswer(idx)}
+                    onClick={() => {
+                      setCorrectAnswer(idx);
+                      if (opt.trim()) setAnswerText(opt);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         setCorrectAnswer(idx);
+                        if (opt.trim()) setAnswerText(opt);
                       }
                     }}
                     tabIndex={0}
@@ -308,6 +330,7 @@ export default function QuizQuestionFormModal({
                         const next = [...options];
                         next[idx] = e.target.value;
                         setOptions(next);
+                        if (idx === correctAnswer) setAnswerText(e.target.value);
                       }}
                       className="w-full bg-transparent text-xs text-foreground focus:outline-none"
                     />

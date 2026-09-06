@@ -90,11 +90,11 @@ export function normalizeQuestionFields(
       ? answerIndex
       : 0;
   const answerText = questionType === 'multiple_choice'
-    ? normalizedText(options[correctAnswer])
+    ? candidateOption || (answerIndex >= 0 ? normalizedText(options[answerIndex]) : suppliedAnswer)
     : suppliedAnswer || normalizedText(options[correctAnswer]);
 
   if (questionType === 'multiple_choice' && !answerText) {
-    throw new Error('A multiple-choice question must include a non-empty correct option.');
+    throw new Error('A multiple-choice question must include a correct answer, either in answer_text or a non-empty option.');
   }
   if (questionType === 'typed_answer' && !answerText) {
     throw new Error('A question must include a correct answer.');

@@ -36,6 +36,7 @@ import {
 import { QuizSessionSync } from '@/lib/quizSessionSync';
 import { useQuizTelemetry } from '@/hooks/useQuizTelemetry';
 import { getQuizStreakRecord, recordSessionCompletion } from '@/lib/streakTracker';
+import type { PersonalizedFeedbackConfig } from '@/lib/personalized-feedback';
 
 interface UseQuizSessionProps {
   quiz: Quiz;
@@ -45,6 +46,7 @@ interface UseQuizSessionProps {
   mode: QuizMode;
   shuffleQuestions?: boolean;
   shuffleOptions?: boolean;
+  personalizedFeedback?: PersonalizedFeedbackConfig | null;
 }
 
 export interface PendingQueueTransition {
@@ -107,7 +109,7 @@ const INCORRECT_FEEDBACK_MESSAGES = [
   'Nice try though'
 ];
 
-function getRandomFeedbackMessage(messages: string[]): string {
+function getRandomFeedbackMessage(messages: readonly string[]): string {
   return messages[Math.floor(Math.random() * messages.length)] || messages[0];
 }
 
@@ -118,7 +120,8 @@ export function useQuizSession({
   initialProgress,
   mode,
   shuffleQuestions = false,
-  shuffleOptions = true
+  shuffleOptions = true,
+  personalizedFeedback
 }: UseQuizSessionProps) {
   const processedQuestions = useMemo(() => {
     const optionReadyQuestions = QuizTransformService.prepareQuestionsForOptions(initialQuestions);
@@ -435,9 +438,14 @@ export function useQuizSession({
     setIsEvaluating(true);
     setSelectedOptionId(option.optionId);
     setAnswerResult(option.isCorrect);
-    setFeedbackMessage(getRandomFeedbackMessage(
-      option.isCorrect ? CORRECT_FEEDBACK_MESSAGES : INCORRECT_FEEDBACK_MESSAGES
-    ));
+    const personalizedMessages = option.isCorrect
+      ? personalizedFeedback?.correct
+      : personalizedFeedback?.incorrect;
+    const defaultMessages = option.isCorrect ? CORRECT_FEEDBACK_MESSAGES : INCORRECT_FEEDBACK_MESSAGES;
+    const feedbackMessages = personalizedMessages?.length
+      ? [...defaultMessages, ...personalizedMessages]
+      : defaultMessages;
+    setFeedbackMessage(getRandomFeedbackMessage(feedbackMessages));
 
     const latencyMs = Math.max(1, Date.now() - questionStartTimeRef.current);
     const questionId = activeQuestion.id;

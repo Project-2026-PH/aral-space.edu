@@ -14,6 +14,7 @@ import {
   VolumeX
 } from 'lucide-react';
 import type { Quiz, QuizMode, QuizQuestion, QuizSession, QuestionProgress } from '@quiz-creator/types';
+import type { PersonalizedFeedbackConfig } from '@/lib/personalized-feedback';
 import { useQuizSession } from '@/hooks/useQuizSession';
 import QuizCompletion from '@/components/quiz/QuizCompletion';
 import QuizRecap from '@/components/quiz/QuizRecap';
@@ -30,6 +31,7 @@ interface QuizRunnerProps {
   mode: QuizMode;
   shuffleQuestions?: boolean;
   shuffleOptions?: boolean;
+  personalizedFeedback?: PersonalizedFeedbackConfig | null;
 }
 
 export default function QuizRunner(props: QuizRunnerProps) {

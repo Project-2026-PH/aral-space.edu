@@ -13,6 +13,8 @@ export * from './repositories/RepositoryFactory';
 
 export * from './cache/LRUCache';
 
+export * from './services/AnswerValidationService';
+export * from './services/AnswerValidationService';
 export * from './services/LocalQuizGenerator';
 export * from './services/QuizGenerationService';
 export * from './services/ai/AiModelConfig';

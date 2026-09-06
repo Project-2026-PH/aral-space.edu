@@ -1,3 +1,5 @@
+export * from './AnswerValidationService';
+export * from './AnswerValidationService';
 export * from './LocalQuizGenerator';
 export * from './QuizGenerationService';
 export * from './ai/AiModelConfig';

@@ -28,8 +28,49 @@ describe('QuizCrudController & MasterySessionController', () => {
     expect(fullQuiz?.questions.length).toBe(1);
   });
 
-  it('MasterySessionController isolates sample quiz sessions in memory and delegates normal quizzes to sessionRepo', async () => {
+  it('uses the injected repository for sample sessions and preserves the legacy non-UUID fallback', async () => {
     const normalQuizId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+    const sharedSessionRepo = new MemorySessionRepository();
+    const legacySessionRepo = new MemorySessionRepository();
+    const mockQuizRepo: any = {
+      getQuestionsByQuizId: vi.fn().mockResolvedValue([
+        { id: 'q-custom-1', question_text: 'Test', options: ['A', 'B'], correct_answer: 0 }
+      ])
+    };
+    const userId = 'anon-user-1';
+
+    const controllerA = new MasterySessionController(sharedSessionRepo, mockQuizRepo, legacySessionRepo);
+    const controllerB = new MasterySessionController(sharedSessionRepo, mockQuizRepo, legacySessionRepo);
+
+    // Sample questions remain bundled, but the session and progress are shared.
+    const sampleResult = await controllerA.getOrStartSession(SAMPLE_QUIZ_ID, 'initial', userId);
+    expect(sampleResult.questions).toHaveLength(10);
+    expect(sampleResult.progress).toHaveLength(10);
+    expect(sampleResult.session.quiz_id).toBe(SAMPLE_QUIZ_ID);
+
+    const updatedProgress = await controllerB.recordAnswer(
+      sampleResult.session.id,
+      sampleResult.questions[0].id,
+      true,
+      'initial',
+      userId
+    );
+    expect(updatedProgress.streak_count).toBe(1);
+
+    const resumedResult = await controllerB.getOrStartSession(SAMPLE_QUIZ_ID, 'initial', userId);
+    expect(resumedResult.session.id).toBe(sampleResult.session.id);
+    expect(resumedResult.progress.find((progress) => progress.question_id === sampleResult.questions[0].id)?.streak_count).toBe(1);
+
+    await expect(
+      controllerB.recordAnswer(sampleResult.session.id, sampleResult.questions[0].id, true, 'initial', 'different-user')
+    ).rejects.toThrow('Session not found or access is restricted');
+
+    const completeResult = await controllerB.completeSession(sampleResult.session.id, SAMPLE_QUIZ_ID, userId);
+    expect(completeResult.completedSession.status).toBe('completed');
+    expect(completeResult.scheduledSession?.session_type).toBe('review_24h');
+    expect((await sharedSessionRepo.getScheduledSession(SAMPLE_QUIZ_ID, userId))?.id).toBe(completeResult.scheduledSession?.id);
+
+    // Normal UUID quizzes still delegate to the injected session repository.
     const mockSessionRepo: any = {
       getActiveSession: vi.fn().mockResolvedValue(null),
       createSession: vi.fn().mockResolvedValue({
@@ -41,38 +82,10 @@ describe('QuizCrudController & MasterySessionController', () => {
       getProgressForSession: vi.fn().mockResolvedValue([]),
       batchSaveQuestionProgress: vi.fn().mockImplementation((rows) => Promise.resolve(rows))
     };
-    const mockQuizRepo: any = {
-      getQuestionsByQuizId: vi.fn().mockResolvedValue([
-        { id: 'q-custom-1', question_text: 'Test', options: ['A', 'B'], correct_answer: 0 }
-      ])
-    };
-
-    const memorySampleRepo = new MemorySessionRepository();
-    const controller = new MasterySessionController(mockSessionRepo, mockQuizRepo, memorySampleRepo);
-    
-    // 1. Starting sample quiz uses sampleSessionRepo without touching mockSessionRepo
-    const sampleResult = await controller.getOrStartSession(SAMPLE_QUIZ_ID);
-    expect(sampleResult.questions.length).toBe(10);
-    expect(sampleResult.progress.length).toBe(10);
-    expect(sampleResult.session.quiz_id).toBe(SAMPLE_QUIZ_ID);
-    expect(sampleResult.session.id).toBeTruthy();
-
-    // 2. Answering sample question updates in-memory progress seamlessly
-    const updatedProgress = await controller.recordAnswer(
-      sampleResult.session.id,
-      sampleResult.questions[0].id,
-      true
-    );
-    expect(updatedProgress.streak_count).toBe(1);
-
-    // 3. Completing sample session finishes without touching mockSessionRepo
-    const completeResult = await controller.completeSession(sampleResult.session.id, SAMPLE_QUIZ_ID);
-    expect(completeResult.completedSession.status).toBe('completed');
-
-    // 4. Normal quiz delegates to underlying sessionRepo as expected
-    const normalResult = await controller.getOrStartSession(normalQuizId);
+    const normalController = new MasterySessionController(mockSessionRepo, mockQuizRepo, legacySessionRepo);
+    const normalResult = await normalController.getOrStartSession(normalQuizId);
     expect(mockSessionRepo.getActiveSession).toHaveBeenCalledWith(normalQuizId, undefined);
     expect(mockSessionRepo.createSession).toHaveBeenCalled();
-    expect(normalResult.questions.length).toBe(1);
+    expect(normalResult.questions).toHaveLength(1);
   });
 });

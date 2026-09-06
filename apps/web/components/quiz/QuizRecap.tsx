@@ -5,7 +5,6 @@ import { Sparkles, Volume2 } from 'lucide-react';
 import type { QuizMode, QuizQuestion } from '@quiz-creator/types';
 import { getQuestionAnswer } from '@/lib/quizAnswerEvaluation';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
-import QuizContinueDock from '@/components/quiz/QuizContinueDock';
 
 interface QuizRecapProps {
   questions: QuizQuestion[];
@@ -18,7 +17,6 @@ interface QuizRecapProps {
   mode?: QuizMode;
   currentStreak?: number;
   bestStreak?: number;
-  onAdvance: () => void;
   onSurfaceClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   onSurfaceKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
 }
@@ -34,7 +32,6 @@ export default function QuizRecap({
   mode = 'multiple_choice',
   currentStreak,
   bestStreak,
-  onAdvance,
   onSurfaceClick,
   onSurfaceKeyDown
 }: QuizRecapProps): React.ReactElement {
@@ -62,7 +59,7 @@ export default function QuizRecap({
       onClick={onSurfaceClick}
       onKeyDown={onSurfaceKeyDown}
       aria-label="Quick recap. Press any key or select Continue to resume."
-      className="mx-auto min-h-[calc(100vh-2rem)] max-w-3xl w-full space-y-8 pb-36 sm:pb-40 outline-none px-2 sm:px-0"
+      className="mx-auto min-h-[calc(100dvh-2rem)] max-w-3xl w-full space-y-8 pb-40 sm:min-h-[calc(100vh-2rem)] sm:pb-40 outline-none px-2 sm:px-0"
     >
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -165,8 +162,6 @@ export default function QuizRecap({
           </div>
         </div>
       </section>
-
-      <QuizContinueDock onAdvance={onAdvance} />
     </div>
   );
 }

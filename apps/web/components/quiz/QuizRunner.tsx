@@ -118,21 +118,23 @@ export default function QuizRunner(props: QuizRunnerProps) {
 
   if (isRecapVisible && pendingAdvance) {
     return (
-      <QuizRecap
-        questions={questions}
-        recapQuestionIds={pendingAdvance.recapQuestionIds}
-        totalLockedCount={totalLockedCount}
-        correctAnswerCount={correctAnswerCount}
-        overallPercent={overallPercent}
-        progressSegments={progressSegments}
-        progressPercent={progressPercent}
-        mode={mode}
-        currentStreak={currentStreak}
-        bestStreak={bestStreak}
-        onAdvance={advance}
-        onSurfaceClick={handleSurfaceClick}
-        onSurfaceKeyDown={handleSurfaceKeyDown}
-      />
+      <>
+        <QuizRecap
+          questions={questions}
+          recapQuestionIds={pendingAdvance.recapQuestionIds}
+          totalLockedCount={totalLockedCount}
+          correctAnswerCount={correctAnswerCount}
+          overallPercent={overallPercent}
+          progressSegments={progressSegments}
+          progressPercent={progressPercent}
+          mode={mode}
+          currentStreak={currentStreak}
+          bestStreak={bestStreak}
+          onSurfaceClick={handleSurfaceClick}
+          onSurfaceKeyDown={handleSurfaceKeyDown}
+        />
+        <QuizContinueDock onAdvance={advance} />
+      </>
     );
   }
 

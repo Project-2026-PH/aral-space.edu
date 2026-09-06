@@ -56,8 +56,16 @@ describe('quizAnswerEvaluation', () => {
       expect(evaluateTypedAnswer('  light   reaction ', 'Light Reaction', 'learn')).toBe(true);
     });
 
+    it('accepts case, minor typo, singular/plural, and number notation variants', () => {
+      expect(evaluateTypedAnswer('SIGAW NG PUGAD LAWIN', 'Sigaw ng Pugad Lawin', 'identification')).toBe(true);
+      expect(evaluateTypedAnswer('photosynthesi', 'Photosynthesis', 'identification')).toBe(true);
+      expect(evaluateTypedAnswer('World War two', 'World War II', 'identification')).toBe(true);
+      expect(evaluateTypedAnswer('theory', 'theories', 'identification')).toBe(true);
+    });
+
     it('rejects incorrect answers', () => {
       expect(evaluateTypedAnswer('Mitochondria', 'Chloroplast')).toBe(false);
+      expect(evaluateTypedAnswer('cat', 'dog', 'identification')).toBe(false);
     });
   });
 

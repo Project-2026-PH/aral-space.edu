@@ -139,7 +139,7 @@ export default function UpdateNotification() {
     <aside
       aria-live="polite"
       role="status"
-      className="fixed bottom-5 right-5 z-50 max-w-sm w-[calc(100vw-2.5rem)] sm:w-auto p-4 rounded-2xl bg-card/95 dark:bg-card/90 backdrop-blur-md border border-border shadow-2xl shadow-primary/10 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5"
+      className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-5 z-50 max-w-sm w-[calc(100vw-2.5rem)] sm:bottom-5 sm:w-auto p-4 rounded-2xl bg-card/95 dark:bg-card/90 backdrop-blur-md border border-border shadow-2xl shadow-primary/10 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5"
     >
       <div className="flex items-start gap-3">
         <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0 mt-0.5">

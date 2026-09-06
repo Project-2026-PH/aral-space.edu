@@ -1,3 +1,4 @@
+import { areAnswersEquivalent } from '@quiz-creator/core';
 import type { QuizQuestion } from '@quiz-creator/types';
 
 export type TypedAnswerMode = 'learn' | 'identification';
@@ -19,9 +20,9 @@ export function normalizeTypedAnswer(value: string, mode: TypedAnswerMode = 'lea
 export function evaluateTypedAnswer(
   value: string,
   expected: string,
-  mode: TypedAnswerMode = 'learn'
+  _mode: TypedAnswerMode = 'learn'
 ): boolean {
-  return normalizeTypedAnswer(value, mode) === normalizeTypedAnswer(expected, mode);
+  return areAnswersEquivalent(value, expected);
 }
 
 function maskAnswer(answer: string): string {

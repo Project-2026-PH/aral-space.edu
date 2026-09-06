@@ -1,6 +1,6 @@
 import { IQuizRepository, ISessionRepository, MemorySessionRepository } from '@quiz-creator/core/repositories';
-import { MasteryEngineService, SAMPLE_QUIZ_ID, SAMPLE_QUIZ_QUESTIONS } from '@quiz-creator/core/services';
-import { SessionType, QuestionProgress, SessionMasterySummary, QuizQuestion } from '@quiz-creator/types';
+import { MasteryEngineService, SAMPLE_QUIZ_ID, SAMPLE_QUIZ_QUESTIONS, areAnswersEquivalent } from '@quiz-creator/core/services';
+import { SessionType, QuestionProgress, SessionMasterySummary, QuizQuestion, QuizSession } from '@quiz-creator/types';
 
 function isUuid(str?: string | null): boolean {
   return Boolean(str && typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
@@ -12,11 +12,6 @@ export interface SubmittedAnswer {
   answerMode?: 'learn' | 'identification';
 }
 
-function normalizeSubmittedAnswer(value: string, mode: SubmittedAnswer['answerMode'] = 'learn'): string {
-  const normalized = value.trim().toLocaleLowerCase();
-  return mode === 'identification' ? normalized : normalized.replace(/\\s+/g, ' ');
-}
-
 function resolveSubmittedAnswer(question: QuizQuestion, submittedAnswer: SubmittedAnswer): boolean {
   const isTypedAnswer = question.question_type === 'typed_answer' || !Array.isArray(question.options) || question.options.length === 0;
   if (isTypedAnswer) {
@@ -24,14 +19,18 @@ function resolveSubmittedAnswer(question: QuizQuestion, submittedAnswer: Submitt
       throw new Error('A typed answer is required');
     }
     const expected = question.answer_text?.trim() || question.options?.[question.correct_answer]?.trim() || '';
-    return normalizeSubmittedAnswer(submittedAnswer.answerText, submittedAnswer.answerMode) ===
-      normalizeSubmittedAnswer(expected, submittedAnswer.answerMode);
+    return areAnswersEquivalent(submittedAnswer.answerText, expected);
   }
 
   if (!Number.isInteger(submittedAnswer.selectedOptionId)) {
     throw new Error('A selected answer option is required');
   }
   return submittedAnswer.selectedOptionId === question.correct_answer;
+}
+
+function isInvalidUuidRepositoryError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /invalid input syntax for type uuid|invalid uuid/i.test(message);
 }
 
 export class MasterySessionController {
@@ -45,9 +44,43 @@ export class MasterySessionController {
     if (sampleSessionRepo) MasterySessionController.sampleSessionRepo = sampleSessionRepo;
   }
 
+  private async resolveSessionRepository(sessionId: string, userId?: string): Promise<{
+    repository: ISessionRepository;
+    session: QuizSession | null;
+  }> {
+    const legacyRepository = MasterySessionController.sampleSessionRepo;
+    const candidates = isUuid(sessionId)
+      ? [this.sessionRepo, legacyRepository]
+      : [legacyRepository, this.sessionRepo];
+    const checked = new Set<ISessionRepository>();
+
+    for (const repository of candidates) {
+      if (checked.has(repository)) continue;
+      checked.add(repository);
+
+      try {
+        const session = repository.getSessionById
+          ? await repository.getSessionById(sessionId, userId)
+          : null;
+        if (session) return { repository, session };
+      } catch (error) {
+        // SQL-backed repositories reject legacy non-UUID IDs before returning no rows.
+        // Preserve that compatibility path without hiding other repository failures.
+        if (repository !== this.sessionRepo || isUuid(sessionId) || !isInvalidUuidRepositoryError(error)) {
+          throw error;
+        }
+      }
+    }
+
+    return { repository: candidates[0]!, session: null };
+  }
+
   async getOrStartSession(quizId: string, sessionType: SessionType = 'initial', userId?: string, providedQuestions?: QuizQuestion[]) {
     if (!isUuid(quizId) || quizId === SAMPLE_QUIZ_ID) {
-      const sessionPromise = MasterySessionController.sampleSessionRepo.getActiveSession(quizId, userId);
+      const repository = quizId === SAMPLE_QUIZ_ID
+        ? this.sessionRepo
+        : MasterySessionController.sampleSessionRepo;
+      const sessionPromise = repository.getActiveSession(quizId, userId);
       const questionsPromise = providedQuestions
         ? Promise.resolve(providedQuestions)
         : quizId === SAMPLE_QUIZ_ID
@@ -57,12 +90,12 @@ export class MasterySessionController {
       const [existingSession, questions] = await Promise.all([sessionPromise, questionsPromise]);
       let session = existingSession;
       let progressList: QuestionProgress[] = [];
-      if (!session) session = await MasterySessionController.sampleSessionRepo.createSession(quizId, sessionType, new Date().toISOString(), userId);
-      else progressList = await MasterySessionController.sampleSessionRepo.getProgressForSession(session.id, userId);
+      if (!session) session = await repository.createSession(quizId, sessionType, new Date().toISOString(), userId);
+      else progressList = await repository.getProgressForSession(session.id, userId);
       const existingMap = new Map(progressList.map(p => [p.question_id, p]));
       const missing = questions.filter(q => !existingMap.has(q.id));
       if (missing.length > 0) {
-        const saved = await MasterySessionController.sampleSessionRepo.batchSaveQuestionProgress(missing.map(q => ({ session_id: session!.id, question_id: q.id, streak_count: 0, has_missed: false, locked: false })), userId);
+        const saved = await repository.batchSaveQuestionProgress(missing.map(q => ({ session_id: session!.id, question_id: q.id, streak_count: 0, has_missed: false, locked: false })), userId);
         progressList = [...progressList, ...saved];
       }
       return { session, questions, progress: progressList };
@@ -98,8 +131,7 @@ export class MasterySessionController {
     _latencyMs?: number,
     submittedAnswer?: SubmittedAnswer
   ) {
-    const repository = isUuid(sessionId) ? this.sessionRepo : MasterySessionController.sampleSessionRepo;
-    const session = repository.getSessionById ? await repository.getSessionById(sessionId, userId) : null;
+    const { repository, session } = await this.resolveSessionRepository(sessionId, userId);
     if (userId && !session) throw new Error('Session not found or access is restricted');
 
     let resolvedIsCorrect = isCorrect;
@@ -123,8 +155,7 @@ export class MasterySessionController {
   }
 
   async completeSession(sessionId: string, quizId: string, userId?: string, summary?: SessionMasterySummary) {
-    const repository = isUuid(sessionId) ? this.sessionRepo : MasterySessionController.sampleSessionRepo;
-    const existing = repository.getSessionById ? await repository.getSessionById(sessionId, userId) : null;
+    const { repository, session: existing } = await this.resolveSessionRepository(sessionId, userId);
     if (userId && (!existing || existing.quiz_id !== quizId)) throw new Error('Session not found or access is restricted');
     const completed = await repository.updateSessionStatus(sessionId, 'completed', new Date().toISOString(), userId);
     const nextPlan = MasteryEngineService.planNextSession(completed);

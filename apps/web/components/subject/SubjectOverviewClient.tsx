@@ -64,19 +64,22 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
             <span aria-hidden="true" style={{ backgroundColor: subject.color }} className="h-14 w-14 shrink-0 rounded-2xl border-2 border-slate-900 shadow-brutal-sm" />
             <div className="min-w-0">
               {editing ? (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
                   <input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    className="rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3.5 py-2 text-xl font-black text-foreground shadow-brutal-sm outline-none focus:border-primary"
+                    className="w-full sm:w-auto flex-1 min-w-0 rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3.5 py-2 text-lg sm:text-xl font-black text-foreground shadow-brutal-sm outline-none focus:border-primary"
                   />
-                  <input
-                    aria-label="Subject color"
-                    type="color"
-                    value={color}
-                    onChange={(event) => setColor(event.target.value)}
-                    className="h-10 w-12 cursor-pointer rounded-xl border-2 border-slate-900 shadow-brutal-sm bg-transparent"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      aria-label="Subject color"
+                      type="color"
+                      value={color}
+                      onChange={(event) => setColor(event.target.value)}
+                      className="h-10 w-12 shrink-0 cursor-pointer rounded-xl border-2 border-slate-900 shadow-brutal-sm bg-transparent"
+                    />
+                    <span className="text-xs font-bold text-muted-foreground uppercase">{color}</span>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2.5">

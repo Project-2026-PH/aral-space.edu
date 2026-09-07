@@ -13,6 +13,7 @@ interface GitHubProfile {
 interface DeveloperConfig {
   username: string;
   defaultName: string;
+  avatarUrl: string;
   cardBg: string;
   badgeBg: string;
   stickerBg: string;
@@ -25,7 +26,7 @@ const DEVELOPERS: DeveloperConfig[] = [
   {
     username: 'aelanimm',
     defaultName: 'Aela',
-    // Pink theme for Aela
+    avatarUrl: 'https://avatars.githubusercontent.com/u/191355555?v=4',
     cardBg: 'bg-[#fff1f5] dark:bg-[#25121b]',
     badgeBg: 'bg-pink-500 text-white',
     stickerBg: 'bg-pink-300 text-slate-900 border-slate-900',
@@ -36,7 +37,7 @@ const DEVELOPERS: DeveloperConfig[] = [
   {
     username: 'primooo05',
     defaultName: 'Primo',
-    // Red theme for Primo
+    avatarUrl: 'https://avatars.githubusercontent.com/u/191092961?v=4',
     cardBg: 'bg-[#fef2f2] dark:bg-[#271212]',
     badgeBg: 'bg-rose-600 text-white',
     stickerBg: 'bg-rose-300 text-slate-900 border-slate-900',
@@ -46,9 +47,16 @@ const DEVELOPERS: DeveloperConfig[] = [
   },
 ];
 
+function createFallbackAvatarSvg(name: string, bg: string, text: string) {
+  const initial = (name[0] || 'D').toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="${bg}"/><text x="50" y="58" font-size="42" font-weight="900" font-family="system-ui, sans-serif" fill="${text}" text-anchor="middle" dominant-baseline="middle">${initial}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 export default function DevelopersModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
   const handleClose = () => {
     setIsClosing(true);
@@ -57,17 +65,18 @@ export default function DevelopersModal() {
       setIsClosing(false);
     }, 200);
   };
+
   const [profiles, setProfiles] = useState<Record<string, GitHubProfile>>({
     aelanimm: {
       username: 'aelanimm',
       name: 'Aela',
-      avatar_url: 'https://github.com/aelanimm.png',
+      avatar_url: 'https://avatars.githubusercontent.com/u/191355555?v=4',
       html_url: 'https://github.com/aelanimm',
     },
     primooo05: {
       username: 'primooo05',
       name: 'Primo',
-      avatar_url: 'https://github.com/primooo05.png',
+      avatar_url: 'https://avatars.githubusercontent.com/u/191092961?v=4',
       html_url: 'https://github.com/primooo05',
     },
   });
@@ -75,9 +84,11 @@ export default function DevelopersModal() {
   useEffect(() => {
     if (!isOpen) return;
 
-    DEVELOPERS.forEach(async ({ username, defaultName }) => {
+    DEVELOPERS.forEach(async ({ username, defaultName, avatarUrl }) => {
       try {
-        const res = await fetch(`https://api.github.com/users/${username}`);
+        const res = await fetch(`https://api.github.com/users/${username}`, {
+          headers: { Accept: 'application/vnd.github.v3+json' },
+        });
         if (!res.ok) return;
         const data = await res.json();
         setProfiles((prev) => ({
@@ -85,12 +96,12 @@ export default function DevelopersModal() {
           [username]: {
             username,
             name: data.name || defaultName,
-            avatar_url: data.avatar_url || `https://github.com/${username}.png`,
+            avatar_url: data.avatar_url || avatarUrl,
             html_url: data.html_url || `https://github.com/${username}`,
           },
         }));
       } catch {
-        // Fallback already prefilled
+        // Fallback prefilled
       }
     });
   }, [isOpen]);
@@ -113,7 +124,7 @@ export default function DevelopersModal() {
       {isOpen && (
         <div
           onClick={handleClose}
-          className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto ${
+          className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs ${
             isClosing ? 'animate-modal-backdrop-out' : 'animate-modal-backdrop'
           }`}
         >
@@ -121,151 +132,149 @@ export default function DevelopersModal() {
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-lg rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] p-6 sm:p-7 shadow-brutal space-y-6 text-slate-900 dark:text-white my-8 ${
+            className={`relative w-full max-w-lg rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] p-4 sm:p-5 shadow-brutal space-y-3.5 text-slate-900 dark:text-white my-auto ${
               isClosing ? 'animate-modal-pop-out' : 'animate-modal-pop'
             } will-change-transform`}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b-2 border-slate-900/15 dark:border-white/15 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-brutal-sm border border-slate-900">
-                  <Heart className="w-4 h-4 fill-white" />
+            <div className="flex items-center justify-between border-b-2 border-slate-900/15 dark:border-white/15 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-brutal-xs border border-slate-900 shrink-0">
+                  <Heart className="w-3.5 h-3.5 fill-white" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black uppercase tracking-tight">About Developers</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Built with care for students</p>
+                  <h3 className="text-sm sm:text-base font-black uppercase tracking-tight leading-tight">About Developers</h3>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Built with care for students</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={handleClose}
                 aria-label="Close dialog"
-                className="rounded-lg p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-900 cursor-pointer"
+                className="rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-900 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Top metadata badge strip: Current Year & Created Year */}
-            <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border-2 border-blue-200 dark:border-blue-900/50">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
-                  <Calendar className="w-3.5 h-3.5" />
+            {/* Compact Top metadata badge strip */}
+            <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <Calendar className="w-3 h-3" />
                 </div>
-                <div className="text-[11px]">
-                  <span className="text-slate-500 dark:text-slate-400 font-semibold block leading-none">Created</span>
-                  <span className="font-black text-slate-900 dark:text-white">Year 2026</span>
-                </div>
-              </div>
-
-              <div className="h-6 w-px bg-blue-200 dark:bg-blue-800/60 hidden sm:block" />
-
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-                  <Calendar className="w-3.5 h-3.5" />
-                </div>
-                <div className="text-[11px]">
-                  <span className="text-slate-500 dark:text-slate-400 font-semibold block leading-none">Now in</span>
-                  <span className="font-black text-slate-900 dark:text-white">Year 2026</span>
+                <div className="min-w-0 leading-tight">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium block text-[9px]">Created</span>
+                  <span className="font-black text-slate-900 dark:text-white text-[10px] truncate block">2026</span>
                 </div>
               </div>
 
-              <div className="h-6 w-px bg-blue-200 dark:bg-blue-800/60 hidden sm:block" />
-
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
-                  <GraduationCap className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1.5 min-w-0 border-l border-blue-200 dark:border-blue-800/60 pl-1.5">
+                <div className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <Calendar className="w-3 h-3" />
                 </div>
-                <div className="text-[11px]">
-                  <span className="text-slate-500 dark:text-slate-400 font-semibold block leading-none">Standing</span>
-                  <span className="font-black text-amber-700 dark:text-amber-400">4th Year Students</span>
+                <div className="min-w-0 leading-tight">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium block text-[9px]">Now</span>
+                  <span className="font-black text-slate-900 dark:text-white text-[10px] truncate block">2026</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 min-w-0 border-l border-blue-200 dark:border-blue-800/60 pl-1.5">
+                <div className="w-5 h-5 rounded-md bg-amber-500 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <GraduationCap className="w-3 h-3" />
+                </div>
+                <div className="min-w-0 leading-tight">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium block text-[9px]">Standing</span>
+                  <span className="font-black text-amber-700 dark:text-amber-400 text-[10px] truncate block">4th Year</span>
                 </div>
               </div>
             </div>
 
-            {/* Developer Collectible Cards in vertical layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Developer Collectible Cards */}
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
               {DEVELOPERS.map((dev) => {
-                const profile = profiles[dev.username];
+                const profile = profiles[dev.username] || {
+                  username: dev.username,
+                  name: dev.defaultName,
+                  avatar_url: dev.avatarUrl,
+                  html_url: `https://github.com/${dev.username}`,
+                };
+                const hasError = imgErrors[dev.username];
+                const fallbackAvatar = createFallbackAvatarSvg(
+                  profile.name,
+                  dev.username === 'aelanimm' ? '#f472b6' : '#f43f5e',
+                  '#ffffff'
+                );
+
                 return (
                   <div
                     key={dev.username}
-                    className={`relative rounded-3xl border-3 border-slate-900 dark:border-white/40 ${dev.cardBg} p-5 shadow-brutal flex flex-col justify-between overflow-hidden group hover:-translate-y-1 transition-transform duration-200`}
+                    className={`relative rounded-2xl border-2 sm:border-3 border-slate-900 dark:border-white/40 ${dev.cardBg} p-3 sm:p-3.5 shadow-brutal-sm flex flex-col justify-between overflow-hidden group hover:-translate-y-0.5 transition-transform duration-200`}
                   >
                     {/* Floating Sticker / Tag */}
-                    <div className="absolute top-3.5 right-3.5 z-10 rotate-3 group-hover:rotate-6 transition-transform">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${dev.stickerBg} text-[10px] font-black uppercase tracking-wider border-2 shadow-brutal-xs`}>
-                        <GraduationCap className="w-3 h-3 text-slate-900" />
-                        4th Year Student
+                    <div className="absolute top-2 right-2 z-10 rotate-2 group-hover:rotate-4 transition-transform">
+                      <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full ${dev.stickerBg} text-[8px] font-black uppercase tracking-wider border shadow-brutal-xs`}>
+                        <GraduationCap className="w-2.5 h-2.5 text-slate-900" />
+                        4th Year
                       </span>
                     </div>
 
-                    {/* Vertical card layout like collector's card */}
                     <div>
                       {/* Vertical side label */}
-                      <span className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500 block mb-3">
-                        DEVELOPER
+                      <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 block mb-1">
+                        DEV
                       </span>
 
-                      {/* Large Centered Illustration / Avatar */}
-                      <div className="flex justify-center py-2">
+                      {/* Illustration / Avatar */}
+                      <div className="flex justify-center py-1">
                         <div className="relative">
                           <img
-                            src={profile.avatar_url}
+                            src={hasError ? fallbackAvatar : (profile.avatar_url || dev.avatarUrl)}
                             alt={profile.name}
-                            className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border-3 border-slate-900 dark:border-white/30 object-cover shadow-brutal-sm bg-white"
-                            onError={(e) => {
-                              // fallback to dicebear
-                              e.currentTarget.src = `https://api.dicebear.com/7.x/bottts/svg?seed=${dev.username}`;
+                            referrerPolicy="no-referrer"
+                            crossOrigin="anonymous"
+                            loading="eager"
+                            className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl border-2 border-slate-900 dark:border-white/30 object-cover shadow-xs bg-white"
+                            onError={() => {
+                              setImgErrors((prev) => ({ ...prev, [dev.username]: true }));
                             }}
                           />
                           {/* Mini sticker pill under avatar */}
-                          <div className={`absolute -bottom-2 -left-2 ${dev.badgeBg} text-[9px] font-black px-2 py-0.5 rounded-md border border-slate-900 shadow-xs uppercase tracking-wide`}>
-                            STUDENT DEV
+                          <div className={`absolute -bottom-1.5 -left-1.5 ${dev.badgeBg} text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded border border-slate-900 shadow-xs uppercase tracking-tight`}>
+                            STUDENT
                           </div>
                         </div>
                       </div>
 
                       {/* Card Info */}
-                      <div className="mt-4 pt-3 border-t-2 border-slate-900/10 dark:border-white/10 text-left space-y-1">
-                        <h4 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+                      <div className="mt-2 pt-2 border-t border-slate-900/10 dark:border-white/10 text-left">
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white tracking-tight truncate leading-tight">
                           {profile.name}
                         </h4>
-                        <p className={`text-[11px] font-bold ${dev.accentText}`}>
+                        <p className={`text-[10px] font-bold ${dev.accentText} truncate leading-tight`}>
                           @{dev.username}
                         </p>
                       </div>
                     </div>
 
-                    {/* Socials: GITHUB ONLY */}
-                    <div className="mt-4 pt-3 border-t-2 border-dashed border-slate-900/15 dark:border-white/15">
+                    {/* Socials: GITHUB */}
+                    <div className="mt-2.5 pt-2 border-t border-dashed border-slate-900/15 dark:border-white/15">
                       <a
                         href={profile.html_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`flex items-center justify-between w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-2 border-slate-900 dark:border-white/20 shadow-brutal-xs ${dev.buttonHover} transition-all font-bold text-xs group/btn`}
+                        className={`flex items-center justify-between w-full px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-900 dark:border-white/20 shadow-xs ${dev.buttonHover} transition-all font-bold text-[10px] group/btn`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Github className="w-4 h-4 shrink-0 text-slate-900 dark:text-white group-hover/btn:text-current" />
-                          <span className="truncate text-[11px]">github.com/{dev.username}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Github className="w-3.5 h-3.5 shrink-0 text-slate-900 dark:text-white group-hover/btn:text-current" />
+                          <span className="truncate text-[10px]">@{dev.username}</span>
                         </div>
-                        <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-70 group-hover/btn:opacity-100" />
+                        <ExternalLink className="w-3 h-3 shrink-0 opacity-70 group-hover/btn:opacity-100" />
                       </a>
                     </div>
                   </div>
                 );
               })}
-            </div>
-
-            {/* Footer close button */}
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="w-full py-3 rounded-2xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-black text-xs uppercase tracking-wider border-2 border-slate-900 shadow-brutal-sm transition-all cursor-pointer"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>

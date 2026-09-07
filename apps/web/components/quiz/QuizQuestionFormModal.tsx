@@ -13,9 +13,8 @@ import { hasRichTextContent, richTextToPlainText } from '@/lib/richText';
 export type QuestionType = 'multiple_choice' | 'typed_answer' | 'identification' | 'true_false' | 'enumeration';
 
 const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'multiple_choice', label: 'Multiple Choice', icon: CircleDot },
-  { id: 'typed_answer', label: 'Typed Answer', icon: PenLine },
   { id: 'identification', label: 'Identification', icon: PenLine },
+  { id: 'typed_answer', label: 'Typed Answer', icon: PenLine },
   { id: 'true_false', label: 'True or False', icon: ToggleLeft },
   { id: 'enumeration', label: 'Enumeration', icon: ListOrdered },
 ];
@@ -63,9 +62,9 @@ export default function QuizQuestionFormModal({
   onSaved
 }: QuizQuestionFormModalProps) {
   const isEditing = Boolean(question);
-  const [type, setType] = useState<QuestionType>('multiple_choice');
+  const [type, setType] = useState<QuestionType>('identification');
   const [questionText, setQuestionText] = useState('');
-  const [options, setOptions] = useState<string[]>(['', '', '', '']);
+  const [options, setOptions] = useState<string[]>(['']);
   const [correctAnswer, setCorrectAnswer] = useState<number>(0);
   const [answerText, setAnswerText] = useState<string>('');
   const [explanation, setExplanation] = useState<string>('');
@@ -95,9 +94,9 @@ export default function QuizQuestionFormModal({
       setAnswerText(question.answer_text || question.options[question.correct_answer] || '');
       setExplanation(question.explanation || '');
     } else {
-      setType('multiple_choice');
+      setType('identification');
       setQuestionText('');
-      setOptions(['', '', '', '']);
+      setOptions(['']);
       setCorrectAnswer(0);
       setAnswerText('');
       setExplanation('');

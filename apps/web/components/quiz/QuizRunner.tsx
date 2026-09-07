@@ -133,6 +133,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
         cardTelemetry={cardTelemetry}
         accumulatedStruggleIds={accumulatedStruggleIds}
         onStartStruggleReview={() => startStruggleReview()}
+        onRetake={() => resetProgress()}
       />
     );
   }

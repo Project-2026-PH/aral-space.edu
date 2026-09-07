@@ -148,10 +148,10 @@ export default function UpdateNotification() {
 
         <div className="flex-1 min-w-0 pr-1">
           <h4 className="text-sm font-semibold text-foreground tracking-tight">
-            Update Available
+            Update Available!
           </h4>
           <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-            A new version of Aral Space is ready with improvements.
+            Mama mama may bagong version na ng Aral Space, pwede mo na refresh or latur
           </p>
 
           <div className="flex items-center gap-2 mt-3">
@@ -162,7 +162,7 @@ export default function UpdateNotification() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 active:scale-95 transition-all rounded-lg shadow-sm disabled:opacity-70 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isUpdating ? 'animate-spin' : ''}`} />
-              {isUpdating ? 'Updating...' : 'Update Now'}
+              {isUpdating ? 'Updating...' : 'Refresh Page'}
             </button>
 
             <button

@@ -291,6 +291,7 @@ export default function QuizQuestionFormModal({
               placeholder="Type question prompt here..."
               minHeight="120px"
               data-skip-clipboard-intercept="true"
+              hideToolbarUntilFocus
             />
           </div>
 
@@ -492,6 +493,7 @@ export default function QuizQuestionFormModal({
             placeholder="Why is the chosen option correct?"
             minHeight="90px"
             data-skip-clipboard-intercept="true"
+            hideToolbarUntilFocus
           />
         </div>
 

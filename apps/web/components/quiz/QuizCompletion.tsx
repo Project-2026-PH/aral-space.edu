@@ -9,6 +9,8 @@ import {
   Award,
   Brain,
   Check,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Gauge,
   Layers,
@@ -35,6 +37,15 @@ interface QuizCompletionProps {
 
 type TelemetryTab = 'all' | 'green' | 'yellow' | 'red';
 
+function getReviewAnswer(question: QuizQuestion): string {
+  const enumerationItems = question.question_type === 'typed_answer'
+    ? question.options.map((option) => option.trim()).filter(Boolean)
+    : [];
+
+  if (enumerationItems.length > 1) return enumerationItems.join(', ');
+  return question.answer_text?.trim() || question.options[question.correct_answer]?.trim() || '';
+}
+
 export default function QuizCompletion({
   quiz,
   questions,
@@ -45,6 +56,7 @@ export default function QuizCompletion({
   onRetake
 }: QuizCompletionProps) {
   const [activeTelemetryTab, setActiveTelemetryTab] = useState<TelemetryTab>('all');
+  const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(new Set());
   const deckMedianSec = (summary.deckMedianLatencyMs / 1000).toFixed(1);
   const hesitationThresholdSec = ((summary.deckMedianLatencyMs * 1.5) / 1000).toFixed(1);
   const conceptEntries = Object.entries(summary.conceptErrorDensity).sort((a, b) => b[1] - a[1]);
@@ -55,6 +67,15 @@ export default function QuizCompletion({
 
   const toggleTab = (tab: Exclude<TelemetryTab, 'all'>) => {
     setActiveTelemetryTab(activeTelemetryTab === tab ? 'all' : tab);
+  };
+
+  const toggleCardExpansion = (questionId: string) => {
+    setExpandedCardIds((current) => {
+      const next = new Set(current);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      return next;
+    });
   };
 
   return (
@@ -90,10 +111,51 @@ export default function QuizCompletion({
                 summary.deckMedianLatencyMs > 0 &&
                 (record.latenciesMs?.[0] || record.timeToCorrectMs || 0) > summary.deckMedianLatencyMs * 1.5
               );
+              const isExpanded = expandedCardIds.has(question.id);
+              const reviewAnswer = getReviewAnswer(question);
+              const answerPanelId = `card-answer-${question.id}`;
               return (
-                <div key={question.id} className="rounded-2xl border border-border/60 bg-muted/20 p-3 text-left space-y-1.5">
-                  <div className="flex items-start justify-between gap-2"><RichTextContent html={question.question_text} className="text-xs font-semibold text-foreground line-clamp-2" /><div className="shrink-0">{bucket === 'green' && <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600">✓ Got it ({latencySec})</span>}{bucket === 'yellow' && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-600">🟡 {isHesitant ? `Hesitant (${latencySec})` : 'Recovered'}</span>}{bucket === 'red' && <span className="rounded-full bg-destructive/10 border border-destructive/20 px-2 py-0.5 text-[10px] font-bold text-destructive">🔴 At-Risk ({record?.totalMisses || 0} misses)</span>}</div></div>
-                  {question.concept_tags && question.concept_tags.length > 0 && <div className="flex items-center gap-1.5 flex-wrap">{question.concept_tags.map((tag, index) => <span key={index} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">#{tag}</span>)}</div>}
+                <div key={question.id} className="rounded-2xl border border-border/60 bg-muted/20 p-3 text-left space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <RichTextContent
+                      html={question.question_text}
+                      className={`min-w-0 flex-1 text-xs font-semibold text-foreground ${isExpanded ? '' : 'line-clamp-2'}`}
+                    />
+                    <div className="shrink-0">
+                      {bucket === 'green' && <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600">✓ Got it ({latencySec})</span>}
+                      {bucket === 'yellow' && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-600">🟡 {isHesitant ? `Hesitant (${latencySec})` : 'Recovered'}</span>}
+                      {bucket === 'red' && <span className="rounded-full bg-destructive/10 border border-destructive/20 px-2 py-0.5 text-[10px] font-bold text-destructive">🔴 At-Risk ({record?.totalMisses || 0} misses)</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-end justify-between gap-2">
+                    {question.concept_tags && question.concept_tags.length > 0 ? (
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        {question.concept_tags.map((tag, index) => <span key={index} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">#{tag}</span>)}
+                      </div>
+                    ) : <span />}
+                    <button
+                      type="button"
+                      onClick={() => toggleCardExpansion(question.id)}
+                      aria-expanded={isExpanded}
+                      aria-controls={answerPanelId}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-primary/20 bg-primary/5 px-2 py-1 text-[10px] font-bold text-primary transition-colors hover:bg-primary/10"
+                    >
+                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                      <span>{isExpanded ? 'Hide answer' : 'Expand & reveal answer'}</span>
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div id={answerPanelId} className="rounded-xl border border-primary/20 bg-primary/5 p-2.5 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Answer</span>
+                      {reviewAnswer ? (
+                        <RichTextContent html={reviewAnswer} className="text-xs font-semibold text-foreground" />
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">No answer recorded for this card.</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

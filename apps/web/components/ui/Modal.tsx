@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -11,6 +12,7 @@ interface ModalProps {
   children: React.ReactNode;
   maxWidth?: string;
   className?: string;
+  contentClassName?: string;
 }
 
 export default function Modal({
@@ -20,28 +22,47 @@ export default function Modal({
   description,
   children,
   maxWidth = 'max-w-xl',
-  className = ''
+  className = '',
+  contentClassName = ''
 }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onOpenChange(false);
+      }
     };
-  }, [open]);
+    window.addEventListener('keydown', handleKeyDown);
 
-  if (!open) return null;
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onOpenChange]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  if (!open || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
       <div
         className="fixed inset-0 bg-background/80 backdrop-blur-md transition-opacity"
         onClick={() => onOpenChange(false)}
       />
-      <div className={`relative z-50 w-full ${maxWidth} max-h-[85vh] flex flex-col rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] p-6 shadow-brutal animate-fade-in ${className}`}>
+      <div className={`relative z-10 w-full ${maxWidth} max-h-[85vh] max-h-[85dvh] flex flex-col rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] p-6 shadow-brutal animate-fade-in ${className}`}>
         <div className="flex items-start justify-between pb-4 border-b-2 border-slate-900/20 dark:border-white/20 shrink-0">
           <div>
             {title && <h3 className="text-lg font-black text-slate-900 dark:text-white">{title}</h3>}
@@ -55,8 +76,9 @@ export default function Modal({
             <X className="h-4 w-4 stroke-[2.5]" />
           </button>
         </div>
-        <div className="mt-4 flex-1 min-h-0 overflow-y-auto custom-scrollbar-card-light dark:custom-scrollbar-card pr-1">{children}</div>
+        <div className={`mt-4 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pr-1 ${contentClassName}`}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

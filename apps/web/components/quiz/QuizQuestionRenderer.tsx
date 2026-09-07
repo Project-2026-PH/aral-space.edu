@@ -58,6 +58,7 @@ interface SharedQuestionProps {
   onFlip: () => void;
   onShowHint: () => void;
   onAdvance?: () => void;
+  onDontKnow?: () => void;
   desktopViewport?: boolean;
 }
 
@@ -81,9 +82,20 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
     onSubmitTyped,
     onShowHint,
     onAdvance,
+    onDontKnow,
     desktopViewport
   } = props;
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleDontKnow = () => {
+    if (isEvaluating || identificationSubmitted) return;
+    if (onDontKnow) {
+      onDontKnow();
+      return;
+    }
+    onInputChange("Don't know");
+    onSubmitTyped('learn');
+  };
 
   return (
     <div className={`w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4 ${desktopViewport ? 'desktop-quiz-card lg:h-auto lg:min-h-0 lg:overflow-visible lg:p-5 lg:space-y-3' : ''}`}>
@@ -177,8 +189,8 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
       </div>
 
       {/* Bottom Section: Feedback */}
-      <div className="min-h-[72px]">
-        {identificationSubmitted && (
+      <div className="min-h-[72px] flex flex-col justify-end">
+        {identificationSubmitted ? (
           <div className={`rounded-2xl border p-4 text-xs space-y-2 text-center animate-in fade-in duration-200 lg:p-3 ${typedAnswerCorrect
             ? 'border-emerald-500/30 bg-emerald-500/10'
             : 'border-destructive/30 bg-destructive/10'
@@ -190,6 +202,18 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
             <p className="text-foreground">Correct answer: <span className="font-bold">{getQuestionAnswer(question)}</span></p>
             {!typedAnswerCorrect && <p className="text-muted-foreground">Your answer: {identificationInput}</p>}
             {question.explanation && <RichTextContent html={question.explanation} className="text-muted-foreground italic" />}
+          </div>
+        ) : (
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={handleDontKnow}
+              disabled={isEvaluating || identificationSubmitted}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            >
+              <Flag className="h-3.5 w-3.5" />
+              <span>Don&apos;t know</span>
+            </button>
           </div>
         )}
       </div>
@@ -229,6 +253,16 @@ export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElemen
               <span>Hint: {getQuestionHint(question)}</span>
             </div>
           )}
+          <div className="flex justify-end pt-4" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              onClick={handleDontKnow}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive active:scale-95 cursor-pointer"
+            >
+              <Flag className="h-3.5 w-3.5" />
+              <span>Don&apos;t know</span>
+            </button>
+          </div>
         </div>
 
         <div className={`space-y-4 backface-hidden rotate-y-180 ${!isCardFlipped ? 'hidden' : 'block'}`}>
@@ -271,9 +305,20 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
     onSubmitTyped,
     onShowHint,
     onAdvance,
+    onDontKnow,
     desktopViewport
   } = props;
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleDontKnow = () => {
+    if (isEvaluating || identificationSubmitted) return;
+    if (onDontKnow) {
+      onDontKnow();
+      return;
+    }
+    onInputChange("Don't know");
+    onSubmitTyped('identification');
+  };
 
   return (
     <div className={`w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md flex flex-col justify-between space-y-4 ${desktopViewport ? 'desktop-quiz-card lg:h-auto lg:min-h-0 lg:overflow-visible lg:p-5 lg:space-y-3' : ''}`}>
@@ -359,11 +404,23 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
       </div>
 
       {/* Result Section */}
-      <div className="min-h-[72px]">
-        {identificationSubmitted && (
+      <div className="min-h-[72px] flex flex-col justify-end">
+        {identificationSubmitted ? (
           <div className="rounded-2xl border border-border/80 bg-muted/40 p-4 text-xs space-y-1 text-center animate-in fade-in duration-200">
             <p className="font-bold text-foreground">Correct Answer: {getQuestionAnswer(question)}</p>
             {question.explanation && <RichTextContent html={question.explanation} className="text-muted-foreground text-[11px] leading-relaxed" />}
+          </div>
+        ) : (
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={handleDontKnow}
+              disabled={isEvaluating || identificationSubmitted}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            >
+              <Flag className="h-3.5 w-3.5" />
+              <span>Don&apos;t know</span>
+            </button>
           </div>
         )}
       </div>
@@ -387,9 +444,23 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
     isRetryQuestion,
     onAnswer,
     onShowHint,
+    onDontKnow,
     desktopViewport
   } = props;
   const definitionContentRef = React.useRef<HTMLDivElement>(null);
+
+  const handleDontKnow = () => {
+    if (isEvaluating) return;
+    if (onDontKnow) {
+      onDontKnow();
+      return;
+    }
+    onAnswer({
+      optionId: -1,
+      text: "Don't know",
+      isCorrect: false
+    });
+  };
   const [isDefinitionScrollable, setIsDefinitionScrollable] = React.useState(false);
   const hasExplanationContent = Boolean(
     question.correct_explanation ||
@@ -564,6 +635,21 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Lower Right Action: Don't know button */}
+      {!isEvaluating && (
+        <div className="flex justify-end pt-1 shrink-0">
+          <button
+            type="button"
+            onClick={handleDontKnow}
+            disabled={isEvaluating}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+          >
+            <Flag className="h-3.5 w-3.5" />
+            <span>Don&apos;t know</span>
+          </button>
         </div>
       )}
     </div>

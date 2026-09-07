@@ -592,6 +592,28 @@ export function useQuizSession({
     }, answerMode);
   }
 
+  function giveUp(answerMode?: 'learn' | 'identification'): void {
+    if (!isProgressHydrated || isEvaluating || !activeQuestion || !currentProg) return;
+
+    if (answerMode === 'learn' || answerMode === 'identification') {
+      setIdentificationInput("Don't know");
+      setTypedAnswerCorrect(false);
+      setIdentificationSubmitted(true);
+      answerQuestion({
+        optionId: -1,
+        text: "Don't know",
+        isCorrect: false
+      }, answerMode);
+      return;
+    }
+
+    answerQuestion({
+      optionId: -1,
+      text: "Don't know",
+      isCorrect: false
+    });
+  }
+
   async function complete(): Promise<void> {
     if (completionSyncStartedRef.current) return;
     completionSyncStartedRef.current = true;
@@ -780,6 +802,7 @@ export function useQuizSession({
     setIsExplanationVisible,
     answerQuestion,
     submitTypedAnswer,
+    giveUp,
     advance,
     startStruggleReview,
     complete,

@@ -64,11 +64,10 @@ export class QuizCrudController {
   }
 
   async getQuiz(id: string, userId?: string) {
-    const [quiz, questions] = await Promise.all([
-      this.quizRepo.getQuizById(id, userId),
-      this.quizRepo.getQuestionsByQuizId(id, userId)
-    ]);
+    const quiz = await this.quizRepo.getQuizById(id, userId);
     if (!quiz) return null;
+
+    const questions = await this.quizRepo.getQuestionsByQuizId(id, userId);
     return { ...quiz, questions };
   }
 

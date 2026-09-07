@@ -155,6 +155,7 @@ export default function ShareSubjectModal({
       title="Share Subject"
       description={subject ? `Share “${subject.name}” and its public study sets.` : undefined}
       maxWidth="max-w-lg"
+      contentClassName="custom-scrollbar"
     >
       <div className="space-y-5 pt-2">
         {loading ? (

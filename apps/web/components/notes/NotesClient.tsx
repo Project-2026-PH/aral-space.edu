@@ -306,7 +306,7 @@ export default function NotesClient() {
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
             >
               <BookOpen className="h-3.5 w-3.5" />
-              Open Reviewer ↗
+              Open Reviewer
             </a>
             <button
               type="button"

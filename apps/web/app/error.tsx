@@ -56,11 +56,11 @@ export default function RootErrorBoundary({
         </button>
 
         <Link
-          href="/"
+          href="/library"
           className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all"
         >
           <Home className="w-4 h-4" />
-          Back Home
+          Back to Library
         </Link>
       </div>
     </div>

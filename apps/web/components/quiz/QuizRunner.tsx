@@ -91,7 +91,8 @@ export default function QuizRunner(props: QuizRunnerProps) {
     shuffleRemainingQueue,
     handleSurfaceClick,
     handleSurfaceKeyDown,
-    toggleMute
+    toggleMute,
+    giveUp
   } = session;
 
   const handleConfirmReset = () => {
@@ -287,6 +288,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
             onFlip={() => setIsCardFlipped((flipped) => !flipped)}
             onShowHint={() => setIsHintVisible(true)}
             onAdvance={advance}
+            onDontKnow={() => giveUp(currentMode === 'learn' || currentMode === 'identification' ? currentMode : undefined)}
           />
         </div>
       </div>

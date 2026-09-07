@@ -71,6 +71,10 @@ export class QuizCrudController {
     return { ...quiz, questions };
   }
 
+  async getQuizById(id: string, userId?: string) {
+    return this.quizRepo.getQuizById(id, userId);
+  }
+
   async createQuiz(dto: CreateQuizDto, userId?: string) { return this.quizRepo.createQuiz(dto, userId); }
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string) { return this.quizRepo.updateQuiz(id, dto, userId); }
   async deleteQuiz(id: string, userId?: string) { return this.quizRepo.deleteQuiz(id, userId); }

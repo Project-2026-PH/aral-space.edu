@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ qu
     const body = await readJsonBody(req, SECURITY_LIMITS.jsonBodyBytes);
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
-    const accessibleQuiz = await controller.getQuiz(quizId, userId);
+    const accessibleQuiz = await controller.getQuizById(quizId, userId);
     const canEditReviewer = accessibleQuiz && await hasReviewerEditAccess(controller, accessibleQuiz, userId);
     if (!accessibleQuiz || !canEditReviewer) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     const updated = await controller.updateQuestion(quizId, questionId, parseUpdateQuestion(body), userId);
@@ -49,7 +49,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ q
     if (rateLimit) return rateLimit;
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
-    const accessibleQuiz = await controller.getQuiz(quizId, userId);
+    const accessibleQuiz = await controller.getQuizById(quizId, userId);
     const canEditReviewer = accessibleQuiz && await hasReviewerEditAccess(controller, accessibleQuiz, userId);
     if (!accessibleQuiz || !canEditReviewer) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     const success = await controller.deleteQuestion(quizId, questionId, userId);

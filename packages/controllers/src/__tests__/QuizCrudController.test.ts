@@ -26,6 +26,10 @@ describe('QuizCrudController & MasterySessionController', () => {
     expect(fullQuiz).not.toBeNull();
     expect(fullQuiz?.id).toBe('quiz-1');
     expect(fullQuiz?.questions.length).toBe(1);
+
+    const quizById = await controller.getQuizById('quiz-1', 'user-1');
+    expect(quizById).toEqual({ id: 'quiz-1', title: 'Test Quiz' });
+    expect(mockRepo.getQuizById).toHaveBeenCalledWith('quiz-1', 'user-1');
   });
 
   it('uses the injected repository for sample sessions and preserves the legacy non-UUID fallback', async () => {

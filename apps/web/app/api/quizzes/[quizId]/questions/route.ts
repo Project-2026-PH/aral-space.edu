@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ qui
     const body = await readJsonBody(req, SECURITY_LIMITS.jsonBodyBytes);
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
-    const accessibleQuiz = await controller.getQuiz(quizId, userId);
+    const accessibleQuiz = await controller.getQuizById(quizId, userId);
     const canEditReviewer = accessibleQuiz && await hasReviewerEditAccess(controller, accessibleQuiz, userId);
     if (!accessibleQuiz || !canEditReviewer) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     const created = await controller.addQuestion(quizId, parseCreateQuestion(body), userId);
@@ -55,7 +55,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ quiz
     const normalizedIds = questionIds.map((id, index) => boundedString(id, `questionIds[${index}]`, 128, true)!);
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
-    const accessibleQuiz = await controller.getQuiz(quizId, userId);
+    const accessibleQuiz = await controller.getQuizById(quizId, userId);
     const canEditReviewer = accessibleQuiz && await hasReviewerEditAccess(controller, accessibleQuiz, userId);
     if (!accessibleQuiz || !canEditReviewer) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     await controller.reorderQuestions(quizId, normalizedIds, userId);

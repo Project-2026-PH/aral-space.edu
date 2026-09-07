@@ -1,4 +1,4 @@
-import { unstable_cache, revalidateTag } from 'next/cache';
+import { unstable_cache, revalidateTag, revalidatePath } from 'next/cache';
 import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
 import { getQuizRepository } from '@/lib/db';
 import type { Quiz, Subject, PublicQuizDto, PublicSubjectDto, LibraryData } from '@quiz-creator/types';
@@ -33,7 +33,7 @@ export async function getCachedQuiz(
 ): Promise<(Quiz & { questions: any[] }) | null> {
   const fetcher = unstable_cache(
     async (id: string, uid?: string) => {
-      const repo = await getQuizRepository(true);
+      const repo = await getQuizRepository(false);
       const controller = new QuizCrudController(repo);
       return controller.getQuiz(id, uid);
     },
@@ -122,6 +122,8 @@ export function revalidateQuizTag(quizId: string, userId?: string): void {
     if (userId) {
       revalidateTag(CacheTags.userQuizzes(userId));
     }
+    revalidatePath(`/quizzes/${quizId}`);
+    revalidatePath(`/review/${quizId}`);
   } catch (err) {
     // Graceful fallback outside Next.js request context (e.g. CLI/tests)
   }

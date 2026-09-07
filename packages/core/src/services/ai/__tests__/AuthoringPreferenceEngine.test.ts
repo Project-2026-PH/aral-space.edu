@@ -111,7 +111,7 @@ describe('AuthoringPreferenceEngine', () => {
     }
 
     let signals = AuthoringPreferenceEngine.toSignals(state);
-    expect(signals.preferredQuestionType || AuthoringPreferenceEngine.preferredQuestionType(signals)).toBe('multiple_choice');
+    expect(AuthoringPreferenceEngine.preferredQuestionType(signals)).toBe('multiple_choice');
     expect(signals.averageQuestionLength).toBe(8);
 
     // User shifts style: authoring 15 true_false questions with long stems and 2 options

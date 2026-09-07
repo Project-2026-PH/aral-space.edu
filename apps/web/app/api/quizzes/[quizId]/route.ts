@@ -12,7 +12,7 @@ export const GET = createApiRoute<{ quizId: string }>(async ({ params, userId })
   const quiz = await getCachedQuiz(params.quizId, userId);
   if (!quiz) return NextResponse.json({ error: 'Quiz not found' }, { status: 404 });
   return quiz;
-}, { cache: 'private' });
+}, { cache: 'noStore' });
 
 export const PATCH = createApiRoute<{ quizId: string }>(async ({ req, params, userId }) => {
   assertAllowedOrigin(req);

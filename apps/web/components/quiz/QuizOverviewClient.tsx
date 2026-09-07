@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Quiz, QuizQuestion, QuizSession } from '@quiz-creator/types';
 import QuizQuestionList from './QuizQuestionList';
 import QuizQuestionFormModal from './QuizQuestionFormModal';
@@ -46,9 +46,16 @@ export default function QuizOverviewClient({
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteQuizModal, setShowDeleteQuizModal] = useState(false);
 
+  useEffect(() => {
+    setQuiz(initialQuiz);
+    setQuestions(initialQuestions);
+    setTitleInput(initialQuiz.title);
+    setDescInput(initialQuiz.description || '');
+  }, [initialQuiz, initialQuestions]);
+
   async function refreshQuestions() {
     try {
-      const res = await fetch(`/api/quizzes/${quiz.id}`);
+      const res = await fetch(`/api/quizzes/${quiz.id}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setQuiz(data);
@@ -57,6 +64,28 @@ export default function QuizOverviewClient({
     } catch (err) {
       console.error('Refresh error:', err);
     }
+  }
+
+  function handleQuestionSaved(savedQuestion?: QuizQuestion) {
+    if (savedQuestion && savedQuestion.id) {
+      setQuestions((prev) => {
+        const exists = prev.some((q) => q.id === savedQuestion.id);
+        if (exists) {
+          return prev.map((q) => (q.id === savedQuestion.id ? savedQuestion : q));
+        }
+        return [...prev, savedQuestion];
+      });
+      refreshQuestions();
+    } else {
+      refreshQuestions();
+    }
+  }
+
+  function handleQuestionDeleted(deletedId?: string) {
+    if (deletedId) {
+      setQuestions((prev) => prev.filter((q) => q.id !== deletedId));
+    }
+    refreshQuestions();
   }
 
   async function handleSaveTitle() {
@@ -342,7 +371,7 @@ export default function QuizOverviewClient({
             setEditingQuestion(q);
             setShowQuestionModal(true);
           }}
-          onDeleted={refreshQuestions}
+          onDeleted={handleQuestionDeleted}
           readOnly={readOnly}
         />
       </div>
@@ -365,7 +394,7 @@ export default function QuizOverviewClient({
         quizId={quiz.id}
         subjectId={quiz.subject_id}
         userId={quiz.user_id}
-        onSaved={refreshQuestions}
+        onSaved={handleQuestionSaved}
       />
 
       <QuizStartConfigModal

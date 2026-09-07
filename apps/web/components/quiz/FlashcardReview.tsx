@@ -48,7 +48,6 @@ interface CardToolbarProps {
   onHint?: () => void;
   onEdit: () => void;
   onSpeak: () => void;
-  onToggleStar: () => void;
   canEdit: boolean;
 }
 
@@ -96,7 +95,7 @@ function getFlashcardSessionKey(quizId: string, userId?: string): string {
   return userId ? `quiz-creator:flashcard-session:${quizId}:${userId}` : `quiz-creator:flashcard-session:${quizId}`;
 }
 
-function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, onSpeak, onToggleStar, canEdit }: CardToolbarProps) {
+function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, onSpeak, canEdit }: CardToolbarProps) {
   return (
     <div className="flex items-center justify-between gap-4 text-xs font-semibold text-muted-foreground" onClick={(event) => event.stopPropagation()}>
       <div className="flex items-center gap-2">
@@ -129,9 +128,6 @@ function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, on
         )}
         <button type="button" onClick={onSpeak} aria-label="Read card aloud" className="text-muted-foreground transition-colors hover:text-foreground">
           <Volume2 className="h-4 w-4" />
-        </button>
-        <button type="button" onClick={onToggleStar} aria-label={isStarred ? 'Unstar card' : 'Star card'} className="text-muted-foreground transition-colors hover:text-foreground">
-          <Star className={`h-4 w-4 ${isStarred ? 'fill-amber-300 text-amber-300' : ''}`} />
         </button>
       </div>
     </div>
@@ -836,7 +832,6 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                   isRetryCard={isRetryCard}
                   onHint={canViewAnswerKey ? () => setIsHintVisible((current) => !current) : undefined}
                   onSpeak={speakCard}
-                  onToggleStar={() => setIsStarred((current) => !current)}
                   canEdit={canEdit}
                 />
                 <div
@@ -870,7 +865,6 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                   isStarred={isStarred}
                   isRetryCard={isRetryCard}
                   onSpeak={speakCard}
-                  onToggleStar={() => setIsStarred((current) => !current)}
                   canEdit={canEdit}
                 />
                 <div
@@ -1062,7 +1056,12 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           onOpenChange={setShowEditQuestionModal}
           question={editingQuestion}
           quizId={quiz.id}
-          onSaved={() => router.refresh()}
+          onSaved={(savedQuestion) => {
+            if (savedQuestion && savedQuestion.id) {
+              setCards((prev) => prev.map((c) => (c.id === savedQuestion.id ? savedQuestion : c)));
+            }
+            router.refresh();
+          }}
         />
       </div>
     </div>

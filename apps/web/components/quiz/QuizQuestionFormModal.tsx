@@ -48,7 +48,7 @@ interface QuizQuestionFormModalProps {
   quizId: string;
   subjectId?: string | null;
   userId?: string | null;
-  onSaved: () => void;
+  onSaved: (savedQuestion?: QuizQuestion) => void;
 }
 
 export default function QuizQuestionFormModal({
@@ -231,7 +231,7 @@ export default function QuizQuestionFormModal({
         { userId, subjectId }
       );
       onOpenChange(false);
-      onSaved();
+      onSaved(data);
     } catch (err: any) {
       setError(err.message || 'Error saving question');
     } finally {

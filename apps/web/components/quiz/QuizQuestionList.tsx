@@ -11,7 +11,7 @@ interface QuizQuestionListProps {
   quizId: string;
   questions: QuizQuestion[];
   onEdit: (question: QuizQuestion) => void;
-  onDeleted: () => void;
+  onDeleted: (deletedId?: string) => void;
   readOnly?: boolean;
   subjectId?: string | null;
   userId?: string | null;
@@ -51,8 +51,9 @@ export default function QuizQuestionList({
             { userId, subjectId }
           );
         }
+        const idToDelete = deletingId;
         setDeletingId(null);
-        onDeleted();
+        onDeleted(idToDelete);
       }
     } catch (err) {
       console.error('Delete question error:', err);

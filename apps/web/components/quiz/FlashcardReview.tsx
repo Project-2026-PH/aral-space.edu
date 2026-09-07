@@ -25,6 +25,8 @@ import { quizAudio } from '@/lib/audio';
 import Modal from '@/components/ui/Modal';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
 import { getQuizStreakRecord, recordSessionCompletion } from '@/lib/streakTracker';
+import RichTextContent from '@/components/editor/RichTextContent';
+import { richTextToPlainText } from '@/lib/richText';
 
 interface FlashcardReviewProps {
   quiz: Quiz;
@@ -45,8 +47,8 @@ interface CardToolbarProps {
   canEdit: boolean;
 }
 
-function getAnswer(question: QuizQuestion, allowPublicAnswerKey?: boolean): string {
-  if (allowPublicAnswerKey === false) {
+function getAnswer(question: QuizQuestion, canViewAnswerKey: boolean = true): string {
+  if (!canViewAnswerKey) {
     return 'The answer key is hidden by the author.';
   }
   return question.answer_text?.trim() || question.options[question.correct_answer]?.trim() || question.options[0]?.trim() || 'No answer provided.';
@@ -121,6 +123,10 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const router = useRouter();
   const sharedQuery = shareToken ? `&shareToken=${encodeURIComponent(shareToken)}` : '';
   const resolvedExitHref = exitHref ?? (subjectShareToken ? `/subjects/share/${encodeURIComponent(subjectShareToken)}` : (shareToken ? '/library' : '/review/'));
+  const isOwner = Boolean(userId && quiz.user_id && quiz.user_id === userId);
+  const isPublicView = Boolean(shareToken || subjectShareToken);
+  const canEdit = !isPublicView || isOwner;
+  const canViewAnswerKey = !isPublicView || isOwner || quiz.allow_public_answer_key === true;
   const [cardIndex, setCardIndex] = useState(0);
   const [cloning, setCloning] = useState(false);
   const [clonedSuccess, setClonedSuccess] = useState(false);
@@ -536,9 +542,10 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   function speakCard() {
     if (!currentCard || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(
-      isFlipped ? getAnswer(currentCard, quiz.allow_public_answer_key) : currentCard.question_text
-    ));
+    const textToSpeak = isFlipped
+      ? richTextToPlainText(getAnswer(currentCard, canViewAnswerKey))
+      : richTextToPlainText(currentCard.question_text);
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(textToSpeak));
   }
 
   function toggleFullscreen() {
@@ -653,7 +660,9 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           onKeyDown={(event) => {
             if (event.key.toLowerCase() === 'h') {
               event.preventDefault();
-              setIsHintVisible((current) => !current);
+              if (canViewAnswerKey) {
+                setIsHintVisible((current) => !current);
+              }
               return;
             }
             if (event.key === 'Enter' || event.key === ' ') {
@@ -675,18 +684,21 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                   quizId={quiz.id}
                   isStarred={isStarred}
                   isHintVisible={isHintVisible}
-                  onHint={quiz.allow_public_answer_key !== false ? () => setIsHintVisible((current) => !current) : undefined}
+                  onHint={canViewAnswerKey ? () => setIsHintVisible((current) => !current) : undefined}
                   onSpeak={speakCard}
                   onToggleStar={() => setIsStarred((current) => !current)}
-                  canEdit={!shareToken}
+                  canEdit={canEdit}
                 />
                 <div
                   ref={frontContentRef}
                   className="flex min-h-0 flex-1 items-center justify-center overflow-hidden [overflow-wrap:anywhere] px-4 py-10 text-center transition-opacity duration-150"
                 >
                   <div className="max-w-3xl space-y-4">
-                    <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-foreground [overflow-wrap:anywhere] line-clamp-10 sm:text-2xl">{currentCard.question_text}</p>
-                    {isHintVisible && quiz.allow_public_answer_key !== false && (
+                    <RichTextContent
+                      html={currentCard.question_text}
+                      className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-foreground [overflow-wrap:anywhere] line-clamp-10 sm:text-2xl text-center"
+                    />
+                    {isHintVisible && canViewAnswerKey && (
                       <div
                         className="inline-flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-xs font-mono font-medium text-amber-700 dark:text-amber-300"
                         onClick={(event) => event.stopPropagation()}
@@ -708,7 +720,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                   isStarred={isStarred}
                   onSpeak={speakCard}
                   onToggleStar={() => setIsStarred((current) => !current)}
-                  canEdit={!shareToken}
+                  canEdit={canEdit}
                 />
                 <div
                   ref={backContentRef}
@@ -716,9 +728,15 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                 >
                   <div className="max-w-3xl space-y-4">
                     <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Answer</span>
-                    <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-primary [overflow-wrap:anywhere] line-clamp-8 sm:text-3xl">{getAnswer(currentCard, quiz.allow_public_answer_key)}</p>
-                    {quiz.allow_public_answer_key !== false && currentCard.explanation && (
-                      <p className="text-sm leading-relaxed text-muted-foreground line-clamp-3">{currentCard.explanation}</p>
+                    <RichTextContent
+                      html={getAnswer(currentCard, canViewAnswerKey)}
+                      className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-primary [overflow-wrap:anywhere] line-clamp-8 sm:text-3xl text-center"
+                    />
+                    {canViewAnswerKey && currentCard.explanation && (
+                      <RichTextContent
+                        html={currentCard.explanation}
+                        className="text-sm leading-relaxed text-muted-foreground line-clamp-3 text-center"
+                      />
                     )}
                   </div>
                 </div>

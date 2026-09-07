@@ -105,7 +105,7 @@ export default function ShareSubjectModal({
     try {
       const expiresAt = collaboratorExpiry === 'never'
         ? null
-        : new Date(Date.now() + Number(collaboratorExpiry) * 24 * 60 * 1000).toISOString();
+        : new Date(Date.now() + Number(collaboratorExpiry) * 24 * 60 * 60 * 1000).toISOString();
       const maxUses = Math.min(5, Math.max(1, Number(collaboratorMaxUses) || 5));
       const response = await fetch(`/api/subjects/${subject.id}/collaborator-link`, {
         method: 'POST',

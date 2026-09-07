@@ -374,6 +374,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     const retryCards = questions.filter((question) => nextIncorrectIds.includes(question.id));
     if (retryCards.length === 0) {
       setIncorrectIds([]);
+      setSwipeOffset(0);
       setIsCompleted(true);
       if (typeof window !== 'undefined' && saveProgress) {
         try {
@@ -412,6 +413,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     hasSeenAnswerRef.current = false;
     setHasSeenAnswer(false);
     setIsHintVisible(false);
+    setSwipeOffset(0);
     setStreak(0);
   }
 

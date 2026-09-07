@@ -6,6 +6,7 @@ import ShareSubjectModal from './ShareSubjectModal';
 import DeleteSubjectModal from './DeleteSubjectModal';
 import EditSubjectModal from './EditSubjectModal';
 import SwipeableSubjectCard from './SwipeableSubjectCard';
+import { ArrowRight } from 'lucide-react';
 
 interface SubjectLibraryProps {
   subjects: Subject[];
@@ -14,6 +15,8 @@ interface SubjectLibraryProps {
   loading?: boolean;
   readOnly?: boolean;
   heading?: string;
+  maxItems?: number;
+  onViewAll?: () => void;
   onSubjectDeleted?: (subjectId: string) => void;
   onSubjectUpdated?: (subjectId: string, config: Partial<Subject>) => void;
 }
@@ -25,6 +28,8 @@ export default function SubjectLibrary({
   loading = false,
   readOnly = false,
   heading = 'Subjects',
+  maxItems,
+  onViewAll,
   onSubjectDeleted,
   onSubjectUpdated
 }: SubjectLibraryProps) {
@@ -58,6 +63,7 @@ export default function SubjectLibrary({
   }, [swipedSubjectId]);
 
   const headingId = readOnly ? 'shared-subject-library-heading' : 'subject-library-heading';
+  const visibleSubjects = maxItems ? subjects.slice(0, maxItems) : subjects;
 
   if (!loading && subjects.length === 0) {
     return null;
@@ -82,7 +88,7 @@ export default function SubjectLibrary({
         </div>
       ) : (
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {subjects.map((subject, index) => {
+          {visibleSubjects.map((subject, index) => {
             const isPublic = subject.is_public !== false;
             const canManage = !readOnly && Boolean(viewerId && subject.user_id === viewerId);
             const canGeneratePublicLink = !readOnly && isPublic && !subject.share_token;
@@ -127,6 +133,17 @@ export default function SubjectLibrary({
             );
           })}
         </div>
+      )}
+
+      {maxItems && subjects.length > visibleSubjects.length && onViewAll && (
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="inline-flex items-center gap-1.5 text-xs font-black text-primary underline-offset-2 hover:underline"
+        >
+          View all {subjects.length} subjects
+          <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
       )}
 
       <ShareSubjectModal

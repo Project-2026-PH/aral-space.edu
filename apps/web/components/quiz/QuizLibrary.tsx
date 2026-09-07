@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Quiz, Subject } from '@quiz-creator/types';
-import { BookOpen, Filter } from 'lucide-react';
+import { ArrowRight, BookOpen, Filter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Skeleton from '@/components/ui/Skeleton';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -17,6 +17,8 @@ interface QuizLibraryProps {
   onQuizDeleted?: (quizId: string) => void;
   readOnly?: boolean;
   heading?: string;
+  maxItems?: number;
+  onViewAll?: () => void;
 }
 
 export default function QuizLibrary({
@@ -28,6 +30,8 @@ export default function QuizLibrary({
   onQuizDeleted,
   readOnly = false,
   heading = 'Reviewers',
+  maxItems,
+  onViewAll,
 }: QuizLibraryProps) {
   const router = useRouter();
   const [swipedQuizId, setSwipedQuizId] = useState<string | null>(null);
@@ -70,6 +74,7 @@ export default function QuizLibrary({
   }
 
   const headingId = readOnly ? 'shared-reviewer-library-heading' : 'quiz-library-heading';
+  const visibleQuizzes = maxItems ? quizzes.slice(0, maxItems) : quizzes;
 
   return (
     <section className="space-y-4" aria-labelledby={headingId}>
@@ -122,7 +127,7 @@ export default function QuizLibrary({
         </div>
       ) : (
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {quizzes.map((quiz) => {
+          {visibleQuizzes.map((quiz) => {
             const subject = quiz.subject ?? subjects?.find((candidate) => candidate.id === quiz.subject_id);
 
             return (
@@ -148,6 +153,17 @@ export default function QuizLibrary({
             );
           })}
         </div>
+      )}
+
+      {maxItems && quizzes.length > visibleQuizzes.length && onViewAll && (
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="inline-flex items-center gap-1.5 text-xs font-black text-primary underline-offset-2 hover:underline"
+        >
+          View all {quizzes.length} reviewers
+          <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
       )}
 
       <ConfirmModal

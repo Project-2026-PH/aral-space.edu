@@ -8,11 +8,13 @@ import Link from 'next/link';
 interface FloatingBottomNavProps {
   onOpenAiModal?: () => void;
   onOpenSubjectModal?: () => void;
+  onLibrarySectionSelect?: (section: 'subjects' | 'reviewers') => void;
 }
 
 export default function FloatingBottomNav({
   onOpenAiModal,
   onOpenSubjectModal,
+  onLibrarySectionSelect,
 }: FloatingBottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -216,15 +218,22 @@ export default function FloatingBottomNav({
   const scrollToSection = (id: string, tab: 'subjects' | 'reviewers') => {
     setActiveTab(tab);
     setShowQuickMenu(false);
+    onLibrarySectionSelect?.(tab);
 
     if (!isLibraryRoute) {
       router.push(`/library#${id}`);
       return;
     }
 
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const scrollToTarget = () => {
+      const element = document.getElementById(id);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    if (document.getElementById(id)) {
+      scrollToTarget();
+    } else {
+      window.setTimeout(scrollToTarget, 0);
     }
   };
 

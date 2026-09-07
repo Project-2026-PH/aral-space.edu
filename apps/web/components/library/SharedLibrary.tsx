@@ -10,9 +10,11 @@ interface SharedLibraryProps {
   subjects: Subject[];
   quizzes: Quiz[];
   viewerId: string;
+  maxItems?: number;
+  onViewAll?: () => void;
 }
 
-export default function SharedLibrary({ subjects, quizzes, viewerId }: SharedLibraryProps) {
+export default function SharedLibrary({ subjects, quizzes, viewerId, maxItems, onViewAll }: SharedLibraryProps) {
   if (subjects.length === 0 && quizzes.length === 0) return null;
 
   return (
@@ -39,12 +41,16 @@ export default function SharedLibrary({ subjects, quizzes, viewerId }: SharedLib
         viewerId={viewerId}
         readOnly
         heading="Shared Subjects"
+        maxItems={maxItems}
+        onViewAll={onViewAll}
       />
       <QuizLibrary
         quizzes={quizzes}
         loading={false}
         subjects={subjects}
         heading="Shared Reviewers"
+        maxItems={maxItems}
+        onViewAll={onViewAll}
       />
     </section>
   );

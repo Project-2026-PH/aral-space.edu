@@ -6,8 +6,6 @@ import PwaRegister from '@/components/PwaRegister';
 import UpdateNotification from '@/components/UpdateNotification';
 import AnonymousSessionBadge from '@/components/AnonymousSessionBadge';
 import ThemeToggle from '@/components/ThemeToggle';
-import DevelopersModal from '@/components/home/DevelopersModal';
-import LegalModal from '@/components/home/LegalModal';
 
 export const viewport: Viewport = {
   themeColor: '#4f46e5',
@@ -84,16 +82,6 @@ export default function RootLayout({
         <main className="w-full min-h-[calc(100vh-4rem)]">
           {children}
         </main>
-
-        <footer className="w-full border-t-2 border-slate-900/80 dark:border-white/30 bg-white dark:bg-[#0c0f1d] py-10">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-5">
-            {/* Developers section with heart (modal popup for github links) */}
-            <DevelopersModal />
-
-            {/* Terms and Privacy Links with smooth open/close modal */}
-            <LegalModal />
-          </div>
-        </footer>
       </body>
     </html>
   );

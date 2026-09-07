@@ -54,7 +54,8 @@ function getAnswer(question: QuizQuestion, canViewAnswerKey: boolean = true): st
   return question.answer_text?.trim() || question.options[question.correct_answer]?.trim() || question.options[0]?.trim() || 'No answer provided.';
 }
 
-const SWIPE_EXIT_DURATION_MS = 520;
+const SWIPE_EXIT_DURATION_MS = 400;
+const SWIPE_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
 const FLASHCARD_SETTINGS_VERSION = 1;
 const FLASHCARD_SESSION_VERSION = 1;
 
@@ -416,7 +417,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
 
     if (Math.abs(offsetX) < 90) {
       if (cardRef.current) {
-        cardRef.current.style.transition = 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1)';
+        cardRef.current.style.transition = `transform 280ms ${SWIPE_EASING}`;
         cardRef.current.style.transform = '';
       }
       setSwipeOffset(0);
@@ -427,11 +428,12 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     const known = offsetX > 0;
     if (known && audioFeedbackEnabled) void quizAudio.playCorrectSound();
     suppressClickRef.current = true;
-    const exitDistance = Math.max(window.innerWidth, 600) * 1.2;
+    const cardWidth = cardRef.current?.offsetWidth || 600;
+    const exitDistance = Math.max((window.innerWidth + cardWidth) / 2 + 80, 600);
     const targetOffset = known ? exitDistance : -exitDistance;
 
     if (cardRef.current) {
-      cardRef.current.style.transition = `transform ${SWIPE_EXIT_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+      cardRef.current.style.transition = `transform ${SWIPE_EXIT_DURATION_MS}ms ${SWIPE_EASING}`;
       updateSwipeTransform(targetOffset);
     }
     setSwipeOffset(targetOffset);
@@ -651,8 +653,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           onPointerUp={handleCardPointerUp}
           onPointerCancel={handleCardPointerCancel}
           style={{
-            transform: swipeOffset ? `translateX(${swipeOffset}px) rotate(${swipeOffset / 12}deg)` : undefined,
-            transition: isDragging ? 'none' : `transform ${SWIPE_EXIT_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+            transform: swipeOffset ? `translate3d(${swipeOffset}px, 0, 0) rotate(${swipeOffset / 12}deg)` : undefined,
+            transition: isDragging ? 'none' : `transform ${SWIPE_EXIT_DURATION_MS}ms ${SWIPE_EASING}`,
             willChange: 'transform'
           }}
           role="button"

@@ -33,7 +33,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
     if (!subjectId) return;
     if (userId) {
       const access = await this.getSubjectAccess(subjectId, userId);
-      if (!access?.can_edit) throw new Error('Subject not found or access is restricted');
+      if (!access?.can_edit_reviewers) throw new Error('Subject not found or access is restricted');
       return;
     }
     const { data, error } = await this.supabase.from('subjects').select('id').eq('id', subjectId).maybeSingle();
@@ -48,7 +48,16 @@ export class SupabaseQuizRepository implements IQuizRepository {
 
   private async requireQuizWriteAccess(quizId: string, userId?: string): Promise<Quiz> {
     const quiz = await this.requireQuizAccess(quizId, userId);
-    if (userId && quiz.user_id !== userId) throw new Error('Reviewer is read-only for this user');
+    if (userId && quiz.user_id !== userId) {
+      const access = quiz.subject_id ? await this.getSubjectAccess(quiz.subject_id, userId) : null;
+      if (!access?.can_edit_reviewers) throw new Error('Reviewer is read-only for this user');
+    }
+    return quiz;
+  }
+
+  private async requireQuizOwnerAccess(quizId: string, userId?: string): Promise<Quiz> {
+    const quiz = await this.requireQuizAccess(quizId, userId);
+    if (userId && quiz.user_id !== userId) throw new Error('Only the reviewer owner can manage this reviewer');
     return quiz;
   }
 
@@ -149,9 +158,9 @@ export class SupabaseQuizRepository implements IQuizRepository {
     if (!userId) return null;
     try {
       const { data: owner } = await this.supabase.from('subjects').select('id').eq('id', subjectId).eq('user_id', userId).maybeSingle();
-      if (owner) return { subject_id: subjectId, role: 'owner', can_edit: true, can_manage: true };
+      if (owner) return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
       const { data: member } = await this.supabase.from('subject_collaborators').select('subject_id').eq('subject_id', subjectId).eq('user_id', userId).maybeSingle();
-      if (member) return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_manage: false };
+      if (member) return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
     } catch (e) {}
     return this.fallback.getSubjectAccess(subjectId, userId);
   }
@@ -184,7 +193,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
       const { data: consumed, error } = await this.supabase.from('subject_collaborator_links').update({ used_at: new Date().toISOString(), used_by: userId }).eq('token', token).is('used_at', null).select('subject_id').maybeSingle();
       if (error || !consumed) return null;
       await this.supabase.from('subject_collaborators').upsert({ subject_id: consumed.subject_id, user_id: userId });
-      return { subject_id: consumed.subject_id, role: 'collaborator', can_edit: false, can_manage: false };
+      return { subject_id: consumed.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
     } catch (e) {}
     return this.fallback.redeemSubjectCollaboratorLink(token, userId);
   }
@@ -434,19 +443,19 @@ export class SupabaseQuizRepository implements IQuizRepository {
   }
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
-    if (userId) await this.requireQuizWriteAccess(id, userId);
-    if (dto.subject_id !== undefined) await this.requireSubjectAssignment(dto.subject_id, userId);
+    const existing = userId ? await this.requireQuizWriteAccess(id, userId) : null;
+    if (dto.subject_id !== undefined) {
+      if (userId && existing && existing.user_id !== userId) {
+        throw new Error('Only the reviewer owner can change subject assignment');
+      }
+      await this.requireSubjectAssignment(dto.subject_id, userId);
+    }
     try {
       let query = this.supabase.from('quizzes').update(dto).eq('id', id);
       if (userId) {
-        const existing = await this.getQuizById(id, userId);
-        if (!existing) throw new Error('Quiz not found');
-        if (existing.user_id !== userId) {
-          const access = await this.getSubjectAccess(existing.subject_id || '', userId);
-          if (!access?.can_edit) throw new Error('Quiz not found');
-        } else {
-          query = query.eq('user_id', userId);
-        }
+        const current = existing || await this.getQuizById(id, userId);
+        if (!current) throw new Error('Quiz not found');
+        if (current.user_id === userId) query = query.eq('user_id', userId);
       }
       const { data, error } = await query.select('*').single();
       if (!error && data) return data;
@@ -595,7 +604,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
     share_expires_at?: string | null;
     share_revoked_at?: string | null;
   }> {
-    if (userId) await this.requireQuizWriteAccess(quizId, userId);
+    if (userId) await this.requireQuizOwnerAccess(quizId, userId);
     try {
       const quiz = await this.getQuizById(quizId, userId);
       if (quiz && quiz.share_token) {

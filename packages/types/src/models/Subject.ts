@@ -16,7 +16,11 @@ export type SubjectAccessRole = 'owner' | 'collaborator';
 export interface SubjectAccess {
   subject_id: string;
   role: SubjectAccessRole;
+  /** Can edit subject name and color. Owner-only. */
   can_edit: boolean;
+  /** Can create reviewer content in the subject and edit its questions/details. */
+  can_edit_reviewers: boolean;
+  /** Can share or delete the subject. Owner-only. */
   can_manage: boolean;
 }
 

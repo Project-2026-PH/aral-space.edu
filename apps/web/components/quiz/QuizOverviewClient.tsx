@@ -19,13 +19,17 @@ interface QuizOverviewClientProps {
   questions: QuizQuestion[];
   sessions: QuizSession[];
   readOnly?: boolean;
+  canDelete?: boolean;
+  canManageSharing?: boolean;
 }
 
 export default function QuizOverviewClient({
   quiz: initialQuiz,
   questions: initialQuestions,
   sessions: initialSessions,
-  readOnly = false
+  readOnly = false,
+  canDelete = !readOnly,
+  canManageSharing = !readOnly
 }: QuizOverviewClientProps) {
   const router = useRouter();
   const [quiz, setQuiz] = useState<Quiz>(initialQuiz);
@@ -123,7 +127,7 @@ export default function QuizOverviewClient({
           Back to Library
         </Link>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {!readOnly && (
+          {canDelete && (
             <button
               onClick={() => setShowDeleteQuizModal(true)}
               className="p-2.5 sm:p-2 rounded-2xl sm:rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
@@ -133,7 +137,7 @@ export default function QuizOverviewClient({
             </button>
           )}
           <QuizExportMenu quiz={quiz} questions={questions} />
-          {!readOnly && (
+          {canManageSharing && (
             <button
               onClick={() => setShowShareModal(true)}
               className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-3 sm:px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs shrink-0"
@@ -368,14 +372,14 @@ export default function QuizOverviewClient({
       />
 
       <ShareQuizModal
-        open={!readOnly && showShareModal}
+        open={canManageSharing && showShareModal}
         onOpenChange={setShowShareModal}
         quizId={quiz.id}
         quizTitle={quiz.title}
       />
 
       <ConfirmModal
-        open={!readOnly && showDeleteQuizModal}
+        open={canDelete && Boolean(showDeleteQuizModal)}
         onOpenChange={setShowDeleteQuizModal}
         onConfirm={handleDeleteQuiz}
         title="Delete Quiz"

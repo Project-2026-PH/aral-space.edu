@@ -86,7 +86,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
   private async requireSubjectAssignment(subjectId: string | null | undefined, userId?: string): Promise<void> {
     if (!subjectId) return;
     if (!this.inMemorySubjects.has(subjectId)) throw new Error('Subject not found or access is restricted');
-    if (userId && !(await this.getSubjectAccess(subjectId, userId))?.can_edit) {
+    if (userId && !(await this.getSubjectAccess(subjectId, userId))?.can_edit_reviewers) {
       throw new Error('Subject not found or access is restricted');
     }
   }
@@ -99,7 +99,16 @@ export class LocalFirstQuizRepository implements IQuizRepository {
 
   private async requireQuizWriteAccess(quizId: string, userId?: string): Promise<Quiz> {
     const quiz = await this.requireQuizAccess(quizId, userId);
-    if (userId && quiz.user_id !== userId) throw new Error('Reviewer is read-only for this user');
+    if (userId && quiz.user_id !== userId) {
+      const access = quiz.subject_id ? await this.getSubjectAccess(quiz.subject_id, userId) : null;
+      if (!access?.can_edit_reviewers) throw new Error('Reviewer is read-only for this user');
+    }
+    return quiz;
+  }
+
+  private async requireQuizOwnerAccess(quizId: string, userId?: string): Promise<Quiz> {
+    const quiz = await this.requireQuizAccess(quizId, userId);
+    if (userId && quiz.user_id !== userId) throw new Error('Only the reviewer owner can manage this reviewer');
     return quiz;
   }
 
@@ -192,7 +201,12 @@ export class LocalFirstQuizRepository implements IQuizRepository {
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
     const quiz = await this.requireQuizWriteAccess(id, userId);
-    if (dto.subject_id !== undefined) await this.requireSubjectAssignment(dto.subject_id, userId);
+    if (dto.subject_id !== undefined) {
+      if (userId && quiz.user_id !== userId) {
+        throw new Error('Only the reviewer owner can change subject assignment');
+      }
+      await this.requireSubjectAssignment(dto.subject_id, userId);
+    }
     if (dto.title !== undefined) quiz.title = dto.title;
     if (dto.description !== undefined) quiz.description = dto.description;
     if (dto.subject_id !== undefined) quiz.subject_id = dto.subject_id;
@@ -202,8 +216,9 @@ export class LocalFirstQuizRepository implements IQuizRepository {
   }
 
   async deleteQuiz(id: string, userId?: string): Promise<boolean> {
-    const quiz = await this.requireQuizWriteAccess(id, userId);
-    const deleted = this.inMemoryQuizzes.delete(id);
+    const quiz = await this.getQuizById(id, userId);
+    if (!quiz || (userId && quiz.user_id !== userId)) return false;
+    const deleted = this.inMemoryQuizzes.delete(quiz.id);
     for (const [qId, q] of this.inMemoryQuestions.entries()) {
       if (q.quiz_id === id) this.inMemoryQuestions.delete(qId);
     }
@@ -302,7 +317,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
   }
 
   async getShareConfig(quizId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
-    const quiz = await this.requireQuizWriteAccess(quizId, userId);
+    const quiz = await this.requireQuizOwnerAccess(quizId, userId);
     if (!quiz.share_token) {
       quiz.share_token = generateShareToken();
       quiz.is_public = quiz.is_public ?? true;
@@ -322,7 +337,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
   }
 
   async updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
-    const quiz = await this.requireQuizWriteAccess(quizId, userId);
+    const quiz = await this.requireQuizOwnerAccess(quizId, userId);
     const wasRevoked = Boolean(quiz.share_revoked_at) || quiz.is_public === false;
     if (dto.reset_token || !quiz.share_token || (dto.is_public === true && wasRevoked)) {
       quiz.share_token = generateShareToken();
@@ -350,8 +365,8 @@ export class LocalFirstQuizRepository implements IQuizRepository {
   async getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null> {
     const subject = this.inMemorySubjects.get(subjectId);
     if (!subject || !userId) return null;
-    if (subject.user_id === userId) return { subject_id: subjectId, role: 'owner', can_edit: true, can_manage: true };
-    if (this.collaborators.get(subjectId)?.has(userId)) return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_manage: false };
+    if (subject.user_id === userId) return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
+    if (this.collaborators.get(subjectId)?.has(userId)) return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
     return null;
   }
 
@@ -401,7 +416,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
       const members = this.collaborators.get(link.subject_id) || new Set<string>();
       members.add(userId);
       this.collaborators.set(link.subject_id, members);
-      return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_manage: false };
+      return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
     }
 
     // Different user/device: check remaining uses
@@ -421,7 +436,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
     members.add(userId);
     this.collaborators.set(link.subject_id, members);
     this.persistToStorage();
-    return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_manage: false };
+    return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
   }
 
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {

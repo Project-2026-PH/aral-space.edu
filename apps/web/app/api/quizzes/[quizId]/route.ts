@@ -6,6 +6,7 @@ import { assertAllowedOrigin, enforceRateLimit, readJsonBody } from '@/lib/reque
 import { SECURITY_LIMITS } from '@/lib/security-config';
 import { parseUpdateQuiz } from '@/lib/request-validation';
 import { getCachedQuiz, revalidatePublicQuizTag, revalidatePublicSubjectCaches, revalidateQuizTag, revalidateUserLists } from '@/lib/cached-queries';
+import { hasReviewerEditAccess, isQuizOwner } from '@/lib/quiz-access';
 
 export const GET = createApiRoute<{ quizId: string }>(async ({ params, userId }) => {
   const quiz = await getCachedQuiz(params.quizId, userId);
@@ -22,7 +23,8 @@ export const PATCH = createApiRoute<{ quizId: string }>(async ({ req, params, us
   const quizRepo = await getQuizRepository();
   const controller = new QuizCrudController(quizRepo);
   const accessibleQuiz = await controller.getQuiz(params.quizId, userId);
-  if (!accessibleQuiz || accessibleQuiz.user_id !== userId) {
+  const canEditReviewer = accessibleQuiz && await hasReviewerEditAccess(controller, accessibleQuiz, userId);
+  if (!accessibleQuiz || !canEditReviewer) {
     return NextResponse.json({ error: 'This reviewer is read-only for you.' }, { status: 403 });
   }
   const before = await controller.getShareConfig(params.quizId, userId).catch(() => null);
@@ -41,8 +43,8 @@ export const DELETE = createApiRoute<{ quizId: string }>(async ({ req, params, u
   const quizRepo = await getQuizRepository();
   const controller = new QuizCrudController(quizRepo);
   const accessibleQuiz = await controller.getQuiz(params.quizId, userId);
-  if (!accessibleQuiz || accessibleQuiz.user_id !== userId) {
-    return NextResponse.json({ error: 'This reviewer is read-only for you.' }, { status: 403 });
+  if (!accessibleQuiz || !isQuizOwner(accessibleQuiz, userId)) {
+    return NextResponse.json({ error: 'Only the reviewer owner can delete it.' }, { status: 403 });
   }
   const before = await controller.getShareConfig(params.quizId, userId).catch(() => null);
   const success = await controller.deleteQuiz(params.quizId, userId);

@@ -128,7 +128,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   private async requireSubjectAssignment(subjectId: string | null | undefined, userId?: string): Promise<void> {
     if (!subjectId) return;
     if (!this.subjects.has(subjectId)) throw new Error('Subject not found or access is restricted');
-    if (userId && !(await this.getSubjectAccess(subjectId, userId))?.can_edit) {
+    if (userId && !(await this.getSubjectAccess(subjectId, userId))?.can_edit_reviewers) {
       throw new Error('Subject not found or access is restricted');
     }
   }
@@ -141,7 +141,16 @@ export class MemoryQuizRepository implements IQuizRepository {
 
   private async requireQuizWriteAccess(quizId: string, userId?: string): Promise<Quiz> {
     const quiz = await this.requireQuizAccess(quizId, userId);
-    if (userId && quiz.user_id !== userId) throw new Error('Reviewer is read-only for this user');
+    if (userId && quiz.user_id !== userId) {
+      const access = quiz.subject_id ? await this.getSubjectAccess(quiz.subject_id, userId) : null;
+      if (!access?.can_edit_reviewers) throw new Error('Reviewer is read-only for this user');
+    }
+    return quiz;
+  }
+
+  private async requireQuizOwnerAccess(quizId: string, userId?: string): Promise<Quiz> {
+    const quiz = await this.requireQuizAccess(quizId, userId);
+    if (userId && quiz.user_id !== userId) throw new Error('Only the reviewer owner can manage this reviewer');
     return quiz;
   }
 
@@ -232,7 +241,12 @@ export class MemoryQuizRepository implements IQuizRepository {
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
     const quiz = await this.requireQuizWriteAccess(id, userId);
-    if (dto.subject_id !== undefined) await this.requireSubjectAssignment(dto.subject_id, userId);
+    if (dto.subject_id !== undefined) {
+      if (userId && quiz.user_id !== userId) {
+        throw new Error('Only the reviewer owner can change subject assignment');
+      }
+      await this.requireSubjectAssignment(dto.subject_id, userId);
+    }
     if (dto.title !== undefined) quiz.title = dto.title;
     if (dto.description !== undefined) quiz.description = dto.description;
     if (dto.subject_id !== undefined) quiz.subject_id = dto.subject_id;
@@ -243,7 +257,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   async deleteQuiz(id: string, userId?: string): Promise<boolean> {
     const quiz = await this.getQuizById(id, userId);
     if (!quiz || (userId && quiz.user_id !== userId)) return false;
-    const deleted = this.quizzes.delete(id);
+    const deleted = this.quizzes.delete(quiz.id);
     for (const [qId, q] of this.questions.entries()) {
       if (q.quiz_id === id) this.questions.delete(qId);
     }
@@ -337,7 +351,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async getShareConfig(quizId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
-    const quiz = await this.requireQuizWriteAccess(quizId, userId);
+    const quiz = await this.requireQuizOwnerAccess(quizId, userId);
     if (!quiz.share_token) {
       quiz.share_token = generateShareToken();
       quiz.is_public = quiz.is_public ?? true;
@@ -357,7 +371,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
-    const quiz = await this.requireQuizWriteAccess(quizId, userId);
+    const quiz = await this.requireQuizOwnerAccess(quizId, userId);
     const wasRevoked = Boolean(quiz.share_revoked_at) || quiz.is_public === false;
     const enablingPublic = dto.is_public === true;
     if (dto.reset_token || !quiz.share_token || (enablingPublic && wasRevoked)) {
@@ -387,10 +401,10 @@ export class MemoryQuizRepository implements IQuizRepository {
     const subject = this.subjects.get(subjectId);
     if (!subject || !userId) return null;
     if (subject.user_id === userId) {
-      return { subject_id: subjectId, role: 'owner', can_edit: true, can_manage: true };
+      return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
     }
     if (this.collaborators.get(subjectId)?.has(userId)) {
-      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_manage: false };
+      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
     }
     return null;
   }
@@ -438,7 +452,7 @@ export class MemoryQuizRepository implements IQuizRepository {
       const members = this.collaborators.get(link.subject_id) || new Set<string>();
       members.add(userId);
       this.collaborators.set(link.subject_id, members);
-      return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_manage: false };
+      return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
     }
 
     // New user/device: check remaining uses
@@ -455,7 +469,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     const members = this.collaborators.get(link.subject_id) || new Set<string>();
     members.add(userId);
     this.collaborators.set(link.subject_id, members);
-    return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_manage: false };
+    return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
   }
 
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {

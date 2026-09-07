@@ -11,6 +11,7 @@ import {
 import { SECURITY_LIMITS } from '@/lib/security-config';
 import { parseUpdateQuestion } from '@/lib/request-validation';
 import { revalidatePublicQuizTag, revalidateQuizTag } from '@/lib/cached-queries';
+import { hasReviewerEditAccess } from '@/lib/quiz-access';
 
 function errorResponse(error: any): NextResponse {
   const status = error instanceof RequestSecurityError ? error.status : typeof error?.status === 'number' ? error.status : 400;
@@ -28,7 +29,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ qu
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const accessibleQuiz = await controller.getQuiz(quizId, userId);
-    if (!accessibleQuiz || accessibleQuiz.user_id !== userId) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
+    const canEditReviewer = accessibleQuiz && await hasReviewerEditAccess(controller, accessibleQuiz, userId);
+    if (!accessibleQuiz || !canEditReviewer) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     const updated = await controller.updateQuestion(quizId, questionId, parseUpdateQuestion(body), userId);
     if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);
@@ -48,7 +50,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ q
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const accessibleQuiz = await controller.getQuiz(quizId, userId);
-    if (!accessibleQuiz || accessibleQuiz.user_id !== userId) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
+    const canEditReviewer = accessibleQuiz && await hasReviewerEditAccess(controller, accessibleQuiz, userId);
+    if (!accessibleQuiz || !canEditReviewer) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     const success = await controller.deleteQuestion(quizId, questionId, userId);
     if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);

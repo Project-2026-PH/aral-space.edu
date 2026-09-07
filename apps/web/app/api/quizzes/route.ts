@@ -22,8 +22,8 @@ export const POST = createApiRoute(async ({ req, userId }) => {
   const controller = new QuizCrudController(quizRepo);
   if (dto.subject_id) {
     const access = await controller.getSubjectAccess(dto.subject_id, userId);
-    if (!access?.can_edit) {
-      return NextResponse.json({ error: 'You do not have edit access to this subject.' }, { status: 403 });
+    if (!access?.can_edit_reviewers) {
+      return NextResponse.json({ error: 'You do not have reviewer edit access to this subject.' }, { status: 403 });
     }
   }
   const created = await controller.createQuiz(dto, userId);

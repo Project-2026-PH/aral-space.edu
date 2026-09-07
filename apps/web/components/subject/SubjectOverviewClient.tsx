@@ -95,7 +95,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
                 </span>
                 {access.role === 'collaborator' && (
                   <span className="rounded-md border-2 border-slate-900 bg-[#fde047] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
-                    Read-only
+                    Collaborator
                   </span>
                 )}
                 {access.role === 'owner' && (
@@ -133,13 +133,15 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
                     <Pencil className="h-3.5 w-3.5 stroke-[2.5]" /> Edit subject
                   </button>
                 )}
-                <Link
-                  href={`/new?mode=manual&subjectId=${encodeURIComponent(subject.id)}`}
-                  className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-2 text-xs font-black text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
-                >
-                  <Plus className="h-3.5 w-3.5 stroke-[2.5]" /> Add reviewer
-                </Link>
               </>
+            )}
+            {access.can_edit_reviewers && (
+              <Link
+                href={`/new?mode=manual&subjectId=${encodeURIComponent(subject.id)}`}
+                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-2 text-xs font-black text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5 stroke-[2.5]" /> Add reviewer
+              </Link>
             )}
             {access.can_manage && (
               <button
@@ -169,7 +171,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
         )}
       </div>
 
-      <QuizLibrary quizzes={quizzes} loading={false} readOnly={!access.can_edit} />
+      <QuizLibrary quizzes={quizzes} loading={false} readOnly={!access.can_edit_reviewers} />
       {editing && (
         <StickyActionDock
           onAction={saveSubject}

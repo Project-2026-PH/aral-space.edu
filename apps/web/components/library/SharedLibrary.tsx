@@ -25,7 +25,7 @@ export default function SharedLibrary({ subjects, quizzes, viewerId }: SharedLib
           </h2>
           <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
             <Eye aria-hidden="true" className="h-3.5 w-3.5" />
-            Shared subjects and reviewers are read-only.
+            Shared subjects are read-only; shared reviewers can be edited.
           </p>
         </div>
         <span className="rounded-lg border-2 border-slate-900 bg-[#bfdbfe] px-3 py-1 text-xs font-black text-slate-900 shadow-brutal-sm">
@@ -44,7 +44,6 @@ export default function SharedLibrary({ subjects, quizzes, viewerId }: SharedLib
         quizzes={quizzes}
         loading={false}
         subjects={subjects}
-        readOnly
         heading="Shared Reviewers"
       />
     </section>

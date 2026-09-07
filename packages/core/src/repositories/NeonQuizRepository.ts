@@ -22,10 +22,13 @@ export class NeonQuizRepository implements IQuizRepository {
 
   private async requireSubjectAssignment(subjectId: string | null | undefined, userId?: string): Promise<void> {
     if (!subjectId) return;
-    const rows = userId
-      ? await this.sql`SELECT 1 FROM subjects WHERE id = ${subjectId} AND user_id = ${userId} LIMIT 1`
-      : await this.sql`SELECT 1 FROM subjects WHERE id = ${subjectId} LIMIT 1`;
-    if (!rows.length) throw new Error('Subject not found or access is restricted');
+    if (!userId) {
+      const rows = await this.sql`SELECT 1 FROM subjects WHERE id = ${subjectId} LIMIT 1`;
+      if (!rows.length) throw new Error('Subject not found or access is restricted');
+      return;
+    }
+    const access = await this.getSubjectAccess(subjectId, userId);
+    if (!access?.can_edit_reviewers) throw new Error('Subject not found or access is restricted');
   }
 
   private async requireQuizAccess(quizId: string, userId?: string): Promise<Quiz> {
@@ -36,7 +39,16 @@ export class NeonQuizRepository implements IQuizRepository {
 
   private async requireQuizWriteAccess(quizId: string, userId?: string): Promise<Quiz> {
     const quiz = await this.requireQuizAccess(quizId, userId);
-    if (userId && quiz.user_id !== userId) throw new Error('Reviewer is read-only for this user');
+    if (userId && quiz.user_id !== userId) {
+      const access = quiz.subject_id ? await this.getSubjectAccess(quiz.subject_id, userId) : null;
+      if (!access?.can_edit_reviewers) throw new Error('Reviewer is read-only for this user');
+    }
+    return quiz;
+  }
+
+  private async requireQuizOwnerAccess(quizId: string, userId?: string): Promise<Quiz> {
+    const quiz = await this.requireQuizAccess(quizId, userId);
+    if (userId && quiz.user_id !== userId) throw new Error('Only the reviewer owner can manage this reviewer');
     return quiz;
   }
 
@@ -131,7 +143,7 @@ export class NeonQuizRepository implements IQuizRepository {
     if (!rows || rows.length === 0) return null;
     const row = rows[0] as any;
     const role = row.user_id === userId ? 'owner' : 'collaborator';
-    return { subject_id: subjectId, role, can_edit: role === 'owner', can_manage: role === 'owner' };
+    return { subject_id: subjectId, role, can_edit: role === 'owner', can_edit_reviewers: true, can_manage: role === 'owner' };
   }
 
   async listQuizzesBySubject(subjectId: string, userId?: string): Promise<Quiz[]> {
@@ -188,7 +200,7 @@ export class NeonQuizRepository implements IQuizRepository {
           VALUES (${link.subject_id}, ${userId})
           ON CONFLICT (subject_id, user_id) DO NOTHING
         `;
-        return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_manage: false };
+        return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
       }
 
       const maxUses = Number(link.max_uses) || 1;
@@ -214,7 +226,7 @@ export class NeonQuizRepository implements IQuizRepository {
         VALUES (${subjectId}, ${userId})
         ON CONFLICT (subject_id, user_id) DO NOTHING
       `;
-      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_manage: false };
+      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
     } catch {
       const rows = await this.sql`
         UPDATE subject_collaborator_links
@@ -231,7 +243,7 @@ export class NeonQuizRepository implements IQuizRepository {
         VALUES (${subjectId}, ${userId})
         ON CONFLICT (subject_id, user_id) DO NOTHING
       `;
-      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_manage: false };
+      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
     }
   }
 
@@ -539,7 +551,12 @@ export class NeonQuizRepository implements IQuizRepository {
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
     const existing = await this.requireQuizWriteAccess(id, userId);
-    if (dto.subject_id !== undefined) await this.requireSubjectAssignment(dto.subject_id, userId);
+    if (dto.subject_id !== undefined) {
+      if (userId && existing.user_id !== userId) {
+        throw new Error('Only the reviewer owner can change subject assignment');
+      }
+      await this.requireSubjectAssignment(dto.subject_id, userId);
+    }
 
     const rows = userId
       ? await this.sql`
@@ -548,7 +565,6 @@ export class NeonQuizRepository implements IQuizRepository {
               description = ${dto.description !== undefined ? dto.description : existing.description || null},
               subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null}
           WHERE id = ${id}
-            AND user_id = ${userId}
           RETURNING *
         `
       : await this.sql`
@@ -680,6 +696,7 @@ export class NeonQuizRepository implements IQuizRepository {
     share_expires_at?: string | null;
     share_revoked_at?: string | null;
   }> {
+    if (userId) await this.requireQuizOwnerAccess(quizId, userId);
     const rows = userId
       ? await this.sql`SELECT share_token, is_public, allow_cloning, allow_public_answer_key, share_expires_at, share_revoked_at FROM quizzes WHERE id = ${quizId} AND user_id = ${userId} LIMIT 1`
       : await this.sql`SELECT share_token, is_public, allow_cloning, allow_public_answer_key, share_expires_at, share_revoked_at FROM quizzes WHERE id = ${quizId} LIMIT 1`;

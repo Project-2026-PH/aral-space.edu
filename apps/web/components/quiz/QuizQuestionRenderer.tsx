@@ -222,7 +222,29 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
 }
 
 export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElement {
-  const { question, isCardFlipped, isHintVisible, onFlip, onAnswer, onShowHint } = props;
+  const {
+    question,
+    isCardFlipped,
+    isHintVisible,
+    isEvaluating,
+    onFlip,
+    onAnswer,
+    onShowHint,
+    onDontKnow
+  } = props;
+
+  const handleDontKnow = () => {
+    if (isEvaluating) return;
+    if (onDontKnow) {
+      onDontKnow();
+      return;
+    }
+    onAnswer({
+      optionId: -1,
+      text: "Don't know",
+      isCorrect: false
+    });
+  };
 
   return (
     <div onClick={onFlip} className="perspective-1000 cursor-pointer min-h-[480px]">
@@ -260,7 +282,8 @@ export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElemen
             <button
               type="button"
               onClick={handleDontKnow}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive active:scale-95 cursor-pointer"
+              disabled={isEvaluating}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
             >
               <Flag className="h-3.5 w-3.5" />
               <span>Don&apos;t know</span>

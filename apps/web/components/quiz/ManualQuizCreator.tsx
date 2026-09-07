@@ -902,6 +902,7 @@ export default function ManualQuizCreator({
                 placeholder="Enter your question prompt (or paste term/definition pair)..."
                 minHeight="100px"
                 data-skip-clipboard-intercept="true"
+                hideToolbarUntilFocus
               />
 
               {/* Dynamic Type Body */}
@@ -1070,6 +1071,7 @@ export default function ManualQuizCreator({
                   placeholder="Explain why this answer is correct..."
                   minHeight="90px"
                   data-skip-clipboard-intercept="true"
+                  hideToolbarUntilFocus
                 />
               </div>
             </div>

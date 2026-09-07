@@ -1,10 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Quiz, Subject } from '@quiz-creator/types';
-import { BookOpen, Filter, Layers, Play } from 'lucide-react';
-import Link from 'next/link';
+import { BookOpen, Filter } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import Skeleton from '@/components/ui/Skeleton';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import SwipeableQuizCard from './SwipeableQuizCard';
 
 interface QuizLibraryProps {
   quizzes: Quiz[];
@@ -12,6 +14,7 @@ interface QuizLibraryProps {
   subjects?: Subject[];
   selectedSubjectId?: string;
   onSubjectChange?: (subjectId: string) => void;
+  onQuizDeleted?: (quizId: string) => void;
   readOnly?: boolean;
   heading?: string;
 }
@@ -22,10 +25,52 @@ export default function QuizLibrary({
   subjects,
   selectedSubjectId = '',
   onSubjectChange,
+  onQuizDeleted,
   readOnly = false,
   heading = 'Reviewers',
 }: QuizLibraryProps) {
+  const router = useRouter();
+  const [swipedQuizId, setSwipedQuizId] = useState<string | null>(null);
+  const [deleteQuiz, setDeleteQuiz] = useState<Quiz | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Close open swipe card when tapping anywhere outside
+  useEffect(() => {
+    if (!swipedQuizId) return;
+
+    function handlePointerDown(e: PointerEvent) {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('.quiz-card-enter')) {
+        setSwipedQuizId(null);
+      }
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    return () => window.removeEventListener('pointerdown', handlePointerDown);
+  }, [swipedQuizId]);
+
+  async function handleDeleteQuiz() {
+    if (!deleteQuiz || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/quizzes/${deleteQuiz.id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to delete reviewer');
+      }
+      onQuizDeleted?.(deleteQuiz.id);
+      setDeleteQuiz(null);
+    } catch (err) {
+      console.error('Failed to delete reviewer:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const headingId = readOnly ? 'shared-reviewer-library-heading' : 'quiz-library-heading';
+
   return (
     <section className="space-y-4" aria-labelledby={headingId}>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -79,90 +124,47 @@ export default function QuizLibrary({
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {quizzes.map((quiz) => {
             const subject = quiz.subject ?? subjects?.find((candidate) => candidate.id === quiz.subject_id);
-            const subjectName = subject?.name;
 
             return (
-              <article
+              <SwipeableQuizCard
                 key={quiz.id}
-                className="group flex min-h-36 sm:min-h-[148px] flex-col justify-between rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card p-4 sm:p-4.5 shadow-brutal transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_#0f172a]"
-              >
-                <Link
-                  href={`/review/${quiz.id}`}
-                  aria-label={`Review ${quiz.title}`}
-                  className="block space-y-2 rounded-xl focus:outline-none"
-                >
-                  <div className="flex items-center justify-between gap-2 text-xs">
-                    {quiz.id === 'b0000000-0000-4000-8000-000000000001' || quiz.share_token === 'kasaysayan-pilipinas-reviewer' ? (
-                      <span className="rounded-md border-2 border-slate-900 bg-[#bfdbfe] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
-                        Sample Reviewer
-                      </span>
-                    ) : subjectName ? (
-                      <span
-                        style={{
-                          backgroundColor: `${subject.color}26`,
-                          borderColor: '#0f172a',
-                          color: subject.color
-                        }}
-                        className="max-w-[12rem] truncate rounded-md border-2 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm"
-                      >
-                        {subjectName}
-                      </span>
-                    ) : (
-                      <span className="rounded-md border-2 border-slate-900 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm">
-                        Reviewer
-                      </span>
-                    )}
-                    <span className="shrink-0 rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black text-slate-900 dark:text-white shadow-brutal-sm">
-                      {quiz.question_count} Qs
-                    </span>
-                  </div>
-
-                  <h3 className="line-clamp-2 text-sm font-black text-foreground transition-colors group-hover:text-primary">
-                    {quiz.title}
-                  </h3>
-
-                  {quiz.description ? (
-                    <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground font-medium">
-                      {quiz.description}
-                    </p>
-                  ) : quiz.handout_name ? (
-                    <p className="truncate text-xs text-muted-foreground font-medium">
-                      Source: {quiz.handout_name}
-                    </p>
-                  ) : quiz.subject ? (
-                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                      <Layers className="h-3.5 w-3.5" />
-                      {quiz.subject.name}
-                    </p>
-                  ) : null}
-                </Link>
-
-                <div className="mt-3 flex items-center justify-between border-t-2 border-slate-900/20 dark:border-white/20 pt-3">
-                  {!readOnly ? (
-                    <Link
-                      href={`/quizzes/${quiz.id}`}
-                      className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
-                    >
-                      Manage
-                    </Link>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
-                      Read-only
-                    </span>
-                  )}
-                  <Link
-                    href={`/review/${quiz.id}`}
-                    className="flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary px-3 py-1 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
-                  >
-                    <Play className="h-3 w-3 fill-current" />
-                    <span>Practice</span>
-                  </Link>
-                </div>
-              </article>
+                quiz={quiz}
+                subject={subject}
+                readOnly={readOnly}
+                isOpen={swipedQuizId === quiz.id}
+                onOpen={() => setSwipedQuizId(quiz.id)}
+                onClose={() => {
+                  if (swipedQuizId === quiz.id) setSwipedQuizId(null);
+                }}
+                onEdit={() => {
+                  setSwipedQuizId(null);
+                  router.push(`/quizzes/${quiz.id}`);
+                }}
+                onDelete={() => {
+                  setSwipedQuizId(null);
+                  setDeleteQuiz(quiz);
+                }}
+              />
             );
           })}
         </div>
       )}
+
+      <ConfirmModal
+        open={Boolean(deleteQuiz)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeleteQuiz(null);
+        }}
+        onConfirm={handleDeleteQuiz}
+        title="Delete Reviewer"
+        message={
+          deleteQuiz
+            ? `Are you sure you want to permanently delete "${deleteQuiz.title}" and all its questions? This action cannot be undone.`
+            : 'Delete reviewer?'
+        }
+        destructive
+        confirmText={isDeleting ? 'Deleting...' : 'Delete Reviewer'}
+      />
     </section>
   );
 }

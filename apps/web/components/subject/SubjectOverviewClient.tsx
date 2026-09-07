@@ -15,8 +15,9 @@ interface SubjectOverviewClientProps {
   access: SubjectAccess;
 }
 
-export default function SubjectOverviewClient({ subject: initialSubject, quizzes, access }: SubjectOverviewClientProps) {
+export default function SubjectOverviewClient({ subject: initialSubject, quizzes: initialQuizzes, access }: SubjectOverviewClientProps) {
   const [subject, setSubject] = useState(initialSubject);
+  const [subjectQuizzes, setSubjectQuizzes] = useState(initialQuizzes);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(subject.name);
   const [color, setColor] = useState(subject.color);
@@ -91,7 +92,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
               )}
               <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[11px] font-black text-slate-900 dark:text-white shadow-brutal-sm">
-                  <Layers className="h-3.5 w-3.5" /> {quizzes.length} {quizzes.length === 1 ? 'reviewer' : 'reviewers'}
+                  <Layers className="h-3.5 w-3.5" /> {subjectQuizzes.length} {subjectQuizzes.length === 1 ? 'reviewer' : 'reviewers'}
                 </span>
                 {access.role === 'collaborator' && (
                   <span className="rounded-md border-2 border-slate-900 bg-[#fde047] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
@@ -171,7 +172,14 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
         )}
       </div>
 
-      <QuizLibrary quizzes={quizzes} loading={false} readOnly={!access.can_edit_reviewers} />
+      <QuizLibrary
+        quizzes={subjectQuizzes}
+        loading={false}
+        readOnly={!access.can_edit_reviewers}
+        onQuizDeleted={(quizId) => {
+          setSubjectQuizzes((current) => current.filter((quiz) => quiz.id !== quizId));
+        }}
+      />
       {editing && (
         <StickyActionDock
           onAction={saveSubject}

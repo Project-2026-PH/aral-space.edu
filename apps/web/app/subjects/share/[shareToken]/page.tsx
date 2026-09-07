@@ -127,7 +127,7 @@ export default function SharedSubjectPage() {
             className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
           >
             <Home className="h-3.5 w-3.5 stroke-[2.5]" />
-            Home
+            Back to Library
           </Link>
         </div>
       </div>

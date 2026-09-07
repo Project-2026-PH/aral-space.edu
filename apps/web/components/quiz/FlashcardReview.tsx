@@ -26,6 +26,7 @@ import { getQuestionHint } from '@/lib/quizAnswerEvaluation';
 import { quizAudio } from '@/lib/audio';
 import { triggerCelebrationConfetti } from '@/lib/confetti';
 import Modal from '@/components/ui/Modal';
+import QuizQuestionFormModal from '@/components/quiz/QuizQuestionFormModal';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
 import { getQuizStreakRecord, recordSessionCompletion } from '@/lib/streakTracker';
 import RichTextContent from '@/components/editor/RichTextContent';
@@ -41,11 +42,11 @@ interface FlashcardReviewProps {
 }
 
 interface CardToolbarProps {
-  quizId: string;
   isStarred: boolean;
   isHintVisible?: boolean;
   isRetryCard?: boolean;
   onHint?: () => void;
+  onEdit: () => void;
   onSpeak: () => void;
   onToggleStar: () => void;
   canEdit: boolean;
@@ -95,7 +96,7 @@ function getFlashcardSessionKey(quizId: string, userId?: string): string {
   return userId ? `quiz-creator:flashcard-session:${quizId}:${userId}` : `quiz-creator:flashcard-session:${quizId}`;
 }
 
-function CardToolbar({ quizId, isStarred, isHintVisible, isRetryCard, onHint, onSpeak, onToggleStar, canEdit }: CardToolbarProps) {
+function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, onSpeak, onToggleStar, canEdit }: CardToolbarProps) {
   return (
     <div className="flex items-center justify-between gap-4 text-xs font-semibold text-muted-foreground" onClick={(event) => event.stopPropagation()}>
       <div className="flex items-center gap-2">
@@ -117,9 +118,14 @@ function CardToolbar({ quizId, isStarred, isHintVisible, isRetryCard, onHint, on
       </div>
       <div className="flex items-center gap-4">
         {canEdit && (
-          <Link href={`/quizzes/${quizId}`} aria-label="Edit reviewer" className="text-muted-foreground transition-colors hover:text-foreground">
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label="Edit question"
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
             <Pencil className="h-4 w-4" />
-          </Link>
+          </button>
         )}
         <button type="button" onClick={onSpeak} aria-label="Read card aloud" className="text-muted-foreground transition-colors hover:text-foreground">
           <Volume2 className="h-4 w-4" />
@@ -152,6 +158,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const [shuffleQuestions, setShuffleQuestions] = useState(false);
   const [saveProgress, setSaveProgress] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showEditQuestionModal, setShowEditQuestionModal] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
   const [sessionHydrated, setSessionHydrated] = useState(false);
   const [hasSeenAnswer, setHasSeenAnswer] = useState(false);
   const [completedRounds, setCompletedRounds] = useState(0);
@@ -321,6 +329,12 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     () => (cards.length > 0 ? ((cardIndex + 1) / cards.length) * 100 : 0),
     [cardIndex, cards.length]
   );
+  function handleEditCurrentQuestion() {
+    if (!currentCard) return;
+    setEditingQuestion(currentCard);
+    setShowEditQuestionModal(true);
+  }
+
   function updateSwipeTransform(offset: number) {
     if (!cardRef.current) return;
     cardRef.current.style.transform = offset === 0
@@ -810,7 +824,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             >
               <div className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm backface-hidden transition-shadow hover:border-primary/40 hover:shadow-md sm:p-7" aria-hidden={isFlipped}>
                 <CardToolbar
-                  quizId={quiz.id}
+                  onEdit={handleEditCurrentQuestion}
                   isStarred={isStarred}
                   isHintVisible={isHintVisible}
                   isRetryCard={isRetryCard}
@@ -846,7 +860,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
 
               <div className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm backface-hidden rotate-x-180 sm:p-7" aria-hidden={!isFlipped}>
                 <CardToolbar
-                  quizId={quiz.id}
+                  onEdit={handleEditCurrentQuestion}
                   isStarred={isStarred}
                   isRetryCard={isRetryCard}
                   onSpeak={speakCard}
@@ -1036,6 +1050,14 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             </button>
           </div>
         </Modal>
+
+        <QuizQuestionFormModal
+          open={showEditQuestionModal}
+          onOpenChange={setShowEditQuestionModal}
+          question={editingQuestion}
+          quizId={quiz.id}
+          onSaved={() => router.refresh()}
+        />
       </div>
     </div>
   );

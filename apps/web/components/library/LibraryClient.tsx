@@ -161,6 +161,9 @@ export default function LibraryClient({ initialQuizzes, initialSubjects, initial
           subjects={subjects}
           selectedSubjectId={selectedSubjectId}
           onSubjectChange={setSelectedSubjectId}
+          onQuizDeleted={(quizId) => {
+            setQuizzes((current) => current.filter((quiz) => quiz.id !== quizId));
+          }}
         />
       </div>
 

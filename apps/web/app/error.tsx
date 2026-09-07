@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { AlertCircle, RefreshCw, Home } from 'lucide-react';
+import { AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RootErrorBoundary({
@@ -59,7 +59,7 @@ export default function RootErrorBoundary({
           href="/library"
           className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all"
         >
-          <Home className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4" />
           Back to Library
         </Link>
       </div>

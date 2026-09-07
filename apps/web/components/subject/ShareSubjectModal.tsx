@@ -25,7 +25,7 @@ export default function ShareSubjectModal({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [collaboratorExpiry, setCollaboratorExpiry] = useState('7d');
+  const [collaboratorExpiry, setCollaboratorExpiry] = useState('7');
   const [collaboratorMaxUses, setCollaboratorMaxUses] = useState('5');
   const [collaboratorUrl, setCollaboratorUrl] = useState('');
   const [collaboratorCopied, setCollaboratorCopied] = useState(false);
@@ -103,9 +103,13 @@ export default function ShareSubjectModal({
     setCreatingCollaborator(true);
     setError(null);
     try {
-      const expiresAt = collaboratorExpiry === 'never'
+      const expiryDays = collaboratorExpiry === 'never' ? null : Number(collaboratorExpiry);
+      if (expiryDays !== null && (!Number.isFinite(expiryDays) || expiryDays <= 0)) {
+        throw new Error('Please choose a valid collaborator link expiration.');
+      }
+      const expiresAt = expiryDays === null
         ? null
-        : new Date(Date.now() + Number(collaboratorExpiry) * 24 * 60 * 60 * 1000).toISOString();
+        : new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString();
       const maxUses = Math.min(5, Math.max(1, Number(collaboratorMaxUses) || 5));
       const response = await fetch(`/api/subjects/${subject.id}/collaborator-link`, {
         method: 'POST',

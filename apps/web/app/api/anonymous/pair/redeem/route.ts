@@ -41,18 +41,22 @@ export async function POST(req: NextRequest) {
     );
     if (rateLimit) return rateLimit;
 
-    // 1. PairingTicketService: validate the short-lived ticket without consuming it
-    const { targetAnonUserId } = await redeemPairingTicket({
+    // 1. PairingTicketService: validate the short-lived ticket without consuming it.
+    // The ticket owner is the source identity whose data will be merged or used.
+    const { targetAnonUserId: sourceAnonUserId } = await redeemPairingTicket({
       ticketId,
       passcode,
       fullCode,
       currentAnonUserId: currentAnonId,
     });
 
-    // 2. IdentityMigrationService: transactional atomic CTE merge
+    // 2. IdentityMigrationService: merge source-owned data into this device's identity.
+    // Merge must preserve the redeeming device's guest ID; replace intentionally switches
+    // this device to the source identity below.
+    const resultingAnonUserId = mode === 'merge' ? currentAnonId : sourceAnonUserId;
     if (mode === 'merge') {
       try {
-        await migrateAnonymousIdentity(currentAnonId, targetAnonUserId);
+        await migrateAnonymousIdentity(sourceAnonUserId, currentAnonId);
       } catch (migrationErr) {
         // Roll back consumed ticket so user can safely retry without losing pairing state
         await rollbackPairingTicket(ticketId);
@@ -62,18 +66,20 @@ export async function POST(req: NextRequest) {
 
     // 3. CacheService: invalidate cached lists and public registries ONLY after DB transactions succeed
     revalidateUserLists(currentAnonId);
-    revalidateUserLists(targetAnonUserId);
+    revalidateUserLists(sourceAnonUserId);
     revalidatePublicSubjectCaches();
 
     const response = NextResponse.json({
       success: true,
-      label: anonymousLabel(targetAnonUserId),
-      message: 'Device successfully synced',
+      label: anonymousLabel(resultingAnonUserId),
+      message: mode === 'merge'
+        ? 'Quizzes merged; this guest session remains active'
+        : 'Device successfully connected to the primary session',
     });
 
     response.cookies.set(
       ANON_COOKIE_NAME,
-      await createAnonymousSessionValue(targetAnonUserId),
+      await createAnonymousSessionValue(resultingAnonUserId),
       anonymousCookieOptions()
     );
 

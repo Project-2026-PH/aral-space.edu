@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { UserCheck, Shield, RotateCcw, X, Smartphone, ArrowRightLeft, Copy, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { UserCheck, Shield, RotateCcw, X, Smartphone, ArrowRightLeft, Copy, Check, AlertCircle, Loader2, Unplug } from 'lucide-react';
 import { setClientUserId } from '@/lib/authoringPreferences';
+import { QRCodeSVG } from 'qrcode.react';
+
+const PAIRING_CONNECTION_STORAGE_KEY = 'quizmaster_pairing_connection';
 
 interface AnonSessionData {
   isAnonymous: boolean;
@@ -17,6 +20,9 @@ export default function AnonymousSessionBadge() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [resetting, setResetting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Share state (Device 1)
@@ -47,6 +53,11 @@ export default function AnonymousSessionBadge() {
           setSession(data);
           if (data.userId) {
             setClientUserId(data.userId);
+          }
+          try {
+            setIsConnected(window.localStorage.getItem(PAIRING_CONNECTION_STORAGE_KEY) === 'true');
+          } catch {
+            setIsConnected(false);
           }
         }
       } catch (err) {
@@ -121,11 +132,42 @@ export default function AnonymousSessionBadge() {
         body: JSON.stringify({ action: 'reset' })
       });
       if (res.ok) {
+        try {
+          window.localStorage.removeItem(PAIRING_CONNECTION_STORAGE_KEY);
+        } catch {
+          // Connection marker is optional browser state.
+        }
         window.location.reload();
       }
     } catch (err) {
       console.error('Reset failed:', err);
       setResetting(false);
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!confirm('Disconnect this device from the connected guest session? Your quizzes will remain under the previous session.')) {
+      return;
+    }
+
+    setDisconnecting(true);
+    setDisconnectError(null);
+    try {
+      const res = await fetch('/api/anonymous/pair/disconnect', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to disconnect guest session');
+      }
+      try {
+        window.localStorage.removeItem(PAIRING_CONNECTION_STORAGE_KEY);
+      } catch {
+        // Connection marker is optional browser state.
+      }
+      window.location.reload();
+    } catch (err: any) {
+      console.error('Disconnect failed:', err);
+      setDisconnectError(err.message || 'Unable to disconnect guest session');
+      setDisconnecting(false);
     }
   }
 
@@ -215,6 +257,11 @@ export default function AnonymousSessionBadge() {
         throw new Error(data.error || 'Failed to sync session');
       }
 
+      try {
+        window.localStorage.setItem(PAIRING_CONNECTION_STORAGE_KEY, 'true');
+      } catch {
+        // Connection marker is optional browser state.
+      }
       setLinkSuccess(data.message || 'Device synced successfully! Reloading...');
       setTimeout(() => {
         window.location.reload();
@@ -323,6 +370,33 @@ export default function AnonymousSessionBadge() {
                 <p className="leading-relaxed text-xs text-muted-foreground">
                   No password or email required. Your guest profile is stored safely in your browser. You can link quizzes across devices using a short-lived sync code.
                 </p>
+
+                {disconnectError && (
+                  <div className="flex items-center gap-2 p-3 rounded-2xl bg-destructive/10 text-destructive text-xs font-medium">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{disconnectError}</span>
+                  </div>
+                )}
+
+                {isConnected && (
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 space-y-2.5">
+                    <div>
+                      <div className="text-xs font-bold text-foreground">Connected to a synced guest session</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        Disconnect to create a new guest ID on this device. Your quizzes stay with the connected session.
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDisconnect}
+                      disabled={disconnecting}
+                      className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-destructive/30 bg-background px-3 py-2 text-xs font-bold text-destructive hover:bg-destructive/5 transition-all disabled:opacity-50"
+                    >
+                      <Unplug className="h-3.5 w-3.5" />
+                      <span>{disconnecting ? 'Disconnecting...' : 'Disconnect Session'}</span>
+                    </button>
+                  </div>
+                )}
+
                 <div className="pt-3 border-t border-border/50 flex items-center justify-between gap-2.5">
                   <button
                     onClick={handleReset}
@@ -363,30 +437,46 @@ export default function AnonymousSessionBadge() {
                       Active Pairing Code
                     </div>
 
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex flex-col items-center">
-                          <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Sync ID</span>
-                          <span className="bg-card px-3 py-1.5 rounded-xl border border-border/80 font-mono text-xl font-black text-foreground shadow-2xs tracking-wider">
-                            {pairingTicketId}
-                          </span>
-                        </div>
-                        <span className="text-muted-foreground font-bold text-xl mt-4">-</span>
-                        <div className="flex flex-col items-center">
-                          <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Passcode</span>
-                          <span className="bg-card px-3 py-1.5 rounded-xl border border-border/80 font-mono text-xl font-black text-foreground shadow-2xs tracking-widest">
-                            {pairingPasscode.slice(0, 3)} {pairingPasscode.slice(3)}
-                          </span>
-                        </div>
+                    <div className="flex flex-col items-center justify-center gap-4">
+                      <div className="flex flex-col items-center gap-2 rounded-2xl border border-border/70 bg-card p-3 shadow-2xs">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Scan to connect</span>
+                        <QRCodeSVG
+                          value={pairingFullCode || `${pairingTicketId}-${pairingPasscode}`}
+                          size={144}
+                          level="M"
+                          includeMargin
+                          bgColor="#ffffff"
+                          fgColor="#111827"
+                          title="Scan this QR code to copy the pairing code"
+                        />
+                        <span className="text-[10px] text-muted-foreground">Then paste the code in Connect</span>
                       </div>
 
-                      <button
-                        onClick={handleCopyCode}
-                        className="mt-4 p-2.5 rounded-xl border border-border/70 bg-card hover:bg-muted/50 transition-all text-muted-foreground hover:text-foreground shadow-2xs"
-                        title="Copy full code"
-                      >
-                        {copiedCode ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-                      </button>
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex flex-col items-center">
+                            <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Sync ID</span>
+                            <span className="bg-card px-3 py-1.5 rounded-xl border border-border/80 font-mono text-xl font-black text-foreground shadow-2xs tracking-wider">
+                              {pairingTicketId}
+                            </span>
+                          </div>
+                          <span className="text-muted-foreground font-bold text-xl mt-4">-</span>
+                          <div className="flex flex-col items-center">
+                            <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Passcode</span>
+                            <span className="bg-card px-3 py-1.5 rounded-xl border border-border/80 font-mono text-xl font-black text-foreground shadow-2xs tracking-widest">
+                              {pairingPasscode.slice(0, 3)} {pairingPasscode.slice(3)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={handleCopyCode}
+                          className="mt-4 p-2.5 rounded-xl border border-border/70 bg-card hover:bg-muted/50 transition-all text-muted-foreground hover:text-foreground shadow-2xs"
+                          title="Copy full code"
+                        >
+                          {copiedCode ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
 
                     {timeLeft && (
@@ -504,7 +594,7 @@ export default function AnonymousSessionBadge() {
                     />
                     <div className="text-xs">
                       <div className="font-bold text-foreground">Merge quizzes (Recommended)</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">Keep quizzes on this device and combine with primary device.</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">Keep this device&apos;s guest ID and combine its quizzes with the primary device.</div>
                     </div>
                   </label>
 

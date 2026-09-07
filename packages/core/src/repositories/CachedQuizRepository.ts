@@ -1,5 +1,5 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, UpdateSubjectShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, UpdateSubjectShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink, LibraryData } from '@quiz-creator/types';
 import { LRUCache } from '../cache/LRUCache';
 
 export class CachedQuizRepository implements IQuizRepository {
@@ -28,6 +28,10 @@ export class CachedQuizRepository implements IQuizRepository {
     return `questions:${quizId}:${userId || 'anon'}`;
   }
 
+  private libraryKey(userId?: string): string {
+    return `library:${userId || 'anon'}`;
+  }
+
   async listSubjects(userId?: string): Promise<Subject[]> {
     const key = this.subjectKey(userId);
     const cached = this.cache.get(key);
@@ -41,14 +45,29 @@ export class CachedQuizRepository implements IQuizRepository {
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {
     const subject = await this.underlying.createSubject(name, color, userId);
     this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('public_subject:');
     return subject;
+  }
+
+  async recordSubjectView(subjectId: string, viewerId: string): Promise<void> {
+    if (!this.underlying.recordSubjectView) return;
+    await this.underlying.recordSubjectView(subjectId, viewerId);
+    this.cache.deleteByPrefix('library:');
+    this.cache.deleteByPrefix('subjects:');
+  }
+
+  async getSubjectViewerCount(subjectId: string, ownerId: string): Promise<number> {
+    if (!this.underlying.getSubjectViewerCount) return 0;
+    return this.underlying.getSubjectViewerCount(subjectId, ownerId);
   }
 
   async updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string): Promise<Subject> {
     const subject = await this.underlying.updateSubject(subjectId, dto, userId);
     this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('public_subject:');
     this.cache.deleteByPrefix('public_quiz:');
     return subject;
@@ -57,7 +76,9 @@ export class CachedQuizRepository implements IQuizRepository {
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
     const result = await this.underlying.deleteSubject(subjectId, userId);
     this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix(`quiz:`);
     this.cache.deleteByPrefix('questions:');
     return result;
@@ -71,14 +92,16 @@ export class CachedQuizRepository implements IQuizRepository {
     return this.underlying.listQuizzesBySubject(subjectId, userId);
   }
 
-  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string): Promise<SubjectCollaboratorLink> {
-    return this.underlying.createSubjectCollaboratorLink(subjectId, expiresAt, userId);
+  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string, maxUses?: number): Promise<SubjectCollaboratorLink> {
+    return this.underlying.createSubjectCollaboratorLink(subjectId, expiresAt, userId, maxUses);
   }
 
   async redeemSubjectCollaboratorLink(token: string, userId: string): Promise<SubjectAccess | null> {
     const access = await this.underlying.redeemSubjectCollaboratorLink(token, userId);
     this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
     return access;
   }
 
@@ -93,6 +116,7 @@ export class CachedQuizRepository implements IQuizRepository {
   ) {
     const config = await this.underlying.updateSubjectShareConfig(subjectId, dto, userId);
     this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('public_subject:');
     return config;
   }
@@ -119,28 +143,31 @@ export class CachedQuizRepository implements IQuizRepository {
     return quizzes;
   }
 
-  async listQuizzesAndSubjects(userId?: string): Promise<{ quizzes: Quiz[]; subjects: Subject[] }> {
-    const qKey = this.quizzesKey(userId);
-    const sKey = this.subjectKey(userId);
-    const cachedQuizzes = this.cache.get(qKey);
-    const cachedSubjects = this.cache.get(sKey);
+  async listQuizzesAndSubjects(userId?: string): Promise<LibraryData> {
+    const key = this.libraryKey(userId);
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached;
 
-    if (cachedQuizzes !== undefined && cachedSubjects !== undefined) {
-      return { quizzes: cachedQuizzes, subjects: cachedSubjects };
-    }
-
-    if (this.underlying.listQuizzesAndSubjects) {
-      const data = await this.underlying.listQuizzesAndSubjects(userId);
-      this.cache.set(qKey, data.quizzes);
-      this.cache.set(sKey, data.subjects);
-      return data;
-    }
-
-    const [quizzes, subjects] = await Promise.all([
-      this.listQuizzes(userId),
-      this.listSubjects(userId),
-    ]);
-    return { quizzes, subjects };
+    const data = this.underlying.listQuizzesAndSubjects
+      ? await this.underlying.listQuizzesAndSubjects(userId)
+      : {
+          quizzes: await this.underlying.listQuizzes(userId),
+          subjects: await this.underlying.listSubjects(userId)
+        };
+    const sourceSubjects = data.subjects || [];
+    const sourceQuizzes = data.quizzes || [];
+    const sharedSubjects = data.sharedSubjects || (userId
+      ? sourceSubjects.filter((subject) => Boolean(subject.user_id && subject.user_id !== userId))
+      : []);
+    const sharedSubjectIds = new Set(sharedSubjects.map((subject) => subject.id));
+    const result: LibraryData = {
+      quizzes: sourceQuizzes.filter((quiz) => !quiz.subject_id || !sharedSubjectIds.has(quiz.subject_id)),
+      subjects: sourceSubjects.filter((subject) => !sharedSubjectIds.has(subject.id)),
+      sharedQuizzes: data.sharedQuizzes || sourceQuizzes.filter((quiz) => Boolean(quiz.subject_id && sharedSubjectIds.has(quiz.subject_id))),
+      sharedSubjects
+    };
+    this.cache.set(key, result);
+    return result;
   }
 
   async getQuizById(id: string, userId?: string): Promise<Quiz | null> {
@@ -197,6 +224,7 @@ export class CachedQuizRepository implements IQuizRepository {
     this.cache.deleteByPrefix(`questions:${quizId}:`);
     this.cache.deleteByPrefix(`quiz:${quizId}`);
     this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('public_quiz:');
     this.cache.deleteByPrefix('public_subject:');
     return question;
@@ -216,6 +244,7 @@ export class CachedQuizRepository implements IQuizRepository {
     this.cache.deleteByPrefix(`questions:${quizId}:`);
     this.cache.deleteByPrefix(`quiz:${quizId}`);
     this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('public_quiz:');
     this.cache.deleteByPrefix('public_subject:');
     return result;

@@ -28,6 +28,7 @@ interface FlashcardReviewProps {
   questions: QuizQuestion[];
   shareToken?: string;
   subjectShareToken?: string;
+  userId?: string;
 }
 
 interface CardToolbarProps {
@@ -71,12 +72,12 @@ function shuffleList<T>(items: T[]): T[] {
   return shuffled;
 }
 
-function getFlashcardSettingsKey(quizId: string): string {
-  return `quiz-creator:flashcard-settings:${quizId}`;
+function getFlashcardSettingsKey(quizId: string, userId?: string): string {
+  return userId ? `quiz-creator:flashcard-settings:${quizId}:${userId}` : `quiz-creator:flashcard-settings:${quizId}`;
 }
 
-function getFlashcardSessionKey(quizId: string): string {
-  return `quiz-creator:flashcard-session:${quizId}`;
+function getFlashcardSessionKey(quizId: string, userId?: string): string {
+  return userId ? `quiz-creator:flashcard-session:${quizId}:${userId}` : `quiz-creator:flashcard-session:${quizId}`;
 }
 
 function CardToolbar({ quizId, isStarred, isHintVisible, onHint, onSpeak, onToggleStar, canEdit }: CardToolbarProps) {
@@ -109,7 +110,7 @@ function CardToolbar({ quizId, isStarred, isHintVisible, onHint, onSpeak, onTogg
   );
 }
 
-export default function FlashcardReview({ quiz, questions, shareToken, subjectShareToken }: FlashcardReviewProps) {
+export default function FlashcardReview({ quiz, questions, shareToken, subjectShareToken, userId }: FlashcardReviewProps) {
   const sharedQuery = shareToken ? `&shareToken=${encodeURIComponent(shareToken)}` : '';
   const exitHref = subjectShareToken ? `/subjects/share/${encodeURIComponent(subjectShareToken)}` : '/review/';
   const [cardIndex, setCardIndex] = useState(0);
@@ -124,6 +125,11 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [sessionHydrated, setSessionHydrated] = useState(false);
   const [hasSeenAnswer, setHasSeenAnswer] = useState(false);
+  const [completedRounds, setCompletedRounds] = useState(0);
+  const [audioFeedbackEnabled, setAudioFeedbackEnabled] = useState(true);
+  const [streakStats, setStreakStats] = useState(() => getQuizStreakRecord(quiz.id));
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [isExitTransitionActive, setIsExitTransitionActive] = useState(false);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -136,6 +142,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const pendingSwipeOffsetRef = useRef(0);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const hasSeenAnswerRef = useRef(false);
+  const touchStartX = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
   const swipeTimerRef = useRef<number | null>(null);
 
@@ -158,7 +165,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
 
     if (typeof window !== 'undefined') {
       try {
-        const storedSettings = JSON.parse(window.localStorage.getItem(getFlashcardSettingsKey(quiz.id)) || 'null') as Partial<FlashcardSettings> | null;
+        const storedSettings = JSON.parse(window.localStorage.getItem(getFlashcardSettingsKey(quiz.id, userId)) || 'null') as Partial<FlashcardSettings> | null;
         if (storedSettings) {
           settings = {
             shuffleQuestions: storedSettings.shuffleQuestions === true,
@@ -178,7 +185,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
 
     if (typeof window !== 'undefined' && settings.saveProgress) {
       try {
-        const snapshot = JSON.parse(window.localStorage.getItem(getFlashcardSessionKey(quiz.id)) || 'null') as FlashcardSessionSnapshot | null;
+        const snapshot = JSON.parse(window.localStorage.getItem(getFlashcardSessionKey(quiz.id, userId)) || 'null') as FlashcardSessionSnapshot | null;
         const restoredCards = snapshot?.version === FLASHCARD_SESSION_VERSION
           ? snapshot.cardIds.map((id) => byId.get(id)).filter((question): question is QuizQuestion => Boolean(question))
           : [];
@@ -209,14 +216,14 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     }
 
     setSessionHydrated(true);
-  }, [quiz.id, questions]);
+  }, [quiz.id, questions, userId]);
 
   useEffect(() => {
     if (!sessionHydrated || typeof window === 'undefined') return;
 
     try {
       if (!saveProgress) {
-        window.localStorage.removeItem(getFlashcardSessionKey(quiz.id));
+        window.localStorage.removeItem(getFlashcardSessionKey(quiz.id, userId));
       } else {
         const snapshot: FlashcardSessionSnapshot = {
           version: FLASHCARD_SESSION_VERSION,
@@ -226,10 +233,10 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           isFlipped,
           hasSeenAnswer
         };
-        window.localStorage.setItem(getFlashcardSessionKey(quiz.id), JSON.stringify(snapshot));
+        window.localStorage.setItem(getFlashcardSessionKey(quiz.id, userId), JSON.stringify(snapshot));
       }
 
-      window.localStorage.setItem(getFlashcardSettingsKey(quiz.id), JSON.stringify({
+      window.localStorage.setItem(getFlashcardSettingsKey(quiz.id, userId), JSON.stringify({
         version: FLASHCARD_SETTINGS_VERSION,
         shuffleQuestions,
         saveProgress
@@ -237,7 +244,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     } catch {
       // Ignore storage restrictions and keep the in-memory session usable.
     }
-  }, [quiz.id, sessionHydrated, saveProgress, shuffleQuestions, cards, cardIndex, incorrectIds, isFlipped, hasSeenAnswer]);
+  }, [quiz.id, sessionHydrated, saveProgress, shuffleQuestions, cards, cardIndex, incorrectIds, isFlipped, hasSeenAnswer, userId]);
 
   useEffect(() => {
     return () => {
@@ -498,7 +505,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
               <X className="h-3.5 w-3.5" />
               Exit review
             </Link>
-            <h1 className="truncate text-lg font-bold text-foreground">In-class review</h1>
+            <h1 className="truncate text-lg font-bold text-foreground">Reviewer</h1>
             <p className="truncate text-xs text-muted-foreground">{quiz.title}</p>
           </div>
           <WindFlameBadge

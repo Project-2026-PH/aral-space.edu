@@ -18,12 +18,14 @@ interface QuizOverviewClientProps {
   quiz: Quiz;
   questions: QuizQuestion[];
   sessions: QuizSession[];
+  readOnly?: boolean;
 }
 
 export default function QuizOverviewClient({
   quiz: initialQuiz,
   questions: initialQuestions,
-  sessions: initialSessions
+  sessions: initialSessions,
+  readOnly = false
 }: QuizOverviewClientProps) {
   const router = useRouter();
   const [quiz, setQuiz] = useState<Quiz>(initialQuiz);
@@ -121,22 +123,26 @@ export default function QuizOverviewClient({
           Back to Library
         </Link>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setShowDeleteQuizModal(true)}
-            className="p-2.5 sm:p-2 rounded-2xl sm:rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
-            title="Delete Quiz"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setShowDeleteQuizModal(true)}
+              className="p-2.5 sm:p-2 rounded-2xl sm:rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
+              title="Delete Quiz"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
           <QuizExportMenu quiz={quiz} questions={questions} />
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-3 sm:px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs shrink-0"
-            title="Share Quiz"
-          >
-            <Share2 className="h-3.5 w-3.5 shrink-0" />
-            <span className="hidden sm:inline">Share</span>
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-3 sm:px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs shrink-0"
+              title="Share Quiz"
+            >
+              <Share2 className="h-3.5 w-3.5 shrink-0" />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+          )}
           <button
             onClick={() => setShowStartModal(true)}
             className="flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-2xl bg-primary px-4 sm:px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95 whitespace-nowrap"
@@ -196,15 +202,17 @@ export default function QuizOverviewClient({
                 >
                   {quiz.title}
                 </h1>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingTitle(true)}
-                  title="Edit title"
-                  aria-label="Edit title"
-                  className="p-1 rounded-lg text-muted-foreground hover:text-foreground shrink-0 mt-0.5"
-                >
-                  <Edit className="h-3.5 w-3.5" />
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTitle(true)}
+                    title="Edit title"
+                    aria-label="Edit title"
+                    className="p-1 rounded-lg text-muted-foreground hover:text-foreground shrink-0 mt-0.5"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             )}
             <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1.5">
@@ -281,18 +289,20 @@ export default function QuizOverviewClient({
                     No description. Click edit to add one.
                   </p>
                 )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDescInput(quiz.description || '');
-                    setIsEditingDesc(true);
-                  }}
-                  title="Edit description"
-                  aria-label="Edit description"
-                  className="rounded-lg p-1 text-muted-foreground opacity-60 hover:opacity-100 hover:bg-muted transition-all"
-                >
-                  <Edit className="h-3 w-3" />
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDescInput(quiz.description || '');
+                      setIsEditingDesc(true);
+                    }}
+                    title="Edit description"
+                    aria-label="Edit description"
+                    className="rounded-lg p-1 text-muted-foreground opacity-60 hover:opacity-100 hover:bg-muted transition-all"
+                  >
+                    <Edit className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -305,16 +315,18 @@ export default function QuizOverviewClient({
           <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Questions ({questions.length})
           </h3>
-          <button
-            onClick={() => {
-              setEditingQuestion(null);
-              setShowQuestionModal(true);
-            }}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-all"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Question</span>
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => {
+                setEditingQuestion(null);
+                setShowQuestionModal(true);
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Question</span>
+            </button>
+          )}
         </div>
 
         <QuizQuestionList
@@ -325,10 +337,11 @@ export default function QuizOverviewClient({
             setShowQuestionModal(true);
           }}
           onDeleted={refreshQuestions}
+          readOnly={readOnly}
         />
       </div>
 
-      {isEditingTitle && (
+      {!readOnly && isEditingTitle && (
         <StickyActionDock
           onAction={handleSaveTitle}
           disabled={savingTitle || !titleInput.trim()}
@@ -340,7 +353,7 @@ export default function QuizOverviewClient({
       )}
 
       <QuizQuestionFormModal
-        open={showQuestionModal}
+        open={!readOnly && showQuestionModal}
         onOpenChange={setShowQuestionModal}
         question={editingQuestion}
         quizId={quiz.id}
@@ -355,14 +368,14 @@ export default function QuizOverviewClient({
       />
 
       <ShareQuizModal
-        open={showShareModal}
+        open={!readOnly && showShareModal}
         onOpenChange={setShowShareModal}
         quizId={quiz.id}
         quizTitle={quiz.title}
       />
 
       <ConfirmModal
-        open={showDeleteQuizModal}
+        open={!readOnly && showDeleteQuizModal}
         onOpenChange={setShowDeleteQuizModal}
         onConfirm={handleDeleteQuiz}
         title="Delete Quiz"

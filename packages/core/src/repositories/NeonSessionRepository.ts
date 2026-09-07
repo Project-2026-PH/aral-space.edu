@@ -7,19 +7,27 @@ export class NeonSessionRepository implements ISessionRepository {
   constructor(clientOrUrl: string | NeonQueryFunction<false, false>) { this.sql = typeof clientOrUrl === 'string' ? neon(clientOrUrl) : clientOrUrl; }
 
   async getActiveSession(quizId: string, userId?: string) {
-    const rows = userId ? await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id = ${userId} AND status = 'in_progress' ORDER BY created_at DESC LIMIT 1` : await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND status = 'in_progress' ORDER BY created_at DESC LIMIT 1`;
+    const rows = userId
+      ? await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id = ${userId} AND status = 'in_progress' ORDER BY created_at DESC LIMIT 1`
+      : await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id IS NULL AND status = 'in_progress' ORDER BY created_at DESC LIMIT 1`;
     return rows[0] as QuizSession || null;
   }
   async getScheduledSession(quizId: string, userId?: string) {
-    const rows = userId ? await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id = ${userId} AND status = 'scheduled' ORDER BY available_at ASC LIMIT 1` : await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND status = 'scheduled' ORDER BY available_at ASC LIMIT 1`;
+    const rows = userId
+      ? await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id = ${userId} AND status = 'scheduled' ORDER BY available_at ASC LIMIT 1`
+      : await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id IS NULL AND status = 'scheduled' ORDER BY available_at ASC LIMIT 1`;
     return rows[0] as QuizSession || null;
   }
   async getLatestCompletedSession(quizId: string, userId?: string) {
-    const rows = userId ? await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id = ${userId} AND status = 'completed' ORDER BY completed_at DESC LIMIT 1` : await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND status = 'completed' ORDER BY completed_at DESC LIMIT 1`;
+    const rows = userId
+      ? await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id = ${userId} AND status = 'completed' ORDER BY completed_at DESC LIMIT 1`
+      : await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id IS NULL AND status = 'completed' ORDER BY completed_at DESC LIMIT 1`;
     return rows[0] as QuizSession || null;
   }
   async listSessions(quizId: string, userId?: string) {
-    const rows = userId ? await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id = ${userId} ORDER BY created_at DESC` : await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} ORDER BY created_at DESC`;
+    const rows = userId
+      ? await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id = ${userId} ORDER BY created_at DESC`
+      : await this.sql`SELECT * FROM quiz_sessions WHERE quiz_id = ${quizId} AND user_id IS NULL ORDER BY created_at DESC`;
     return rows as QuizSession[];
   }
   async getSessionById(sessionId: string, userId?: string) {

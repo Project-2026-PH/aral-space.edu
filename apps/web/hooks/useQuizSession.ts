@@ -682,6 +682,64 @@ export function useQuizSession({
     }
   }
 
+  function resetProgress() {
+    removeQuizProgressSnapshot(quiz.id, session.id);
+
+    const freshProgressMap = new Map<string, QuestionProgress>();
+    for (const q of questions) {
+      freshProgressMap.set(q.id, {
+        session_id: session.id,
+        question_id: q.id,
+        streak_count: 0,
+        has_missed: false,
+        locked: false
+      });
+    }
+    setProgressMap(freshProgressMap);
+
+    const freshQueue = CognitiveMasteryQueue.initialize(questions.map((q) => q.id));
+    setQueueState(freshQueue);
+
+    setAccumulatedStruggleIds([]);
+    setIsStruggleReviewMode(false);
+    setIsCardFlipped(false);
+    setSelectedOptionId(null);
+    setIsEvaluating(false);
+    setEvaluatedCardIds([]);
+    setPendingAdvance(null);
+    setIsRecapVisible(false);
+    setIsQuestionTransitioning(false);
+    setIdentificationInput('');
+    setIdentificationSubmitted(false);
+    setTypedAnswerCorrect(null);
+    setAnswerResult(null);
+    setFeedbackMessage(null);
+    setIsHintVisible(false);
+    setIsExplanationVisible(false);
+    setPendingAnswerEvents([]);
+    setHasRestoredProgress(false);
+    setIsCompleted(false);
+    setSessionSummary(null);
+    setCorrectAnswerIds(new Set());
+    setCurrentStreak(0);
+    telemetry.restore({});
+    latestSnapshotRef.current = null;
+    restoringSnapshotRef.current = null;
+
+    const firstQuestion = questions.find((q) => q.id === freshQueue.activeQueue[0]);
+    if (firstQuestion && firstQuestion.options?.length > 0) {
+      setCurrentOptions(
+        shuffleOptions
+          ? QuizShuffleService.shuffleOptions(firstQuestion.options, firstQuestion.correct_answer)
+          : firstQuestion.options.map((text, index) => ({
+            optionId: index,
+            text,
+            isCorrect: index === firstQuestion.correct_answer
+          }))
+      );
+    }
+  }
+
   return {
     questions,
     session,
@@ -725,6 +783,7 @@ export function useQuizSession({
     advance,
     startStruggleReview,
     complete,
+    resetProgress,
     shuffleRemainingQueue,
     handleSurfaceClick,
     handleSurfaceKeyDown,

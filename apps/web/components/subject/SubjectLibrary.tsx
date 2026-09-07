@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Quiz, Subject } from '@quiz-creator/types';
-import { BookOpen, ExternalLink, Layers, Link2, Lock, Share2, Trash2 } from 'lucide-react';
+import { BookOpen, ExternalLink, Eye, Layers, Link2, Lock, Share2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ShareSubjectModal from './ShareSubjectModal';
@@ -14,6 +14,8 @@ interface SubjectLibraryProps {
   quizzes: Quiz[];
   viewerId: string;
   loading?: boolean;
+  readOnly?: boolean;
+  heading?: string;
   onSubjectDeleted?: (subjectId: string) => void;
   onSubjectUpdated?: (subjectId: string, config: { share_token: string; is_public: boolean }) => void;
 }
@@ -23,6 +25,8 @@ export default function SubjectLibrary({
   quizzes,
   viewerId,
   loading = false,
+  readOnly = false,
+  heading = 'Subjects',
   onSubjectDeleted,
   onSubjectUpdated
 }: SubjectLibraryProps) {
@@ -39,15 +43,17 @@ export default function SubjectLibrary({
     );
   }, [subjects, quizzes]);
 
+  const headingId = readOnly ? 'shared-subject-library-heading' : 'subject-library-heading';
+
   if (!loading && subjects.length === 0) {
     return null;
   }
 
   return (
-    <section className="space-y-4" aria-labelledby="subject-library-heading">
+    <section className="space-y-4" aria-labelledby={headingId}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="subject-library-heading" className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-          Subjects
+        <h2 id={headingId} className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+          {heading}
         </h2>
         <span className="rounded-lg border-2 border-slate-900 bg-[#86efac] text-slate-900 px-3 py-1 text-xs font-black shadow-brutal-sm">
           {subjects.length} {subjects.length === 1 ? 'subject' : 'subjects'}
@@ -64,14 +70,16 @@ export default function SubjectLibrary({
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {subjects.map((subject, index) => {
             const isPublic = subject.is_public !== false;
-            const canManage = Boolean(viewerId && subject.user_id === viewerId);
-            const canGeneratePublicLink = isPublic && !subject.share_token;
-            const canOpen = canManage || Boolean(isPublic && subject.share_token) || canGeneratePublicLink;
-            const subjectHref = canManage
+            const canManage = !readOnly && Boolean(viewerId && subject.user_id === viewerId);
+            const canGeneratePublicLink = !readOnly && isPublic && !subject.share_token;
+            const canOpen = readOnly || canManage || Boolean(isPublic && subject.share_token) || canGeneratePublicLink;
+            const subjectHref = readOnly
               ? `/subjects/${subject.id}`
-              : subject.share_token
-                ? `/subjects/share/${subject.share_token}`
-                : '';
+              : canManage
+                ? `/subjects/${subject.id}`
+                : subject.share_token
+                  ? `/subjects/share/${subject.share_token}`
+                  : '';
             const quizCount = quizCounts.get(subject.id) || 0;
 
             return (
@@ -81,13 +89,13 @@ export default function SubjectLibrary({
                 tabIndex={canOpen ? 0 : undefined}
                 aria-label={`Open subject ${subject.name}`}
                 onClick={() => {
-                  if (canManage || subject.share_token) router.push(subjectHref);
+                  if (readOnly || canManage || subject.share_token) router.push(subjectHref);
                   else if (canGeneratePublicLink) setSelectedSubject(subject);
                 }}
                 onKeyDown={(event) => {
                   if (canOpen && (event.key === 'Enter' || event.key === ' ')) {
                     event.preventDefault();
-                    if (canManage || subject.share_token) router.push(subjectHref);
+                    if (readOnly || canManage || subject.share_token) router.push(subjectHref);
                     else if (canGeneratePublicLink) setSelectedSubject(subject);
                   }
                 }}
@@ -104,9 +112,15 @@ export default function SubjectLibrary({
                       />
                       <div className="min-w-0">
                         <h3 className="truncate text-sm font-black text-foreground transition-colors group-hover:text-primary">{subject.name}</h3>
-                        <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
+                        <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
                           <BookOpen className="h-3 w-3" />
                           {quizCount} {quizCount === 1 ? 'study set' : 'study sets'}
+                          {!readOnly && canManage && (
+                            <span className="ml-1 inline-flex items-center gap-1" title="Unique viewers">
+                              <Eye aria-hidden="true" className="h-3 w-3" />
+                              {subject.viewer_count ?? 0}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -191,7 +205,7 @@ export default function SubjectLibrary({
           if (!open) setSelectedSubject(null);
         }}
         subject={selectedSubject}
-        readOnly={Boolean(selectedSubject && selectedSubject.user_id !== viewerId)}
+        readOnly={readOnly || Boolean(selectedSubject && selectedSubject.user_id !== viewerId)}
         onUpdated={(config) => {
           if (selectedSubject) onSubjectUpdated?.(selectedSubject.id, config);
         }}

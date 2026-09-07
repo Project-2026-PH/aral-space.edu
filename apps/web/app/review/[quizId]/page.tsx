@@ -20,11 +20,14 @@ export default async function ReviewPage({
   const controller = new QuizCrudController(quizRepo);
   let quiz: Quiz | null = await controller.getQuiz(quizId, userId);
 
-  if (!quiz && query.shareToken) {
-    const sharedQuiz = await quizRepo.getQuizByShareToken(query.shareToken);
+  const validShareToken = query.shareToken && query.shareToken !== 'undefined' ? query.shareToken : undefined;
+  const validSubjectShareToken = query.subjectShareToken && query.subjectShareToken !== 'undefined' ? query.subjectShareToken : undefined;
+
+  if (!quiz && validShareToken) {
+    const sharedQuiz = await quizRepo.getQuizByShareToken(validShareToken);
     if (sharedQuiz && sharedQuiz.id === quizId) {
       if (sharedQuiz.allow_public_answer_key !== true) {
-        redirect(`/sets/share/${query.shareToken}`);
+        redirect(`/sets/share/${validShareToken}`);
       }
       quiz = {
         ...sharedQuiz,
@@ -37,14 +40,33 @@ export default async function ReviewPage({
     }
   }
 
+  if (!quiz && validSubjectShareToken) {
+    const publicSubject = await quizRepo.getSubjectByShareToken(validSubjectShareToken);
+    if (publicSubject && publicSubject.quizzes?.some((q) => q.id === quizId)) {
+      const baseQuiz = await quizRepo.getQuizById(quizId);
+      if (baseQuiz) {
+        const questions = await quizRepo.getQuestionsByQuizId(quizId);
+        quiz = {
+          ...baseQuiz,
+          questions: questions.map((question): QuizQuestion => ({
+            ...question,
+            quiz_id: baseQuiz.id,
+            correct_answer: question.correct_answer ?? 0,
+          }))
+        } as Quiz;
+      }
+    }
+  }
+
   if (!quiz) notFound();
 
   return (
     <FlashcardReview
       quiz={quiz}
       questions={quiz.questions || []}
-      shareToken={query.shareToken}
-      subjectShareToken={query.subjectShareToken}
+      shareToken={validShareToken}
+      subjectShareToken={validSubjectShareToken}
+      userId={userId}
     />
   );
 }

@@ -68,6 +68,7 @@ export interface UpdateSubjectDto {
 
 export interface CreateSubjectCollaboratorLinkDto {
   expires_at?: string | null;
+  max_uses?: number;
 }
 
 export interface SubjectShareConfig {

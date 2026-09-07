@@ -1,5 +1,5 @@
 import type { IQuizRepository } from '@quiz-creator/core/repositories';
-import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto, UpdateSubjectShareConfigDto, UpdateSubjectDto } from '@quiz-creator/types';
+import { CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, UpdateShareConfigDto, UpdateSubjectShareConfigDto, UpdateSubjectDto, LibraryData } from '@quiz-creator/types';
 
 export class QuizCrudController {
   constructor(private quizRepo: IQuizRepository) {}
@@ -12,7 +12,7 @@ export class QuizCrudController {
     return this.quizRepo.listSubjects(userId);
   }
 
-  async listQuizzesAndSubjects(userId?: string) {
+  async listQuizzesAndSubjects(userId?: string): Promise<LibraryData> {
     if (this.quizRepo.listQuizzesAndSubjects) {
       return this.quizRepo.listQuizzesAndSubjects(userId);
     }
@@ -20,7 +20,33 @@ export class QuizCrudController {
       this.quizRepo.listQuizzes(userId),
       this.quizRepo.listSubjects(userId)
     ]);
-    return { quizzes, subjects };
+    const sharedSubjects = userId
+      ? subjects.filter((subject) => Boolean(subject.user_id && subject.user_id !== userId))
+      : [];
+    const sharedSubjectIds = new Set(sharedSubjects.map((subject) => subject.id));
+    const ownedSubjects = subjects.filter((subject) => !sharedSubjectIds.has(subject.id));
+    const subjectsWithCounts = await Promise.all(ownedSubjects.map(async (subject) => ({
+      ...subject,
+      viewer_count: userId && this.quizRepo.getSubjectViewerCount
+        ? await this.quizRepo.getSubjectViewerCount(subject.id, userId)
+        : subject.viewer_count || 0
+    })));
+    return {
+      quizzes: quizzes.filter((quiz) => !quiz.subject_id || !sharedSubjectIds.has(quiz.subject_id)),
+      subjects: subjectsWithCounts,
+      sharedQuizzes: quizzes.filter((quiz) => Boolean(quiz.subject_id && sharedSubjectIds.has(quiz.subject_id))),
+      sharedSubjects
+    };
+  }
+
+  async recordSubjectView(subjectId: string, viewerId: string) {
+    if (!this.quizRepo.recordSubjectView) return;
+    return this.quizRepo.recordSubjectView(subjectId, viewerId);
+  }
+
+  async getSubjectViewerCount(subjectId: string, ownerId: string) {
+    if (!this.quizRepo.getSubjectViewerCount) return 0;
+    return this.quizRepo.getSubjectViewerCount(subjectId, ownerId);
   }
 
   async createSubject(name: string, color: string, userId?: string) { return this.quizRepo.createSubject(name, color, userId); }
@@ -28,7 +54,7 @@ export class QuizCrudController {
   async deleteSubject(subjectId: string, userId?: string) { return this.quizRepo.deleteSubject(subjectId, userId); }
   async getSubjectAccess(subjectId: string, userId?: string) { return this.quizRepo.getSubjectAccess(subjectId, userId); }
   async listQuizzesBySubject(subjectId: string, userId?: string) { return this.quizRepo.listQuizzesBySubject(subjectId, userId); }
-  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string) { return this.quizRepo.createSubjectCollaboratorLink(subjectId, expiresAt, userId); }
+  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string, maxUses?: number) { return this.quizRepo.createSubjectCollaboratorLink(subjectId, expiresAt, userId, maxUses); }
   async redeemSubjectCollaboratorLink(token: string, userId: string) { return this.quizRepo.redeemSubjectCollaboratorLink(token, userId); }
   async getSubjectShareConfig(subjectId: string, userId?: string) { return this.quizRepo.getSubjectShareConfig(subjectId, userId); }
   async updateSubjectShareConfig(subjectId: string, dto: UpdateSubjectShareConfigDto, userId?: string) { return this.quizRepo.updateSubjectShareConfig(subjectId, dto, userId); }

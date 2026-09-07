@@ -13,8 +13,9 @@ export class MemoryQuizRepository implements IQuizRepository {
   private subjects: Map<string, Subject> = new Map();
   private quizzes: Map<string, Quiz> = new Map();
   private questions: Map<string, QuizQuestion> = new Map();
-  private collaboratorLinks: Map<string, { subject_id: string; expires_at: string | null; used_at: string | null; user_id: string | null }> = new Map();
+  private collaboratorLinks: Map<string, { subject_id: string; expires_at: string | null; used_at: string | null; user_id: string | null; max_uses: number; uses_count: number; redeemed_by: Set<string> }> = new Map();
   private collaborators: Map<string, Set<string>> = new Map();
+  private subjectViews: Map<string, Set<string>> = new Map();
 
   constructor() {
     this.seedDefaultData();
@@ -127,7 +128,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   private async requireSubjectAssignment(subjectId: string | null | undefined, userId?: string): Promise<void> {
     if (!subjectId) return;
     if (!this.subjects.has(subjectId)) throw new Error('Subject not found or access is restricted');
-    if (userId && !(await this.getSubjectAccess(subjectId, userId))) {
+    if (userId && !(await this.getSubjectAccess(subjectId, userId))?.can_edit) {
       throw new Error('Subject not found or access is restricted');
     }
   }
@@ -135,6 +136,12 @@ export class MemoryQuizRepository implements IQuizRepository {
   private async requireQuizAccess(quizId: string, userId?: string): Promise<Quiz> {
     const quiz = await this.getQuizById(quizId, userId);
     if (!quiz) throw new Error('Quiz not found or access is restricted');
+    return quiz;
+  }
+
+  private async requireQuizWriteAccess(quizId: string, userId?: string): Promise<Quiz> {
+    const quiz = await this.requireQuizAccess(quizId, userId);
+    if (userId && quiz.user_id !== userId) throw new Error('Reviewer is read-only for this user');
     return quiz;
   }
 
@@ -224,8 +231,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
-    const quiz = await this.getQuizById(id, userId);
-    if (!quiz) throw new Error(`Quiz ${id} not found`);
+    const quiz = await this.requireQuizWriteAccess(id, userId);
     if (dto.subject_id !== undefined) await this.requireSubjectAssignment(dto.subject_id, userId);
     if (dto.title !== undefined) quiz.title = dto.title;
     if (dto.description !== undefined) quiz.description = dto.description;
@@ -236,7 +242,7 @@ export class MemoryQuizRepository implements IQuizRepository {
 
   async deleteQuiz(id: string, userId?: string): Promise<boolean> {
     const quiz = await this.getQuizById(id, userId);
-    if (!quiz) return false;
+    if (!quiz || (userId && quiz.user_id !== userId)) return false;
     const deleted = this.quizzes.delete(id);
     for (const [qId, q] of this.questions.entries()) {
       if (q.quiz_id === id) this.questions.delete(qId);
@@ -254,7 +260,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async addQuestion(quizId: string, dto: CreateQuestionDto, userId?: string): Promise<QuizQuestion> {
-    const quiz = await this.requireQuizAccess(quizId, userId);
+    const quiz = await this.requireQuizWriteAccess(quizId, userId);
     const questions = await this.getQuestionsByQuizId(quizId, userId);
     const orderIndex = dto.order_index !== undefined ? dto.order_index : questions.length;
     const qId = `q-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
@@ -283,7 +289,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async updateQuestion(quizId: string, questionId: string, dto: UpdateQuestionDto, userId?: string): Promise<QuizQuestion> {
-    await this.requireQuizAccess(quizId, userId);
+    await this.requireQuizWriteAccess(quizId, userId);
     const question = this.questions.get(questionId);
     if (!question || question.quiz_id !== quizId) throw new Error('Question not found');
     const fields = normalizeQuestionFields(dto, question);
@@ -302,7 +308,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async deleteQuestion(quizId: string, questionId: string, userId?: string): Promise<boolean> {
-    await this.requireQuizAccess(quizId, userId);
+    await this.requireQuizWriteAccess(quizId, userId);
     const question = this.questions.get(questionId);
     if (!question || question.quiz_id !== quizId) return false;
     this.questions.delete(questionId);
@@ -316,7 +322,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async reorderQuestions(quizId: string, questionIds: string[], userId?: string): Promise<boolean> {
-    await this.requireQuizAccess(quizId, userId);
+    await this.requireQuizWriteAccess(quizId, userId);
     const questions = await this.getQuestionsByQuizId(quizId, userId);
     const expectedIds = new Set(questions.map((question) => question.id));
     if (questionIds.length !== questions.length || questionIds.some((id) => !expectedIds.has(id))) {
@@ -331,7 +337,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async getShareConfig(quizId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
-    const quiz = await this.requireQuizAccess(quizId, userId);
+    const quiz = await this.requireQuizWriteAccess(quizId, userId);
     if (!quiz.share_token) {
       quiz.share_token = generateShareToken();
       quiz.is_public = quiz.is_public ?? true;
@@ -351,7 +357,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean; allow_public_answer_key?: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
-    const quiz = await this.requireQuizAccess(quizId, userId);
+    const quiz = await this.requireQuizWriteAccess(quizId, userId);
     const wasRevoked = Boolean(quiz.share_revoked_at) || quiz.is_public === false;
     const enablingPublic = dto.is_public === true;
     if (dto.reset_token || !quiz.share_token || (enablingPublic && wasRevoked)) {
@@ -384,7 +390,7 @@ export class MemoryQuizRepository implements IQuizRepository {
       return { subject_id: subjectId, role: 'owner', can_edit: true, can_manage: true };
     }
     if (this.collaborators.get(subjectId)?.has(userId)) {
-      return { subject_id: subjectId, role: 'collaborator', can_edit: true, can_manage: false };
+      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_manage: false };
     }
     return null;
   }
@@ -397,7 +403,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string): Promise<Subject> {
-    if (!(await this.getSubjectAccess(subjectId, userId))) throw new Error('Subject not found or access is restricted');
+    if (!(await this.getSubjectAccess(subjectId, userId))?.can_edit) throw new Error('Subject not found or access is restricted');
     const subject = this.subjects.get(subjectId)!;
     if (dto.name !== undefined) subject.name = dto.name;
     if (dto.color !== undefined) subject.color = dto.color;
@@ -405,24 +411,51 @@ export class MemoryQuizRepository implements IQuizRepository {
     return subject;
   }
 
-  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string): Promise<SubjectCollaboratorLink> {
+  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string, maxUses: number = 5): Promise<SubjectCollaboratorLink> {
     const access = await this.getSubjectAccess(subjectId, userId);
     if (!access?.can_manage) throw new Error('Only the subject owner can create collaborator links');
+    const clampedUses = Math.min(Math.max(Number(maxUses) || 1, 1), 5);
     const token = generateShareToken() + generateShareToken();
-    this.collaboratorLinks.set(token, { subject_id: subjectId, expires_at: expiresAt, used_at: null, user_id: null });
-    return { token, expires_at: expiresAt, used_at: null };
+    this.collaboratorLinks.set(token, {
+      subject_id: subjectId,
+      expires_at: expiresAt,
+      used_at: null,
+      user_id: null,
+      max_uses: clampedUses,
+      uses_count: 0,
+      redeemed_by: new Set<string>()
+    });
+    return { token, expires_at: expiresAt, used_at: null, max_uses: clampedUses, uses_count: 0, redeemed_by: [] };
   }
 
   async redeemSubjectCollaboratorLink(token: string, userId: string): Promise<SubjectAccess | null> {
     const link = this.collaboratorLinks.get(token);
-    if (!link || link.used_at || (link.expires_at && new Date(link.expires_at).getTime() <= Date.now())) return null;
-    link.used_at = new Date().toISOString();
+    if (!link) return null;
+    if (link.expires_at && new Date(link.expires_at).getTime() <= Date.now()) return null;
+
+    // Check if the same user/device already redeemed this link
+    if (link.redeemed_by.has(userId)) {
+      const members = this.collaborators.get(link.subject_id) || new Set<string>();
+      members.add(userId);
+      this.collaborators.set(link.subject_id, members);
+      return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_manage: false };
+    }
+
+    // New user/device: check remaining uses
+    if (link.uses_count >= link.max_uses || link.used_at) return null;
+
+    link.redeemed_by.add(userId);
+    link.uses_count += 1;
     link.user_id = userId;
+    if (link.uses_count >= link.max_uses) {
+      link.used_at = new Date().toISOString();
+    }
     this.collaboratorLinks.set(token, link);
+
     const members = this.collaborators.get(link.subject_id) || new Set<string>();
     members.add(userId);
     this.collaborators.set(link.subject_id, members);
-    return { subject_id: link.subject_id, role: 'collaborator', can_edit: true, can_manage: false };
+    return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_manage: false };
   }
 
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
@@ -444,12 +477,27 @@ export class MemoryQuizRepository implements IQuizRepository {
     return this.subjects.delete(subjectId);
   }
 
+  async recordSubjectView(subjectId: string, viewerId: string): Promise<void> {
+    const subject = this.subjects.get(subjectId);
+    if (!subject || subject.user_id === viewerId) return;
+    const access = await this.getSubjectAccess(subjectId, viewerId);
+    const isPublic = isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at);
+    if (!access && !isPublic) return;
+    const viewers = this.subjectViews.get(subjectId) || new Set<string>();
+    viewers.add(viewerId);
+    this.subjectViews.set(subjectId, viewers);
+  }
+
+  async getSubjectViewerCount(subjectId: string, ownerId: string): Promise<number> {
+    const subject = this.subjects.get(subjectId);
+    if (!subject || subject.user_id !== ownerId) return 0;
+    return this.subjectViews.get(subjectId)?.size || 0;
+  }
+
   async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
     const subject = this.subjects.get(subjectId);
     if (!subject) throw new Error(`Subject ${subjectId} not found`);
-    if (userId && subject.user_id !== userId && !(await this.getSubjectAccess(subjectId, userId))) {
-      throw new Error(`Subject ${subjectId} not found`);
-    }
+    if (userId && subject.user_id !== userId) throw new Error(`Subject ${subjectId} not found`);
 
     if (!subject.share_token) {
       subject.share_token = generateShareToken();
@@ -496,7 +544,6 @@ export class MemoryQuizRepository implements IQuizRepository {
 
     const quizzes = Array.from(this.quizzes.values()).filter((quiz) =>
       quiz.subject_id === subject.id &&
-      Boolean(quiz.share_token) &&
       isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)
     );
     return toPublicSubjectDto(subject, quizzes);

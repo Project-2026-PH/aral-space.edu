@@ -15,15 +15,17 @@ interface RichTextEditorProps {
   minHeight?: string;
   className?: string;
   floatingToolbar?: boolean;
+  hideToolbarUntilFocus?: boolean;
   enableGrammarCheck?: boolean;
   onPaste?: React.ClipboardEventHandler<HTMLDivElement>;
   'data-skip-clipboard-intercept'?: string;
 }
 
-export default function RichTextEditor({ value, onChange, placeholder = 'Start writing...', minHeight = '150px', className = '', floatingToolbar = false, enableGrammarCheck = false, ...props }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder = 'Start writing...', minHeight = '150px', className = '', floatingToolbar = false, hideToolbarUntilFocus = false, enableGrammarCheck = false, ...props }: RichTextEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
   const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{ top: number; left: number } | null>(null);
   const lastValue = useRef(value);
 
@@ -452,8 +454,18 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
   }
 
   return (
-    <div ref={containerRef} className={`relative overflow-hidden rounded-2xl border border-border bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 ${className}`}>
-      <RichTextToolbar editorRef={editorRef} />
+    <div
+      ref={containerRef}
+      className={`relative overflow-hidden rounded-2xl border border-border bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 ${className}`}
+      onFocus={hideToolbarUntilFocus ? () => setIsFocused(true) : undefined}
+      onBlur={hideToolbarUntilFocus ? (event) => {
+        const nextFocus = event.relatedTarget as Node | null;
+        if (!nextFocus || !event.currentTarget.contains(nextFocus)) {
+          setIsFocused(false);
+        }
+      } : undefined}
+    >
+      {(!hideToolbarUntilFocus || isFocused) && <RichTextToolbar editorRef={editorRef} />}
       {floatingToolbar && selectionToolbarPosition && (
         <div
           className="rich-text-selection-toolbar"

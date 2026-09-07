@@ -10,7 +10,12 @@ import { revalidatePublicSubjectCaches, revalidatePublicSubjectTag, revalidateUs
 export const GET = createApiRoute<{ subjectId: string }>(async ({ params, userId }) => {
   const repository = await getQuizRepository();
   const controller = new QuizCrudController(repository);
-  return controller.getSubjectShareConfig(params.subjectId, userId);
+  const config = await controller.getSubjectShareConfig(params.subjectId, userId);
+  if (config?.share_token) {
+    revalidatePublicSubjectTag(config.share_token);
+    revalidatePublicSubjectCaches();
+  }
+  return config;
 });
 
 export const POST = createApiRoute<{ subjectId: string }>(async ({ req, params, userId }) => {

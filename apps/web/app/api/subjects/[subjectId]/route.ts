@@ -35,6 +35,8 @@ export const PATCH = createApiRoute<{ subjectId: string }>(async ({ req, params,
   const color = subjectColor(body.color);
   const repository = await getQuizRepository();
   const controller = new QuizCrudController(repository);
+  const access = await controller.getSubjectAccess(params.subjectId, userId);
+  if (!access?.can_edit) return NextResponse.json({ error: 'This subject is read-only for you.' }, { status: 403 });
   const updated = await controller.updateSubject(params.subjectId, { name, color }, userId);
   revalidateUserLists(userId);
   revalidatePublicSubjectCaches();
@@ -54,6 +56,8 @@ export const DELETE = createApiRoute<{ subjectId: string }>(async ({ req, params
   }
   const repository = await getQuizRepository();
   const controller = new QuizCrudController(repository);
+  const access = await controller.getSubjectAccess(params.subjectId, userId);
+  if (!access?.can_manage) return NextResponse.json({ error: 'Only the subject owner can delete it.' }, { status: 403 });
   const quizzesBeforeDelete = await controller.listQuizzesBySubject(params.subjectId, userId).catch(() => []);
   const deleted = await controller.deleteSubject(params.subjectId, userId);
   if (!deleted) throw new Error('Subject not found');

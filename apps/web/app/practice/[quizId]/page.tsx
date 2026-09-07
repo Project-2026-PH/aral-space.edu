@@ -16,6 +16,7 @@ export default async function PracticePage({
     shuffleQuestions?: string;
     shuffleOptions?: string;
     shareToken?: string;
+    subjectShareToken?: string;
   }>;
 }) {
   const { quizId } = await params;
@@ -31,14 +32,13 @@ export default async function PracticePage({
   ]);
   const sessionController = new MasterySessionController(sessionRepo, quizRepo);
 
-  const [initialQuiz, sessionData] = await Promise.all([
-    quizRepo.getQuizById(quizId, userId),
-    sessionController.getOrStartSession(quizId, 'initial', userId)
-  ]);
+  const validShareToken = query.shareToken && query.shareToken !== 'undefined' ? query.shareToken : undefined;
+  const validSubjectShareToken = query.subjectShareToken && query.subjectShareToken !== 'undefined' ? query.subjectShareToken : undefined;
 
-  let quiz: Quiz | null = initialQuiz;
-  if (!quiz && query.shareToken) {
-    const sharedQuiz = await quizRepo.getQuizByShareToken(query.shareToken);
+  let quiz: Quiz | null = await quizRepo.getQuizById(quizId, userId);
+
+  if (!quiz && validShareToken) {
+    const sharedQuiz = await quizRepo.getQuizByShareToken(validShareToken);
     if (sharedQuiz && sharedQuiz.id === quizId) {
       quiz = {
         ...sharedQuiz,
@@ -51,7 +51,31 @@ export default async function PracticePage({
     }
   }
 
+  if (!quiz && validSubjectShareToken) {
+    const publicSubject = await quizRepo.getSubjectByShareToken(validSubjectShareToken);
+    if (publicSubject && publicSubject.quizzes?.some((q) => q.id === quizId)) {
+      const baseQuiz = await quizRepo.getQuizById(quizId);
+      if (baseQuiz) {
+        const questions = await quizRepo.getQuestionsByQuizId(quizId);
+        quiz = {
+          ...baseQuiz,
+          questions: questions.map((question): QuizQuestion => ({
+            ...question,
+            quiz_id: baseQuiz.id,
+            correct_answer: question.correct_answer ?? 0,
+          }))
+        } as Quiz;
+      }
+    }
+  }
+
   if (!quiz) notFound();
+
+  const questions = (quiz.questions && quiz.questions.length > 0)
+    ? quiz.questions
+    : await quizRepo.getQuestionsByQuizId(quizId, userId);
+
+  const sessionData = await sessionController.getOrStartSession(quizId, 'initial', userId, questions);
 
   return (
     <QuizRunner

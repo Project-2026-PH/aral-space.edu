@@ -1,5 +1,5 @@
 import { IQuizRepository } from './IQuizRepository';
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, UpdateSubjectShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, UpdateSubjectShareConfigDto, PublicQuizDto, UpdateSubjectDto, SubjectAccess, SubjectCollaboratorLink, LibraryData } from '@quiz-creator/types';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { MemoryQuizRepository } from './MemoryQuizRepository';
 import { normalizeQuestionFields } from './questionFields';
@@ -33,7 +33,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
     if (!subjectId) return;
     if (userId) {
       const access = await this.getSubjectAccess(subjectId, userId);
-      if (!access) throw new Error('Subject not found or access is restricted');
+      if (!access?.can_edit) throw new Error('Subject not found or access is restricted');
       return;
     }
     const { data, error } = await this.supabase.from('subjects').select('id').eq('id', subjectId).maybeSingle();
@@ -46,26 +46,36 @@ export class SupabaseQuizRepository implements IQuizRepository {
     return quiz;
   }
 
+  private async requireQuizWriteAccess(quizId: string, userId?: string): Promise<Quiz> {
+    const quiz = await this.requireQuizAccess(quizId, userId);
+    if (userId && quiz.user_id !== userId) throw new Error('Reviewer is read-only for this user');
+    return quiz;
+  }
+
   async listSubjects(userId?: string): Promise<Subject[]> {
     if (!userId) return [];
     try {
-      let query = this.supabase.from('subjects').select('*').order('name');
-      query = typeof query.eq === 'function' ? query.eq('user_id', userId) : query.or(`user_id.eq.${userId}`);
-      const { data, error } = await query;
-      if (!error) {
-        const subjects = data || [];
-        if (subjects.length > 0) {
-          const { data: memberships } = await this.supabase.from('subject_collaborators').select('subject_id').eq('user_id', userId);
-          const memberIds = new Set((memberships || []).map((membership: any) => membership.subject_id));
-          const missingIds = Array.from(memberIds).filter((id) => !subjects.some((subject: any) => subject.id === id));
-          if (missingIds.length > 0) {
-            const { data: memberSubjects } = await this.supabase.from('subjects').select('*').in('id', missingIds).order('name');
-            return [...subjects, ...(memberSubjects || [])] as Subject[];
-          }
-        }
-        return subjects as Subject[];
-      }
-      throw error;
+      let ownedQuery = this.supabase.from('subjects').select('*').order('name');
+      ownedQuery = typeof ownedQuery.eq === 'function'
+        ? ownedQuery.eq('user_id', userId)
+        : ownedQuery.or(`user_id.eq.${userId}`);
+      const { data: ownedSubjects, error: ownedError } = await ownedQuery;
+      if (ownedError) throw ownedError;
+
+      const membershipBase = this.supabase.from('subject_collaborators').select('subject_id');
+      if (typeof membershipBase.eq !== 'function') return (ownedSubjects || []) as Subject[];
+      const { data: memberships, error: membershipError } = await membershipBase.eq('user_id', userId);
+      if (membershipError) throw membershipError;
+      const memberIds = Array.from(new Set((memberships || []).map((membership: any) => membership.subject_id)));
+      const { data: memberSubjects, error: memberError } = memberIds.length > 0
+        ? await this.supabase.from('subjects').select('*').in('id', memberIds).order('name')
+        : { data: [], error: null };
+      if (memberError) throw memberError;
+      const subjects = [...(ownedSubjects || []), ...(memberSubjects || [])] as Subject[];
+      return subjects.map((subject) => ({
+        ...subject,
+        viewer_count: subject.user_id === userId ? subject.viewer_count : 0
+      }));
     } catch (e) {}
     return this.fallback.listSubjects(userId);
   }
@@ -88,6 +98,43 @@ export class SupabaseQuizRepository implements IQuizRepository {
     return this.fallback.createSubject(name, color, userId);
   }
 
+  async recordSubjectView(subjectId: string, viewerId: string): Promise<void> {
+    try {
+      const { data: subject, error } = await this.supabase
+        .from('subjects')
+        .select('id, user_id, is_public, share_expires_at, share_revoked_at')
+        .eq('id', subjectId)
+        .maybeSingle();
+      if (error || !subject || subject.user_id === viewerId) return;
+      const access = await this.getSubjectAccess(subjectId, viewerId);
+      const isPublic = isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at);
+      if (!access && !isPublic) return;
+      await this.supabase
+        .from('subject_views')
+        .upsert({ subject_id: subjectId, viewer_id: viewerId, last_viewed_at: new Date().toISOString() }, { onConflict: 'subject_id,viewer_id' });
+    } catch (e) {}
+  }
+
+  async getSubjectViewerCount(subjectId: string, ownerId: string): Promise<number> {
+    try {
+      const { data: subject } = await this.supabase
+        .from('subjects')
+        .select('id')
+        .eq('id', subjectId)
+        .eq('user_id', ownerId)
+        .maybeSingle();
+      if (!subject) return 0;
+      const { data, error } = await this.supabase
+        .from('subject_views')
+        .select('viewer_id')
+        .eq('subject_id', subjectId);
+      if (error) throw error;
+      return (data || []).length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   async updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string): Promise<Subject> {
     try {
       let query = this.supabase.from('subjects').update(dto).eq('id', subjectId);
@@ -104,7 +151,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
       const { data: owner } = await this.supabase.from('subjects').select('id').eq('id', subjectId).eq('user_id', userId).maybeSingle();
       if (owner) return { subject_id: subjectId, role: 'owner', can_edit: true, can_manage: true };
       const { data: member } = await this.supabase.from('subject_collaborators').select('subject_id').eq('subject_id', subjectId).eq('user_id', userId).maybeSingle();
-      if (member) return { subject_id: subjectId, role: 'collaborator', can_edit: true, can_manage: false };
+      if (member) return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_manage: false };
     } catch (e) {}
     return this.fallback.getSubjectAccess(subjectId, userId);
   }
@@ -118,15 +165,16 @@ export class SupabaseQuizRepository implements IQuizRepository {
     return this.fallback.listQuizzesBySubject(subjectId, userId);
   }
 
-  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string): Promise<SubjectCollaboratorLink> {
+  async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string, maxUses: number = 5): Promise<SubjectCollaboratorLink> {
     try {
       const access = await this.getSubjectAccess(subjectId, userId);
       if (!access?.can_manage) throw new Error('Only the subject owner can create collaborator links');
+      const clampedUses = Math.min(Math.max(Number(maxUses) || 1, 1), 5);
       const token = generateShareToken() + generateShareToken();
-      const { data, error } = await this.supabase.from('subject_collaborator_links').insert({ subject_id: subjectId, token, expires_at: expiresAt }).select('token, expires_at, used_at').single();
+      const { data, error } = await this.supabase.from('subject_collaborator_links').insert({ subject_id: subjectId, token, expires_at: expiresAt, max_uses: clampedUses, uses_count: 0 }).select('token, expires_at, used_at, max_uses, uses_count').single();
       if (!error && data) return data as SubjectCollaboratorLink;
     } catch (e) {}
-    return this.fallback.createSubjectCollaboratorLink(subjectId, expiresAt, userId);
+    return this.fallback.createSubjectCollaboratorLink(subjectId, expiresAt, userId, maxUses);
   }
 
   async redeemSubjectCollaboratorLink(token: string, userId: string): Promise<SubjectAccess | null> {
@@ -136,7 +184,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
       const { data: consumed, error } = await this.supabase.from('subject_collaborator_links').update({ used_at: new Date().toISOString(), used_by: userId }).eq('token', token).is('used_at', null).select('subject_id').maybeSingle();
       if (error || !consumed) return null;
       await this.supabase.from('subject_collaborators').upsert({ subject_id: consumed.subject_id, user_id: userId });
-      return { subject_id: consumed.subject_id, role: 'collaborator', can_edit: true, can_manage: false };
+      return { subject_id: consumed.subject_id, role: 'collaborator', can_edit: false, can_manage: false };
     } catch (e) {}
     return this.fallback.redeemSubjectCollaboratorLink(token, userId);
   }
@@ -239,7 +287,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
         .order('generated_at', { ascending: false });
       if (quizzesError) throw quizzesError;
       const activeQuizzes = (quizzes || []).filter((quiz: any) =>
-        Boolean(quiz.share_token) && isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)
+        isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)
       );
       return toPublicSubjectDto(subject as Subject, activeQuizzes as Quiz[]);
     } catch (error) {
@@ -263,10 +311,49 @@ export class SupabaseQuizRepository implements IQuizRepository {
           : query;
       }
       const { data, error } = await query;
-      if (!error) return (data || []) as Quiz[];
-      throw error;
+      if (error) throw error;
+      const quizzes = (data || []) as Quiz[];
+      if (!userId) return quizzes;
+      const membershipBase = this.supabase.from('subject_collaborators').select('subject_id');
+      if (typeof membershipBase.eq !== 'function') return quizzes;
+      const { data: memberships, error: membershipError } = await membershipBase.eq('user_id', userId);
+      if (membershipError) throw membershipError;
+      const subjectIds = Array.from(new Set((memberships || []).map((row: any) => row.subject_id)));
+      if (subjectIds.length === 0) return quizzes;
+      const { data: shared, error: sharedError } = await this.supabase
+        .from('quizzes')
+        .select('*, subject:subjects(*)')
+        .in('subject_id', subjectIds)
+        .order('generated_at', { ascending: false });
+      if (sharedError) throw sharedError;
+      const quizIds = new Set(quizzes.map((quiz) => quiz.id));
+      return [...quizzes, ...((shared || []) as Quiz[]).filter((quiz) => !quizIds.has(quiz.id))];
     } catch (e) {}
     return this.fallback.listQuizzes(userId);
+  }
+
+  async listQuizzesAndSubjects(userId?: string): Promise<LibraryData> {
+    const [allQuizzes, allSubjects] = await Promise.all([
+      this.listQuizzes(userId),
+      this.listSubjects(userId)
+    ]);
+    const sharedSubjects = userId
+      ? allSubjects.filter((subject) => Boolean(subject.user_id && subject.user_id !== userId))
+      : [];
+    const sharedSubjectIds = new Set(sharedSubjects.map((subject) => subject.id));
+    const ownedSubjects = allSubjects.filter((subject) => !sharedSubjectIds.has(subject.id));
+    const subjects = await Promise.all(ownedSubjects.map(async (subject) => ({
+      ...subject,
+      viewer_count: userId && this.getSubjectViewerCount
+        ? await this.getSubjectViewerCount(subject.id, userId)
+        : 0
+    })));
+    return {
+      subjects,
+      quizzes: allQuizzes.filter((quiz) => !quiz.subject_id || !sharedSubjectIds.has(quiz.subject_id)),
+      sharedSubjects,
+      sharedQuizzes: allQuizzes.filter((quiz) => Boolean(quiz.subject_id && sharedSubjectIds.has(quiz.subject_id)))
+    };
   }
 
   async getQuizById(id: string, userId?: string): Promise<Quiz | null> {
@@ -347,6 +434,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
   }
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
+    if (userId) await this.requireQuizWriteAccess(id, userId);
     if (dto.subject_id !== undefined) await this.requireSubjectAssignment(dto.subject_id, userId);
     try {
       let query = this.supabase.from('quizzes').update(dto).eq('id', id);
@@ -368,12 +456,12 @@ export class SupabaseQuizRepository implements IQuizRepository {
 
   async deleteQuiz(id: string, userId?: string): Promise<boolean> {
     try {
-      let query = this.supabase.from('quizzes').delete().eq('id', id);
+      let query = this.supabase.from('quizzes').delete({ count: 'exact' }).eq('id', id);
       if (userId) query = query.eq('user_id', userId);
-      const { error } = await query;
-      if (!error) return true;
+      const { error, count } = await query;
+      if (!error) return (count || 0) > 0;
     } catch (e) {}
-    return this.fallback.deleteQuiz(id);
+    return this.fallback.deleteQuiz(id, userId);
   }
 
   async getQuestionsByQuizId(quizId: string, userId?: string): Promise<QuizQuestion[]> {
@@ -393,7 +481,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
   }
 
   async addQuestion(quizId: string, dto: CreateQuestionDto, userId?: string): Promise<QuizQuestion> {
-    await this.requireQuizAccess(quizId, userId);
+    await this.requireQuizWriteAccess(quizId, userId);
     const fields = normalizeQuestionFields(dto);
     try {
       const { data, error } = await this.supabase
@@ -423,7 +511,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
   }
 
   async updateQuestion(quizId: string, questionId: string, dto: UpdateQuestionDto, userId?: string): Promise<QuizQuestion> {
-    await this.requireQuizAccess(quizId, userId);
+    await this.requireQuizWriteAccess(quizId, userId);
     try {
       const { data: existing, error: existingError } = await this.supabase
         .from('quiz_questions')
@@ -463,7 +551,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
   }
 
   async deleteQuestion(quizId: string, questionId: string, userId?: string): Promise<boolean> {
-    await this.requireQuizAccess(quizId, userId);
+    await this.requireQuizWriteAccess(quizId, userId);
     try {
       const { error, count } = await this.supabase
         .from('quiz_questions')
@@ -479,7 +567,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
   }
 
   async reorderQuestions(quizId: string, questionIds: string[], userId?: string): Promise<boolean> {
-    await this.requireQuizAccess(quizId, userId);
+    await this.requireQuizWriteAccess(quizId, userId);
     const questions = await this.getQuestionsByQuizId(quizId, userId);
     const expectedIds = new Set(questions.map((question) => question.id));
     if (questionIds.length !== expectedIds.size || questionIds.some((id) => !expectedIds.has(id))) {
@@ -507,6 +595,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
     share_expires_at?: string | null;
     share_revoked_at?: string | null;
   }> {
+    if (userId) await this.requireQuizWriteAccess(quizId, userId);
     try {
       const quiz = await this.getQuizById(quizId, userId);
       if (quiz && quiz.share_token) {

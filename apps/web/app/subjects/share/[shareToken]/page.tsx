@@ -26,6 +26,10 @@ export default function SharedSubjectPage() {
           throw new Error(data.error || 'This shared subject is not available.');
         }
         setSubject(data);
+        void fetch(`/api/public/subjects/${encodeURIComponent(shareToken)}`, {
+          method: 'POST',
+          credentials: 'same-origin'
+        }).catch(() => undefined);
       } catch (err: any) {
         setError(err.message || 'Unable to load shared subject.');
       } finally {
@@ -119,7 +123,7 @@ export default function SharedSubjectPage() {
             </div>
           </div>
           <Link
-            href="/"
+            href="/library"
             className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
           >
             <Home className="h-3.5 w-3.5 stroke-[2.5]" />
@@ -161,7 +165,7 @@ export default function SharedSubjectPage() {
                 </div>
                 <div className="mt-5 border-t-2 border-slate-900/20 dark:border-white/20 pt-4">
                   <Link
-                    href={`/review/${quiz.id}?shareToken=${encodeURIComponent(quiz.share_token)}&subjectShareToken=${encodeURIComponent(subject.share_token)}`}
+                    href={`/review/${quiz.id}?${quiz.share_token ? `shareToken=${encodeURIComponent(quiz.share_token)}&` : ''}subjectShareToken=${encodeURIComponent(subject.share_token)}`}
                     className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-1.5 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                   >
                     <ExternalLink className="h-3.5 w-3.5 stroke-[2.5]" />

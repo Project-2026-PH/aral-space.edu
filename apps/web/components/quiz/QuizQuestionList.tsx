@@ -12,13 +12,15 @@ interface QuizQuestionListProps {
   questions: QuizQuestion[];
   onEdit: (question: QuizQuestion) => void;
   onDeleted: () => void;
+  readOnly?: boolean;
 }
 
 export default function QuizQuestionList({
   quizId,
   questions,
   onEdit,
-  onDeleted
+  onDeleted,
+  readOnly = false
 }: QuizQuestionListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -84,21 +86,28 @@ export default function QuizQuestionList({
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : q.id)}
                   className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted transition-colors"
+                  aria-label={isExpanded ? 'Collapse question' : 'Expand question'}
                 >
                   {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </button>
-                <button
-                  onClick={() => onEdit(q)}
-                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-                >
-                  <Edit className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setDeletingId(q.id)}
-                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {!readOnly && (
+                  <>
+                    <button
+                      onClick={() => onEdit(q)}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                      aria-label="Edit question"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeletingId(q.id)}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      aria-label="Delete question"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 

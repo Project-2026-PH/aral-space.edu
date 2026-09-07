@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ qui
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const accessibleQuiz = await controller.getQuiz(quizId, userId);
-    if (!accessibleQuiz) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
+    if (!accessibleQuiz || accessibleQuiz.user_id !== userId) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     const created = await controller.addQuestion(quizId, parseCreateQuestion(body), userId);
     if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);
@@ -54,7 +54,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ quiz
     const quizRepo = await getQuizRepository();
     const controller = new QuizCrudController(quizRepo);
     const accessibleQuiz = await controller.getQuiz(quizId, userId);
-    if (!accessibleQuiz) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
+    if (!accessibleQuiz || accessibleQuiz.user_id !== userId) return NextResponse.json({ error: 'You do not have edit access to this reviewer.' }, { status: 403 });
     await controller.reorderQuestions(quizId, normalizedIds, userId);
     if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);

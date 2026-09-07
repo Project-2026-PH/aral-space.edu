@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ExternalLink, Layers, Link2, Lock, Pencil, Plus, Save } from 'lucide-react';
+import { ArrowLeft, Eye, ExternalLink, Layers, Link2, Lock, Pencil, Plus, Save } from 'lucide-react';
 import { Quiz, Subject, SubjectAccess } from '@quiz-creator/types';
 import QuizLibrary from '@/components/quiz/QuizLibrary';
 import ShareSubjectModal from './ShareSubjectModal';
@@ -95,7 +95,13 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
                 </span>
                 {access.role === 'collaborator' && (
                   <span className="rounded-md border-2 border-slate-900 bg-[#fde047] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
-                    Collaborator
+                    Read-only
+                  </span>
+                )}
+                {access.role === 'owner' && (
+                  <span className="inline-flex items-center gap-1 rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[11px] font-black text-slate-900 dark:text-white shadow-brutal-sm" title="Unique viewers">
+                    <Eye aria-hidden="true" className="h-3.5 w-3.5" />
+                    {subject.viewer_count ?? 0} {subject.viewer_count === 1 ? 'viewer' : 'viewers'}
                   </span>
                 )}
               </div>
@@ -163,7 +169,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
         )}
       </div>
 
-      <QuizLibrary quizzes={quizzes} loading={false} />
+      <QuizLibrary quizzes={quizzes} loading={false} readOnly={!access.can_edit} />
       {editing && (
         <StickyActionDock
           onAction={saveSubject}

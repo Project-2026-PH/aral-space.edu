@@ -901,6 +901,7 @@ export default function ManualQuizCreator({
                 placeholder="Enter your question prompt (or paste term/definition pair)..."
                 minHeight="100px"
                 data-skip-clipboard-intercept="true"
+                hideToolbarUntilFocus
               />
 
               {/* Dynamic Type Body */}
@@ -1057,7 +1058,6 @@ export default function ManualQuizCreator({
                   </div>
                 </div>
               )}
-
             </div>
           );
         })}

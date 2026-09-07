@@ -6,22 +6,22 @@ export class MemorySessionRepository implements ISessionRepository {
   private progress: Map<string, QuestionProgress> = new Map();
 
   async getActiveSession(quizId: string, userId?: string): Promise<QuizSession | null> {
-    return Array.from(this.sessions.values()).find((session) => session.quiz_id === quizId && session.status === 'in_progress' && (!userId || session.user_id === userId)) || null;
+    return Array.from(this.sessions.values()).find((session) => session.quiz_id === quizId && session.status === 'in_progress' && (userId ? session.user_id === userId : !session.user_id)) || null;
   }
 
   async getScheduledSession(quizId: string, userId?: string): Promise<QuizSession | null> {
-    return Array.from(this.sessions.values()).find((session) => session.quiz_id === quizId && session.status === 'scheduled' && (!userId || session.user_id === userId)) || null;
+    return Array.from(this.sessions.values()).find((session) => session.quiz_id === quizId && session.status === 'scheduled' && (userId ? session.user_id === userId : !session.user_id)) || null;
   }
 
   async getLatestCompletedSession(quizId: string, userId?: string): Promise<QuizSession | null> {
     return Array.from(this.sessions.values())
-      .filter((session) => session.quiz_id === quizId && session.status === 'completed' && (!userId || session.user_id === userId))
+      .filter((session) => session.quiz_id === quizId && session.status === 'completed' && (userId ? session.user_id === userId : !session.user_id))
       .sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime())[0] || null;
   }
 
   async listSessions(quizId: string, userId?: string): Promise<QuizSession[]> {
     return Array.from(this.sessions.values())
-      .filter((session) => session.quiz_id === quizId && (!userId || session.user_id === userId))
+      .filter((session) => session.quiz_id === quizId && (userId ? session.user_id === userId : !session.user_id))
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   }
 

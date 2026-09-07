@@ -73,12 +73,10 @@ export default function QuizQuestionList({
                   {idx + 1}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <RichTextContent html={q.question_text} className="text-xs font-semibold text-foreground leading-snug line-clamp-2" />
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Correct: <span className="font-medium text-foreground">
-                      {q.answer_text || q.options[q.correct_answer] || 'Typed answer'}
-                    </span>
-                  </p>
+                  <RichTextContent
+                    html={q.question_text}
+                    className={`text-xs font-semibold text-foreground leading-snug ${isExpanded ? '' : 'line-clamp-2'}`}
+                  />
                 </div>
               </div>
 

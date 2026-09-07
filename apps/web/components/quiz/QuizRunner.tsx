@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -21,6 +21,7 @@ import QuizRecap from '@/components/quiz/QuizRecap';
 import { QuestionRenderer } from '@/components/quiz/QuizQuestionRenderer';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
 import QuizContinueDock from '@/components/quiz/QuizContinueDock';
+import ResumePracticeModal from '@/components/quiz/ResumePracticeModal';
 import Modal from '@/components/ui/Modal';
 
 interface QuizRunnerProps {
@@ -39,6 +40,8 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const [currentMode, setCurrentMode] = useState<QuizMode>(mode);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [shuffleToast, setShuffleToast] = useState(false);
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+  const resumePromptShownRef = useRef(false);
 
   const session = useQuizSession({ ...props, mode: currentMode });
   const {
@@ -66,6 +69,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
     feedbackMessage,
     isHintVisible,
     isExplanationVisible,
+    hasRestoredProgress,
     isProgressHydrated,
     isCompleted,
     isMuted,
@@ -87,6 +91,21 @@ export default function QuizRunner(props: QuizRunnerProps) {
 
   const isMultipleChoiceMode = currentMode === 'multiple_choice';
   const isDesktopViewportMode = isMultipleChoiceMode || currentMode === 'identification';
+  const isResumePromptMode = mode === 'multiple_choice' || mode === 'identification';
+  const hasExistingMasteryProgress = props.initialProgress.some((progress) => progress.locked);
+
+  useEffect(() => {
+    if (
+      !isProgressHydrated ||
+      isCompleted ||
+      !isResumePromptMode ||
+      resumePromptShownRef.current ||
+      (!hasRestoredProgress && !hasExistingMasteryProgress)
+    ) return;
+
+    resumePromptShownRef.current = true;
+    setShowResumePrompt(true);
+  }, [hasExistingMasteryProgress, hasRestoredProgress, isCompleted, isProgressHydrated, isResumePromptMode]);
 
   if (!isProgressHydrated) {
     return <div className="mx-auto flex min-h-[50vh] max-w-md items-center justify-center text-center text-xs text-muted-foreground">Restoring your quiz progress...</div>;
@@ -110,7 +129,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const activeProgressMap = pendingAdvance?.progressMap || progressMap;
   const totalLockedCount = questions.filter((question) => activeProgressMap.get(question.id)?.locked).length;
   const correctAnswerCount = correctAnswerIds.size;
-  const overallPercent = Math.round((totalLockedCount / questions.length) * 100);
+  const overallPercent = Math.round((totalLockedCount / (questions.length || 1)) * 100);
   const questionsPerReviewRound = 7;
   const reviewRoundCount = Math.max(1, Math.ceil(questions.length / questionsPerReviewRound));
   const progressSegments = Array.from({ length: reviewRoundCount }, (_, index) => {
@@ -120,6 +139,20 @@ export default function QuizRunner(props: QuizRunnerProps) {
     return { id: index, fillPercent: segmentSize > 0 ? (completedInSegment / segmentSize) * 100 : 0 };
   });
   const progressPercent = progressSegments.reduce((sum, segment) => sum + segment.fillPercent, 0) / reviewRoundCount;
+  const questionsUntilNextCheckIn = Math.min(
+    questionsPerReviewRound,
+    Math.max(questions.length - totalLockedCount, 0)
+  );
+  const resumePrompt = (
+    <ResumePracticeModal
+      open={showResumePrompt}
+      quizId={quiz.id}
+      progressPercent={overallPercent}
+      completedQuestions={totalLockedCount}
+      questionsUntilNextCheckIn={questionsUntilNextCheckIn}
+      onContinue={() => setShowResumePrompt(false)}
+    />
+  );
 
   if (isRecapVisible && pendingAdvance) {
     return (
@@ -139,6 +172,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
           onSurfaceKeyDown={handleSurfaceKeyDown}
         />
         <QuizContinueDock onAdvance={advance} />
+        {resumePrompt}
       </>
     );
   }
@@ -253,6 +287,8 @@ export default function QuizRunner(props: QuizRunnerProps) {
           }
         />
       )}
+
+      {resumePrompt}
 
       {/* Session Settings & Mode Switcher Modal */}
       <Modal

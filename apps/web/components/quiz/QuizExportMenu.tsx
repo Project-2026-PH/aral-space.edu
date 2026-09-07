@@ -57,24 +57,25 @@ export default function QuizExportMenu({ quiz, questions }: QuizExportMenuProps)
   }
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
+        className="flex items-center gap-1.5 rounded-2xl border border-border bg-card px-3 sm:px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all active:scale-95 shadow-2xs"
+        title="Export Quiz"
       >
-        <Download className="h-3.5 w-3.5" />
-        <span>Export</span>
-        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <Download className="h-3.5 w-3.5 shrink-0" />
+        <span className="hidden sm:inline">Export</span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <div
           role="menu"
           aria-label="Export quiz"
-          className="absolute right-0 top-full z-30 mt-2 min-w-44 rounded-2xl border border-border bg-card p-1.5 shadow-xl"
+          className="absolute left-0 sm:left-auto sm:right-0 top-full z-30 mt-2 min-w-44 rounded-2xl border border-border bg-card p-1.5 shadow-xl"
         >
           <button
             type="button"

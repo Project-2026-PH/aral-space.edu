@@ -36,12 +36,12 @@ export default function QuizStartConfigModal({
   }
 
   const modes = [
-    {
-      id: 'learn' as QuizMode,
-      name: 'Learn Mode',
-      desc: 'Type the answer, get immediate feedback, and build mastery through active recall.',
-      icon: PenTool
-    },
+    // {
+    //   id: 'learn' as QuizMode,
+    //   name: 'Learn Mode',
+    //   desc: 'Type the answer, get immediate feedback, and build mastery through active recall.',
+    //   icon: PenTool
+    // },
     {
       id: 'multiple_choice' as QuizMode,
       name: 'Multiple Choice',
@@ -50,21 +50,15 @@ export default function QuizStartConfigModal({
     },
     {
       id: 'flashcard' as QuizMode,
-      name: 'Interactive Flashcards',
+      name: 'Flashcards',
       desc: 'Self-paced 3D flip card review for active recall.',
       icon: BookOpen
     },
     {
       id: 'identification' as QuizMode,
-      name: 'Direct Identification',
+      name: 'Identification',
       desc: 'Legacy typed-answer mode for existing quiz cards.',
       icon: PenTool
-    },
-    {
-      id: 'reverse' as QuizMode,
-      name: 'Reverse Questioning',
-      desc: 'Prompts match definitions against terms for bidirectional mastery.',
-      icon: Sparkles
     }
   ];
 
@@ -118,7 +112,7 @@ export default function QuizStartConfigModal({
             />
           </label>
           <label className={`flex items-center justify-between text-xs font-semibold text-foreground ${mode === 'multiple_choice' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
-            <span>Randomize Option Positions</span>
+            <span>Randomize Choices Positions</span>
             <input
               type="checkbox"
               checked={shuffleOptions}

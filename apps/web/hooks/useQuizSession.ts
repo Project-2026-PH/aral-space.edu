@@ -169,6 +169,7 @@ export function useQuizSession({
   const [isExplanationVisible, setIsExplanationVisible] = useState(false);
   const [pendingAnswerEvents, setPendingAnswerEvents] = useState<PersistedAnswerEvent[]>([]);
   const [isProgressHydrated, setIsProgressHydrated] = useState(false);
+  const [hasRestoredProgress, setHasRestoredProgress] = useState(false);
   const [isCompleted, setIsCompleted] = useState(
     () => questions.length > 0 && MasteryEngineService.isAllQuestionsLocked(questions, initialProgressMap)
   );
@@ -196,6 +197,7 @@ export function useQuizSession({
 
   useEffect(() => {
     const snapshot = readQuizProgressSnapshot(quiz.id, session.id);
+    let restoredProgress = false;
     if (snapshot) {
       const knownQuestionIds = new Set(questions.map((question) => question.id));
       const snapshotQuestionIds = [
@@ -211,6 +213,7 @@ export function useQuizSession({
       const isCompatible = snapshotQuestionIds.every((questionId) => knownQuestionIds.has(questionId));
 
       if (isCompatible) {
+        restoredProgress = true;
         restoringSnapshotRef.current = snapshot;
         setProgressMap(new Map(snapshot.progressEntries));
         setQueueState(snapshot.queueState);
@@ -249,6 +252,7 @@ export function useQuizSession({
       setBestStreak(streakRecord.allTimeBestStreak);
     }
 
+    setHasRestoredProgress(restoredProgress);
     setIsProgressHydrated(true);
   }, [quiz.id, session.id, questions]);
 
@@ -706,6 +710,7 @@ export function useQuizSession({
     isHintVisible,
     isExplanationVisible,
     pendingAnswerEvents,
+    hasRestoredProgress,
     isProgressHydrated,
     isCompleted,
     isMuted,

@@ -3,8 +3,10 @@
 import { type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Quiz, QuizQuestion } from '@quiz-creator/types';
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Layers,
   Lightbulb,
   Maximize,
@@ -17,6 +19,7 @@ import {
   X
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { getQuestionHint } from '@/lib/quizAnswerEvaluation';
 import { quizAudio } from '@/lib/audio';
 import Modal from '@/components/ui/Modal';
@@ -28,6 +31,7 @@ interface FlashcardReviewProps {
   questions: QuizQuestion[];
   shareToken?: string;
   subjectShareToken?: string;
+  exitHref?: string;
   userId?: string;
 }
 
@@ -41,7 +45,10 @@ interface CardToolbarProps {
   canEdit: boolean;
 }
 
-function getAnswer(question: QuizQuestion): string {
+function getAnswer(question: QuizQuestion, allowPublicAnswerKey?: boolean): string {
+  if (allowPublicAnswerKey === false) {
+    return 'The answer key is hidden by the author.';
+  }
   return question.answer_text?.trim() || question.options[question.correct_answer]?.trim() || question.options[0]?.trim() || 'No answer provided.';
 }
 
@@ -110,10 +117,13 @@ function CardToolbar({ quizId, isStarred, isHintVisible, onHint, onSpeak, onTogg
   );
 }
 
-export default function FlashcardReview({ quiz, questions, shareToken, subjectShareToken, userId }: FlashcardReviewProps) {
+export default function FlashcardReview({ quiz, questions, shareToken, subjectShareToken, exitHref, userId }: FlashcardReviewProps) {
+  const router = useRouter();
   const sharedQuery = shareToken ? `&shareToken=${encodeURIComponent(shareToken)}` : '';
-  const exitHref = subjectShareToken ? `/subjects/share/${encodeURIComponent(subjectShareToken)}` : '/review/';
+  const resolvedExitHref = exitHref ?? (subjectShareToken ? `/subjects/share/${encodeURIComponent(subjectShareToken)}` : (shareToken ? '/library' : '/review/'));
   const [cardIndex, setCardIndex] = useState(0);
+  const [cloning, setCloning] = useState(false);
+  const [clonedSuccess, setClonedSuccess] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isHintVisible, setIsHintVisible] = useState(false);
   const [trackProgress, setTrackProgress] = useState(false);
@@ -501,11 +511,33 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     setIsHintVisible(false);
   }
 
+  async function handleClone() {
+    if (!shareToken || !quiz.allow_cloning || cloning) return;
+    setCloning(true);
+    try {
+      const res = await fetch(`/api/public/sets/${encodeURIComponent(shareToken)}/clone`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to clone study set');
+      }
+      const cloned = await res.json();
+      setClonedSuccess(true);
+      setTimeout(() => {
+        router.push(`/quizzes/${cloned.id}`);
+      }, 800);
+    } catch (err: any) {
+      alert(err.message || 'Could not clone study set.');
+      setCloning(false);
+    }
+  }
+
   function speakCard() {
     if (!currentCard || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(
-      isFlipped ? getAnswer(currentCard) : currentCard.question_text
+      isFlipped ? getAnswer(currentCard, quiz.allow_public_answer_key) : currentCard.question_text
     ));
   }
 
@@ -532,7 +564,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
         <div className="mb-4 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <Link
-              href={exitHref}
+              href={resolvedExitHref}
               className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
@@ -541,12 +573,39 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             <h1 className="truncate text-lg font-bold text-foreground">Reviewer</h1>
             <p className="truncate text-xs text-muted-foreground">{quiz.title}</p>
           </div>
-          <WindFlameBadge
-            streak={streak}
-            totalQuestions={cards.length}
-            bestStreak={bestStreak}
-            size="md"
-          />
+          <div className="flex items-center gap-2 sm:gap-3">
+            {shareToken && quiz.allow_cloning && (
+              <button
+                type="button"
+                onClick={handleClone}
+                disabled={cloning}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+                  clonedSuccess
+                    ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm'
+                    : 'border-border bg-card hover:bg-muted text-foreground'
+                }`}
+                title="Save this reviewer deck to your library"
+              >
+                {clonedSuccess ? (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    <span>Saved!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    <span>{cloning ? 'Saving...' : 'Save to Library'}</span>
+                  </>
+                )}
+              </button>
+            )}
+            <WindFlameBadge
+              streak={streak}
+              totalQuestions={cards.length}
+              bestStreak={bestStreak}
+              size="md"
+            />
+          </div>
         </div>
 
         <div className="mb-5 grid grid-cols-3 gap-2 sm:gap-3">
@@ -616,7 +675,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                   quizId={quiz.id}
                   isStarred={isStarred}
                   isHintVisible={isHintVisible}
-                  onHint={() => setIsHintVisible((current) => !current)}
+                  onHint={quiz.allow_public_answer_key !== false ? () => setIsHintVisible((current) => !current) : undefined}
                   onSpeak={speakCard}
                   onToggleStar={() => setIsStarred((current) => !current)}
                   canEdit={!shareToken}
@@ -627,7 +686,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                 >
                   <div className="max-w-3xl space-y-4">
                     <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-foreground [overflow-wrap:anywhere] line-clamp-10 sm:text-2xl">{currentCard.question_text}</p>
-                    {isHintVisible && (
+                    {isHintVisible && quiz.allow_public_answer_key !== false && (
                       <div
                         className="inline-flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-xs font-mono font-medium text-amber-700 dark:text-amber-300"
                         onClick={(event) => event.stopPropagation()}
@@ -657,8 +716,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                 >
                   <div className="max-w-3xl space-y-4">
                     <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Answer</span>
-                    <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-primary [overflow-wrap:anywhere] line-clamp-8 sm:text-3xl">{getAnswer(currentCard)}</p>
-                    {currentCard.explanation && (
+                    <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-primary [overflow-wrap:anywhere] line-clamp-8 sm:text-3xl">{getAnswer(currentCard, quiz.allow_public_answer_key)}</p>
+                    {quiz.allow_public_answer_key !== false && currentCard.explanation && (
                       <p className="text-sm leading-relaxed text-muted-foreground line-clamp-3">{currentCard.explanation}</p>
                     )}
                   </div>

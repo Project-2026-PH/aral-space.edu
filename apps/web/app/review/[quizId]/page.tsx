@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { notFound } from 'next/navigation';
 import { Quiz, QuizQuestion } from '@quiz-creator/types';
 import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
@@ -26,9 +25,6 @@ export default async function ReviewPage({
   if (!quiz && validShareToken) {
     const sharedQuiz = await quizRepo.getQuizByShareToken(validShareToken);
     if (sharedQuiz && sharedQuiz.id === quizId) {
-      if (sharedQuiz.allow_public_answer_key !== true) {
-        redirect(`/sets/share/${validShareToken}`);
-      }
       quiz = {
         ...sharedQuiz,
         questions: sharedQuiz.questions.map((question): QuizQuestion => ({

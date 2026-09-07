@@ -145,6 +145,11 @@ export default function LibraryClient({ initialQuizzes, initialSubjects, initial
                 ? { ...subject, ...config }
                 : subject
             )));
+            setQuizzes((current) => current.map((quiz) => (
+              quiz.subject_id === subjectId && quiz.subject
+                ? { ...quiz, subject: { ...quiz.subject, ...config } }
+                : quiz
+            )));
           }}
         />
       </div>

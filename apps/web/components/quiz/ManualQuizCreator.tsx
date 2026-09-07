@@ -66,7 +66,6 @@ function parseManualQuizDraft(raw: string | null): ManualQuizDraft | null {
 }
 
 const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'multiple_choice', label: 'Multiple Choice', icon: CircleDot },
   { id: 'identification', label: 'Identification', icon: PenLine },
   { id: 'true_false', label: 'True or False', icon: ToggleLeft },
   { id: 'enumeration', label: 'Enumeration', icon: ListOrdered },
@@ -87,9 +86,9 @@ export default function ManualQuizCreator({
   const [pendingImport, setPendingImport] = useState<ParsedClipboard | null>(null);
   const [questions, setQuestions] = useState<QuestionDraft[]>([
     {
-      type: 'multiple_choice',
+      type: 'identification',
       question_text: '',
-      options: ['', '', '', ''],
+      options: [''],
       correct_answer: 0,
       explanation: ''
     }
@@ -215,9 +214,9 @@ export default function ManualQuizCreator({
     setQuestions((current) => [
       ...current,
       {
-        type: 'multiple_choice',
+        type: 'identification',
         question_text: '',
-        options: ['', '', '', ''],
+        options: [''],
         correct_answer: 0,
         explanation: ''
       }
@@ -1059,19 +1058,6 @@ export default function ManualQuizCreator({
                 </div>
               )}
 
-              {/* Explanation editor */}
-              <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Explanation <span className="font-normal normal-case tracking-normal">(optional)</span>
-                </label>
-                <RichTextEditor
-                  value={q.explanation || ''}
-                  onChange={(value) => updateExplanation(qIdx, value)}
-                  placeholder="Explain why this answer is correct..."
-                  minHeight="90px"
-                  data-skip-clipboard-intercept="true"
-                />
-              </div>
             </div>
           );
         })}

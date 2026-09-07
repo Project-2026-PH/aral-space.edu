@@ -12,8 +12,10 @@ import {
   Maximize,
   Pencil,
   PenTool,
+  RotateCcw,
   Settings,
   Shuffle,
+  Sparkles,
   Star,
   Volume2,
   X
@@ -22,6 +24,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getQuestionHint } from '@/lib/quizAnswerEvaluation';
 import { quizAudio } from '@/lib/audio';
+import { triggerCelebrationConfetti } from '@/lib/confetti';
 import Modal from '@/components/ui/Modal';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
 import { getQuizStreakRecord, recordSessionCompletion } from '@/lib/streakTracker';
@@ -41,6 +44,7 @@ interface CardToolbarProps {
   quizId: string;
   isStarred: boolean;
   isHintVisible?: boolean;
+  isRetryCard?: boolean;
   onHint?: () => void;
   onSpeak: () => void;
   onToggleStar: () => void;
@@ -71,6 +75,7 @@ type FlashcardSessionSnapshot = {
   incorrectIds: string[];
   isFlipped: boolean;
   hasSeenAnswer: boolean;
+  completedRounds?: number;
 };
 
 function shuffleList<T>(items: T[]): T[] {
@@ -90,19 +95,26 @@ function getFlashcardSessionKey(quizId: string, userId?: string): string {
   return userId ? `quiz-creator:flashcard-session:${quizId}:${userId}` : `quiz-creator:flashcard-session:${quizId}`;
 }
 
-function CardToolbar({ quizId, isStarred, isHintVisible, onHint, onSpeak, onToggleStar, canEdit }: CardToolbarProps) {
+function CardToolbar({ quizId, isStarred, isHintVisible, isRetryCard, onHint, onSpeak, onToggleStar, canEdit }: CardToolbarProps) {
   return (
     <div className="flex items-center justify-between gap-4 text-xs font-semibold text-muted-foreground" onClick={(event) => event.stopPropagation()}>
-      {onHint ? (
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-muted hover:text-foreground"
-          onClick={onHint}
-        >
-          <Lightbulb className={`h-4 w-4 ${isHintVisible ? 'text-amber-500 fill-amber-500/20' : 'text-primary'}`} />
-          {isHintVisible ? 'Hide hint' : 'Get a hint'}
-        </button>
-      ) : <div />}
+      <div className="flex items-center gap-2">
+        {onHint ? (
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-muted hover:text-foreground"
+            onClick={onHint}
+          >
+            <Lightbulb className={`h-4 w-4 ${isHintVisible ? 'text-amber-500 fill-amber-500/20' : 'text-primary'}`} />
+            {isHintVisible ? 'Hide hint' : 'Get a hint'}
+          </button>
+        ) : null}
+        {isRetryCard && (
+          <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+            Let&apos;s try again
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-4">
         {canEdit && (
           <Link href={`/quizzes/${quizId}`} aria-label="Edit reviewer" className="text-muted-foreground transition-colors hover:text-foreground">
@@ -143,6 +155,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const [sessionHydrated, setSessionHydrated] = useState(false);
   const [hasSeenAnswer, setHasSeenAnswer] = useState(false);
   const [completedRounds, setCompletedRounds] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
   const [audioFeedbackEnabled, setAudioFeedbackEnabled] = useState(true);
   const [streakStats, setStreakStats] = useState(() => getQuizStreakRecord(quiz.id));
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
@@ -216,6 +229,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           setIsFlipped(snapshot?.isFlipped === true);
           hasSeenAnswerRef.current = snapshot?.hasSeenAnswer === true;
           setHasSeenAnswer(snapshot?.hasSeenAnswer === true);
+          setCompletedRounds(snapshot?.completedRounds || 0);
           setIsHintVisible(false);
           restored = true;
         }
@@ -228,6 +242,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
       setCards(settings.shuffleQuestions ? shuffleList(questions) : [...questions]);
       setCardIndex(0);
       setIncorrectIds([]);
+      setCompletedRounds(0);
+      setIsCompleted(false);
       setIsFlipped(false);
       hasSeenAnswerRef.current = false;
       setHasSeenAnswer(false);
@@ -241,7 +257,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     if (!sessionHydrated || typeof window === 'undefined') return;
 
     try {
-      if (!saveProgress) {
+      if (!saveProgress || isCompleted) {
         window.localStorage.removeItem(getFlashcardSessionKey(quiz.id, userId));
       } else {
         const snapshot: FlashcardSessionSnapshot = {
@@ -250,7 +266,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           cardIndex,
           incorrectIds,
           isFlipped,
-          hasSeenAnswer
+          hasSeenAnswer,
+          completedRounds
         };
         window.localStorage.setItem(getFlashcardSessionKey(quiz.id, userId), JSON.stringify(snapshot));
       }
@@ -263,7 +280,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     } catch {
       // Ignore storage restrictions and keep the in-memory session usable.
     }
-  }, [quiz.id, sessionHydrated, saveProgress, shuffleQuestions, cards, cardIndex, incorrectIds, isFlipped, hasSeenAnswer, userId]);
+  }, [quiz.id, sessionHydrated, saveProgress, shuffleQuestions, cards, cardIndex, incorrectIds, isFlipped, hasSeenAnswer, completedRounds, isCompleted, userId]);
 
   useEffect(() => {
     return () => {
@@ -277,6 +294,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }, []);
 
   const currentCard = cards[cardIndex];
+  const isRetryCard = completedRounds > 0 || (currentCard ? incorrectIds.includes(currentCard.id) : false);
   const progress = useMemo(
     () => (cards.length > 0 ? ((cardIndex + 1) / cards.length) * 100 : 0),
     [cardIndex, cards.length]
@@ -354,8 +372,20 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     }
 
     const retryCards = questions.filter((question) => nextIncorrectIds.includes(question.id));
-    const nextRound = retryCards.length > 0 ? retryCards : questions;
-    setCards(shuffleQuestions ? shuffleList(nextRound) : [...nextRound]);
+    if (retryCards.length === 0) {
+      setIncorrectIds([]);
+      setIsCompleted(true);
+      if (typeof window !== 'undefined' && saveProgress) {
+        try {
+          window.localStorage.removeItem(getFlashcardSessionKey(quiz.id, userId));
+        } catch {}
+      }
+      if (audioFeedbackEnabled) void quizAudio.playSuccessSound();
+      triggerCelebrationConfetti();
+      return;
+    }
+
+    setCards(shuffleQuestions ? shuffleList(retryCards) : [...retryCards]);
     setCompletedRounds((prev) => prev + 1);
     setCardIndex(0);
     setIsFlipped(false);
@@ -364,10 +394,25 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     setIsHintVisible(false);
     setSwipeOffset(0);
     updateSwipeFeedback(0);
+  }
 
-    if (retryCards.length === 0) {
-      setIncorrectIds([]);
+  function handleRestartReview() {
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.removeItem(getFlashcardSessionKey(quiz.id, userId));
+      } catch {}
     }
+    const nextCards = shuffleQuestions ? shuffleList(questions) : [...questions];
+    setCards(nextCards);
+    setCardIndex(0);
+    setIncorrectIds([]);
+    setCompletedRounds(0);
+    setIsCompleted(false);
+    setIsFlipped(false);
+    hasSeenAnswerRef.current = false;
+    setHasSeenAnswer(false);
+    setIsHintVisible(false);
+    setStreak(0);
   }
 
   function handleCardPointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -513,6 +558,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     setCards(nextCards);
     setCardIndex(0);
     setIncorrectIds([]);
+    setCompletedRounds(0);
+    setIsCompleted(false);
     setIsFlipped(false);
     hasSeenAnswerRef.current = false;
     setHasSeenAnswer(false);
@@ -557,6 +604,62 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     } else {
       void document.documentElement.requestFullscreen?.();
     }
+  }
+
+  if (isCompleted) {
+    return (
+      <div className="relative left-1/2 w-screen -translate-x-1/2 bg-background px-4 py-8 text-foreground sm:px-6 sm:py-12">
+        <div className="mx-auto max-w-xl text-center space-y-6">
+          <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-500/10 text-emerald-500 ring-8 ring-emerald-500/5 mx-auto">
+            <Sparkles className="h-10 w-10" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-black text-foreground">
+              All flashcards mastered!
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              You reviewed all {questions.length} cards and conquered every missed card.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto">
+            <div className="rounded-2xl border border-border bg-card p-4 text-center">
+              <p className="text-2xl font-black text-foreground">{completedRounds + 1}</p>
+              <p className="text-xs font-semibold text-muted-foreground">Rounds completed</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4 text-center">
+              <p className="text-2xl font-black text-primary">{bestStreak}</p>
+              <p className="text-xs font-semibold text-muted-foreground">Best streak</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleRestartReview}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>Review Again</span>
+            </button>
+            <Link
+              href={`/practice/${quiz.id}?mode=multiple_choice${sharedQuery}`}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-6 py-3.5 text-xs font-bold text-foreground transition-all hover:bg-muted active:scale-95"
+            >
+              <Layers className="h-4 w-4 text-primary" />
+              <span>Practice Multiple Choice</span>
+            </Link>
+            <Link
+              href={resolvedExitHref}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-border/60 bg-muted/20 px-6 py-3.5 text-xs font-bold text-muted-foreground transition-all hover:bg-muted hover:text-foreground active:scale-95"
+            >
+              <X className="h-4 w-4" />
+              <span>Exit review</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!currentCard) {
@@ -686,6 +789,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                   quizId={quiz.id}
                   isStarred={isStarred}
                   isHintVisible={isHintVisible}
+                  isRetryCard={isRetryCard}
                   onHint={canViewAnswerKey ? () => setIsHintVisible((current) => !current) : undefined}
                   onSpeak={speakCard}
                   onToggleStar={() => setIsStarred((current) => !current)}
@@ -720,6 +824,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                 <CardToolbar
                   quizId={quiz.id}
                   isStarred={isStarred}
+                  isRetryCard={isRetryCard}
                   onSpeak={speakCard}
                   onToggleStar={() => setIsStarred((current) => !current)}
                   canEdit={canEdit}
@@ -789,7 +894,16 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
-          <span className="min-w-14 text-center text-sm font-bold text-foreground">{cardIndex + 1} / {cards.length}</span>
+          <div className="flex flex-col items-center">
+            <span className="min-w-14 text-center text-sm font-bold text-foreground">
+              {cardIndex + 1} / {cards.length}
+            </span>
+            {completedRounds > 0 && (
+              <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                Retry round {completedRounds + 1} ({cards.length} remaining)
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => goToCard(Math.min(cards.length - 1, cardIndex + 1))}

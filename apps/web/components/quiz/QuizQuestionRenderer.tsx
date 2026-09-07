@@ -227,6 +227,7 @@ export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElemen
     isCardFlipped,
     isHintVisible,
     isEvaluating,
+    isRetryQuestion,
     onFlip,
     onAnswer,
     onShowHint,
@@ -254,7 +255,14 @@ export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElemen
       >
         <div className={`space-y-4 backface-hidden ${isCardFlipped ? 'hidden' : 'block'}`}>
           <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            <span>Prompt (Click to Flip)</span>
+            <div className="flex items-center gap-2">
+              <span>Prompt (Click to Flip)</span>
+              {isRetryQuestion && (
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 normal-case tracking-normal">
+                  Let&apos;s try again
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
               <button
                 type="button"
@@ -293,7 +301,14 @@ export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElemen
 
         <div className={`space-y-4 backface-hidden rotate-y-180 ${!isCardFlipped ? 'hidden' : 'block'}`}>
           <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            <span>Answer & Explanation</span>
+            <div className="flex items-center gap-2">
+              <span>Answer & Explanation</span>
+              {isRetryQuestion && (
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 normal-case tracking-normal">
+                  Let&apos;s try again
+                </span>
+              )}
+            </div>
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </div>
           <p className="text-base font-bold text-primary">{getQuestionAnswer(question)}</p>

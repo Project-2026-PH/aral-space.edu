@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, ScrollView, StatusBar } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Quiz, QuizQuestion } from '@quiz-creator/types';
 import { RepositoryFactory } from '@quiz-creator/core';
 
@@ -38,6 +39,9 @@ export default function App() {
     if (isCorrect) {
       setStreak((s) => s + 1);
     } else {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {
+        // Haptics are optional and may be unavailable or suppressed by the OS.
+      });
       setStreak(0);
     }
 

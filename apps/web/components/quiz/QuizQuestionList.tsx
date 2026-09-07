@@ -132,9 +132,15 @@ export default function QuizQuestionList({
                     ))}
                   </div>
                 ) : (
-                  <p className="rounded-xl bg-primary/5 px-3 py-2 text-[11px] text-primary">
-                    Typed-answer card. Learners will enter the answer in Learn mode.
-                  </p>
+                  <div className="rounded-xl bg-primary/5 px-3 py-2 text-xs text-primary flex flex-wrap items-center justify-between gap-2 border border-primary/20">
+                    <span className="font-semibold">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground mr-1.5">Answer:</span>
+                      {q.answer_text || 'No answer provided'}
+                    </span>
+                    <span className="text-[10px] font-normal text-muted-foreground italic">
+                      Typed-answer card (Learn mode)
+                    </span>
+                  </div>
                 )}
                 {q.explanation && (
                   <p className="text-[11px] text-muted-foreground italic bg-muted/30 p-2 rounded-xl">

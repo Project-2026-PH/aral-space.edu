@@ -27,20 +27,17 @@ function detectQuestionType(question: QuizQuestion): QuestionType {
   ) {
     return 'true_false';
   }
-  if (question.question_type === 'typed_answer') {
-    return 'typed_answer';
-  }
-  if (question.question_type === 'multiple_choice') {
-    return 'multiple_choice';
-  }
-  if (options.length === 0 && question.answer_text) {
-    return 'typed_answer';
-  }
   if (options.length === 1) {
     return 'identification';
   }
   if (options.length > 4) {
     return 'enumeration';
+  }
+  if (options.length === 0 && question.answer_text) {
+    return 'typed_answer';
+  }
+  if (question.question_type === 'typed_answer') {
+    return 'typed_answer';
   }
   return 'multiple_choice';
 }
@@ -87,7 +84,9 @@ export default function QuizQuestionFormModal({
                 }
                 return padded;
               })()
-            : question.options
+            : detected === 'identification'
+              ? [question.options[0] || question.answer_text || '']
+              : question.options
       );
       setCorrectAnswer(question.correct_answer);
       setAnswerText(question.answer_text || question.options[question.correct_answer] || '');

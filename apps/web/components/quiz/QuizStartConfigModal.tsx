@@ -32,7 +32,7 @@ export default function QuizStartConfigModal({
       shuffleOptions: String(shuffleOptions)
     }).toString();
 
-    router.push(`/practice/${quizId}?${query}`);
+    router.push(mode === 'flashcard' ? `/review/${quizId}` : `/practice/${quizId}?${query}`);
   }
 
   const modes = [

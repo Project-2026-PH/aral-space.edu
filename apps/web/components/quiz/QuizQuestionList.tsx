@@ -150,9 +150,13 @@ export default function QuizQuestionList({
                   </div>
                 )}
                 {q.explanation && (
-                  <p className="text-[11px] text-muted-foreground italic bg-muted/30 p-2 rounded-xl">
-                    💡 {q.explanation}
-                  </p>
+                  <div className="flex items-start gap-1.5 rounded-xl bg-muted/30 p-2 text-[11px] text-muted-foreground">
+                    <span aria-hidden="true">💡</span>
+                    <RichTextContent
+                      html={q.explanation}
+                      className="italic"
+                    />
+                  </div>
                 )}
               </div>
             )}

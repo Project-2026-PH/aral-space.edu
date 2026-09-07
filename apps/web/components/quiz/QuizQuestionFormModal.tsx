@@ -3,11 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import { QuizQuestion } from '@quiz-creator/types';
-import { QuizTransformService } from '@quiz-creator/core';
 import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
 import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
-import { hasRichTextContent, richTextToPlainText } from '@/lib/richText';
+import { hasRichTextContent } from '@/lib/richText';
 
 export type QuestionType = 'multiple_choice' | 'typed_answer' | 'identification' | 'true_false' | 'enumeration';
 
@@ -125,13 +124,8 @@ export default function QuizQuestionFormModal({
       newOptions = [];
       newCorrect = 0;
     } else if (newType === 'true_false') {
-      const termCandidate = (type === 'identification' || type === 'typed_answer')
-        ? (options[0] || answerText || '')
-        : (options[correctAnswer] || options[0] || answerText || '');
-
-      if (termCandidate.trim() && hasRichTextContent(questionText)) {
-        setQuestionText(QuizTransformService.paraphraseToStatement(richTextToPlainText(questionText), termCandidate.trim()));
-      }
+      // Preserve the prompt and its rich-text formatting when changing modes.
+      // Users can edit the wording directly if the statement needs adjustment.
       newOptions = ['True', 'False'];
       newCorrect = newCorrect === 1 ? 1 : 0;
     } else if (newType === 'identification') {

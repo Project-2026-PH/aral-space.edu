@@ -900,7 +900,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             </span>
             {completedRounds > 0 && (
               <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                Retry round {completedRounds + 1} ({cards.length} remaining)
+                Retry round # {completedRounds + 1}
               </span>
             )}
           </div>

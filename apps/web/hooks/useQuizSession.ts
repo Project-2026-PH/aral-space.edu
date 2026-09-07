@@ -19,6 +19,7 @@ import type {
   ShuffledOption
 } from '@quiz-creator/types';
 import { quizAudio } from '@/lib/audio';
+import { triggerIncorrectAnswerVibration } from '@/lib/haptics';
 import { triggerCelebrationConfetti } from '@/lib/confetti';
 import {
   createAnswerEventId,
@@ -470,6 +471,7 @@ export function useQuizSession({
         return nextStreak;
       });
     } else {
+      triggerIncorrectAnswerVibration();
       setCurrentStreak(0);
       setBestStreak((currentBest) => {
         recordSessionCompletion(quiz.id, mode, currentBest, 0, questions.length);

@@ -226,7 +226,10 @@ export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElemen
 
   return (
     <div onClick={onFlip} className="perspective-1000 cursor-pointer min-h-[480px]">
-      <div className={`relative w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md transition-transform duration-500 transform-style-3d flex flex-col justify-between ${isCardFlipped ? 'rotate-y-180' : ''}`}>
+      <div
+        key={question.id}
+        className={`relative w-full min-h-[480px] rounded-3xl border border-border/80 bg-card p-6 sm:p-9 shadow-md transition-transform duration-500 transform-style-3d flex flex-col justify-between ${isCardFlipped ? 'rotate-y-180' : ''}`}
+      >
         <div className={`space-y-4 backface-hidden ${isCardFlipped ? 'hidden' : 'block'}`}>
           <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <span>Prompt (Click to Flip)</span>

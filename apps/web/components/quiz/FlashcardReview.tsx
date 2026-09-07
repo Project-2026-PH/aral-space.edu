@@ -145,6 +145,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const touchStartX = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
   const swipeTimerRef = useRef<number | null>(null);
+  const frontContentRef = useRef<HTMLDivElement>(null);
+  const backContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     quizAudio.preload();
@@ -282,6 +284,10 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     overlay.style.backgroundColor = isLeft ? 'rgba(249, 115, 22, 0.14)' : 'rgba(34, 197, 94, 0.14)';
     if (swipeLeftLabelRef.current) swipeLeftLabelRef.current.style.display = isLeft ? 'inline' : 'none';
     if (swipeRightLabelRef.current) swipeRightLabelRef.current.style.display = isLeft ? 'none' : 'inline';
+
+    const contentOpacity = offset === 0 ? '' : String(Math.max(0.08, 1 - progress * 0.92));
+    if (frontContentRef.current) frontContentRef.current.style.opacity = contentOpacity;
+    if (backContentRef.current) backContentRef.current.style.opacity = contentOpacity;
   }
 
   function applySwipeVisual(offset: number) {
@@ -333,6 +339,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     const retryCards = questions.filter((question) => nextIncorrectIds.includes(question.id));
     const nextRound = retryCards.length > 0 ? retryCards : questions;
     setCards(shuffleQuestions ? shuffleList(nextRound) : [...nextRound]);
+    setCompletedRounds((prev) => prev + 1);
     setCardIndex(0);
     setIsFlipped(false);
     hasSeenAnswerRef.current = false;
@@ -347,55 +354,72 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function handleCardPointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (!hasSeenAnswerRef.current || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('button, a, input, select')) return;
+
     cancelPendingSwipeFrame();
     swipeStartRef.current = { x: event.clientX, y: event.clientY };
     setIsDragging(true);
+    suppressClickRef.current = false;
+    if (cardRef.current) {
+      cardRef.current.style.transition = 'none';
+    }
     setSwipeOffset(0);
     applySwipeVisual(0);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {}
   }
 
   function handleCardPointerMove(event: PointerEvent<HTMLDivElement>) {
     const start = swipeStartRef.current;
-    if (!start || !hasSeenAnswerRef.current) return;
+    if (!start) return;
 
     const offsetX = event.clientX - start.x;
-    const offsetY = event.clientY - start.y;
-    if (Math.abs(offsetY) > Math.abs(offsetX) && Math.abs(offsetY) > 10) {
-      cancelPendingSwipeFrame();
-      swipeStartRef.current = null;
-      setIsDragging(false);
-      setSwipeOffset(0);
-      applySwipeVisual(0);
-      return;
+    if (Math.abs(offsetX) > 8) {
+      suppressClickRef.current = true;
     }
 
     queueSwipeVisual(offsetX);
   }
 
   function handleCardPointerUp(event: PointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {}
+    }
+
     const start = swipeStartRef.current;
     swipeStartRef.current = null;
     cancelPendingSwipeFrame();
-    if (!start || !hasSeenAnswerRef.current) return;
+    if (!start) return;
 
     const offsetX = event.clientX - start.x;
-    const offsetY = event.clientY - start.y;
-    applySwipeVisual(offsetX);
     setIsDragging(false);
 
-    if (Math.abs(offsetX) < 90 || Math.abs(offsetX) <= Math.abs(offsetY)) {
+    if (Math.abs(offsetX) < 90) {
+      if (cardRef.current) {
+        cardRef.current.style.transition = 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1)';
+        cardRef.current.style.transform = '';
+      }
       setSwipeOffset(0);
       updateSwipeFeedback(0);
       return;
     }
 
     const known = offsetX > 0;
-    if (known) void quizAudio.playCorrectSound();
+    if (known && audioFeedbackEnabled) void quizAudio.playCorrectSound();
     suppressClickRef.current = true;
     const exitDistance = Math.max(window.innerWidth, 600) * 1.2;
-    setSwipeOffset(known ? exitDistance : -exitDistance);
+    const targetOffset = known ? exitDistance : -exitDistance;
+
+    if (cardRef.current) {
+      cardRef.current.style.transition = `transform ${SWIPE_EXIT_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+      updateSwipeTransform(targetOffset);
+    }
+    setSwipeOffset(targetOffset);
+
     swipeTimerRef.current = window.setTimeout(() => {
       swipeTimerRef.current = null;
       updateSwipeFeedback(0);
@@ -410,10 +434,19 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
     }, SWIPE_EXIT_DURATION_MS);
   }
 
-  function handleCardPointerCancel() {
+  function handleCardPointerCancel(event: PointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {}
+    }
     cancelPendingSwipeFrame();
     swipeStartRef.current = null;
     setIsDragging(false);
+    if (cardRef.current) {
+      cardRef.current.style.transition = 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1)';
+      cardRef.current.style.transform = '';
+    }
     setSwipeOffset(0);
     applySwipeVisual(0);
   }
@@ -545,7 +578,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
 
         <div
           ref={cardRef}
-          className="perspective-1000 relative h-[430px] cursor-pointer touch-pan-y select-none sm:h-[500px]"
+          className={`perspective-1000 relative h-[430px] cursor-pointer select-none sm:h-[500px] ${isDragging ? 'touch-none' : 'touch-pan-y'}`}
           onClick={handleCardClick}
           onPointerDown={handleCardPointerDown}
           onPointerMove={handleCardPointerMove}
@@ -571,75 +604,88 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           }}
           aria-label={isFlipped ? 'Show flashcard prompt' : 'Show flashcard answer'}
         >
-          <div className={`relative h-full transform-style-3d transition-transform duration-500 ease-in-out ${isFlipped ? 'rotate-x-180' : ''}`}>
-            <div className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm backface-hidden transition-shadow hover:border-primary/40 hover:shadow-md sm:p-7" aria-hidden={isFlipped}>
-              <CardToolbar
-                quizId={quiz.id}
-                isStarred={isStarred}
-                isHintVisible={isHintVisible}
-                onHint={() => setIsHintVisible((current) => !current)}
-                onSpeak={speakCard}
-                onToggleStar={() => setIsStarred((current) => !current)}
-                canEdit={!shareToken}
-              />
-              <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden [overflow-wrap:anywhere] px-4 py-10 text-center">
-                <div className="max-w-3xl space-y-4">
-                  <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-foreground [overflow-wrap:anywhere] line-clamp-10 sm:text-2xl">{currentCard.question_text}</p>
-                  {isHintVisible && (
-                    <div
-                      className="inline-flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-xs font-mono font-medium text-amber-700 dark:text-amber-300"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <Lightbulb className="h-4 w-4 shrink-0 text-amber-500" />
-                      <span>Hint: {getQuestionHint(currentCard)}</span>
-                    </div>
-                  )}
+          <div
+            key={`${currentCard.id}-${cardIndex}-${completedRounds}`}
+            className="h-full w-full flashcard-slide-in-bottom"
+          >
+            <div
+              className={`relative h-full transform-style-3d transition-transform duration-500 ease-in-out ${isFlipped ? 'rotate-x-180' : ''}`}
+            >
+              <div className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm backface-hidden transition-shadow hover:border-primary/40 hover:shadow-md sm:p-7" aria-hidden={isFlipped}>
+                <CardToolbar
+                  quizId={quiz.id}
+                  isStarred={isStarred}
+                  isHintVisible={isHintVisible}
+                  onHint={() => setIsHintVisible((current) => !current)}
+                  onSpeak={speakCard}
+                  onToggleStar={() => setIsStarred((current) => !current)}
+                  canEdit={!shareToken}
+                />
+                <div
+                  ref={frontContentRef}
+                  className="flex min-h-0 flex-1 items-center justify-center overflow-hidden [overflow-wrap:anywhere] px-4 py-10 text-center transition-opacity duration-150"
+                >
+                  <div className="max-w-3xl space-y-4">
+                    <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-foreground [overflow-wrap:anywhere] line-clamp-10 sm:text-2xl">{currentCard.question_text}</p>
+                    {isHintVisible && (
+                      <div
+                        className="inline-flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-xs font-mono font-medium text-amber-700 dark:text-amber-300"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <Lightbulb className="h-4 w-4 shrink-0 text-amber-500" />
+                        <span>Hint: {getQuestionHint(currentCard)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-center text-xs font-semibold text-muted-foreground">
+                  Click the card to reveal the answer
                 </div>
               </div>
-              <div className="text-center text-xs font-semibold text-muted-foreground">
-                Click the card to reveal the answer
-              </div>
-            </div>
 
-            <div className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm backface-hidden rotate-x-180 sm:p-7" aria-hidden={!isFlipped}>
-              <CardToolbar
-                quizId={quiz.id}
-                isStarred={isStarred}
-                onSpeak={speakCard}
-                onToggleStar={() => setIsStarred((current) => !current)}
-                canEdit={!shareToken}
-              />
-              <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden [overflow-wrap:anywhere] px-4 py-10 text-center">
-                <div className="max-w-3xl space-y-4">
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Answer</span>
-                  <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-primary [overflow-wrap:anywhere] line-clamp-8 sm:text-3xl">{getAnswer(currentCard)}</p>
-                  {currentCard.explanation && (
-                    <p className="text-sm leading-relaxed text-muted-foreground line-clamp-3">{currentCard.explanation}</p>
-                  )}
+              <div className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm backface-hidden rotate-x-180 sm:p-7" aria-hidden={!isFlipped}>
+                <CardToolbar
+                  quizId={quiz.id}
+                  isStarred={isStarred}
+                  onSpeak={speakCard}
+                  onToggleStar={() => setIsStarred((current) => !current)}
+                  canEdit={!shareToken}
+                />
+                <div
+                  ref={backContentRef}
+                  className="flex min-h-0 flex-1 items-center justify-center overflow-hidden [overflow-wrap:anywhere] px-4 py-10 text-center transition-opacity duration-150"
+                >
+                  <div className="max-w-3xl space-y-4">
+                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Answer</span>
+                    <p className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-primary [overflow-wrap:anywhere] line-clamp-8 sm:text-3xl">{getAnswer(currentCard)}</p>
+                    {currentCard.explanation && (
+                      <p className="text-sm leading-relaxed text-muted-foreground line-clamp-3">{currentCard.explanation}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="text-center text-xs font-semibold text-muted-foreground">
-                Swipe left if you missed it · swipe right if you got it right
-              </div>
-              <div className="mt-3 flex items-center justify-center gap-3" onClick={(event) => event.stopPropagation()}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    completeCard(false);
-                  }}
-                  className="rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                >
-                  Still learning
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    completeCard(true);
-                  }}
-                  className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors shadow-sm"
-                >
-                  Got it right ✓
-                </button>
+                <div className="text-center text-xs font-semibold text-muted-foreground">
+                  Swipe left if you missed it · swipe right if you got it right
+                </div>
+                <div className="mt-3 flex items-center justify-center gap-3" onClick={(event) => event.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      completeCard(false);
+                    }}
+                    className="rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    Still learning
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      completeCard(true);
+                    }}
+                    className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors shadow-sm"
+                  >
+                    Got it right ✓
+                  </button>
+                </div>
               </div>
             </div>
           </div>

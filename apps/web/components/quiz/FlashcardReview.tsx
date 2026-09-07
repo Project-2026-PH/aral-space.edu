@@ -141,7 +141,7 @@ function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, on
 export default function FlashcardReview({ quiz, questions, shareToken, subjectShareToken, exitHref, userId }: FlashcardReviewProps) {
   const router = useRouter();
   const sharedQuery = shareToken ? `&shareToken=${encodeURIComponent(shareToken)}` : '';
-  const resolvedExitHref = exitHref ?? (subjectShareToken ? `/subjects/share/${encodeURIComponent(subjectShareToken)}` : (shareToken ? '/library' : '/review/'));
+  const resolvedExitHref = exitHref ?? (subjectShareToken ? `/subjects/share/${encodeURIComponent(subjectShareToken)}` : (shareToken ? '/library' : '/review'));
   const isOwner = Boolean(userId && quiz.user_id && quiz.user_id === userId);
   const isPublicView = Boolean(shareToken || subjectShareToken);
   const canEdit = !isPublicView || isOwner;
@@ -185,7 +185,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const swipeTimerRef = useRef<number | null>(null);
   const frontContentRef = useRef<HTMLDivElement>(null);
   const backContentRef = useRef<HTMLDivElement>(null);
-  const lastReviewRefreshRef = useRef(0);
+  const lastReviewRefreshRef = useRef(Date.now());
 
   useEffect(() => {
     quizAudio.preload();
@@ -205,13 +205,19 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
       router.refresh();
     };
 
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        refreshReview();
+      }
+    };
+
     window.addEventListener('focus', refreshReview);
-    window.addEventListener('pageshow', refreshReview);
+    window.addEventListener('pageshow', handlePageShow);
     document.addEventListener('visibilitychange', refreshReview);
 
     return () => {
       window.removeEventListener('focus', refreshReview);
-      window.removeEventListener('pageshow', refreshReview);
+      window.removeEventListener('pageshow', handlePageShow);
       document.removeEventListener('visibilitychange', refreshReview);
     };
   }, [router]);

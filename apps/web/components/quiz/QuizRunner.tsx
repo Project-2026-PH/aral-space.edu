@@ -8,6 +8,7 @@ import {
   BookOpen,
   Layers,
   PenTool,
+  RotateCcw,
   Settings,
   Shuffle,
   Volume2,
@@ -22,7 +23,9 @@ import { QuestionRenderer } from '@/components/quiz/QuizQuestionRenderer';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
 import QuizContinueDock from '@/components/quiz/QuizContinueDock';
 import ResumePracticeModal from '@/components/quiz/ResumePracticeModal';
+import { removeQuizProgressSnapshot } from '@/lib/quizProgressPersistence';
 import Modal from '@/components/ui/Modal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 interface QuizRunnerProps {
   quiz: Quiz;
@@ -39,6 +42,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const { quiz, mode } = props;
   const [currentMode, setCurrentMode] = useState<QuizMode>(mode);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [shuffleToast, setShuffleToast] = useState(false);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const resumePromptShownRef = useRef(false);
@@ -81,6 +85,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
     answerQuestion,
     submitTypedAnswer,
     advance,
+    resetProgress,
     startStruggleReview,
     complete,
     shuffleRemainingQueue,
@@ -88,6 +93,11 @@ export default function QuizRunner(props: QuizRunnerProps) {
     handleSurfaceKeyDown,
     toggleMute
   } = session;
+
+  const handleConfirmReset = () => {
+    resetProgress();
+    setShowSettingsModal(false);
+  };
 
   const isMultipleChoiceMode = currentMode === 'multiple_choice';
   const isDesktopViewportMode = isMultipleChoiceMode || currentMode === 'identification';
@@ -143,14 +153,18 @@ export default function QuizRunner(props: QuizRunnerProps) {
     questionsPerReviewRound,
     Math.max(questions.length - totalLockedCount, 0)
   );
+  const resetSavedReview = () => {
+    removeQuizProgressSnapshot(quiz.id, props.initialSession.id);
+    window.location.assign(`/practice/${quiz.id}?mode=learn`);
+  };
   const resumePrompt = (
     <ResumePracticeModal
       open={showResumePrompt}
-      quizId={quiz.id}
       progressPercent={overallPercent}
       completedQuestions={totalLockedCount}
       questionsUntilNextCheckIn={questionsUntilNextCheckIn}
       onContinue={() => setShowResumePrompt(false)}
+      onReset={resetSavedReview}
     />
   );
 
@@ -303,7 +317,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
             <div className="flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                Progress Preserved
+                Progress:
               </span>
             </div>
             <span className="font-bold text-foreground">
@@ -331,16 +345,14 @@ export default function QuizRunner(props: QuizRunnerProps) {
                     onClick={() => {
                       setCurrentMode(m.id);
                     }}
-                    className={`flex flex-col items-start gap-2 rounded-2xl border p-3 text-left transition-all active:scale-[0.98] ${
-                      isSelected
+                    className={`flex flex-col items-start gap-2 rounded-2xl border p-3 text-left transition-all active:scale-[0.98] ${isSelected
                         ? 'border-primary bg-primary/10 ring-1 ring-primary text-foreground'
                         : 'border-border bg-card hover:bg-muted/50 text-foreground'
-                    }`}
+                      }`}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${
-                        isSelected ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
-                      }`}>
+                      <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${isSelected ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                        }`}>
                         <Icon className="h-4 w-4" />
                       </div>
                       {isSelected && (
@@ -388,6 +400,31 @@ export default function QuizRunner(props: QuizRunnerProps) {
             </div>
           </div>
 
+          {/* Reset Progress */}
+          <div className="space-y-2 pt-1 border-t border-border/40">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              Reset Progress
+            </label>
+            <div className="flex items-center justify-between rounded-2xl border border-destructive/20 bg-destructive/5 p-3.5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                  <RotateCcw className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-foreground">Reset Progress</p>
+                  <p className="text-[10px] text-muted-foreground">Start over from question 1 with 0% mastery</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(true)}
+                className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive hover:text-white transition-all active:scale-95"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
           {/* Close Action */}
           <button
             type="button"
@@ -398,6 +435,17 @@ export default function QuizRunner(props: QuizRunnerProps) {
           </button>
         </div>
       </Modal>
+
+      {/* Reset Progress Confirmation Modal */}
+      <ConfirmModal
+        open={showResetConfirm}
+        onOpenChange={setShowResetConfirm}
+        onConfirm={handleConfirmReset}
+        title="Reset Progress"
+        message="Are you sure you want to reset your progress?"
+        confirmText="Reset Progress"
+        destructive
+      />
     </div>
   );
 }

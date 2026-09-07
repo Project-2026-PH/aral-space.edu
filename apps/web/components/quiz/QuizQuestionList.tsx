@@ -13,6 +13,8 @@ interface QuizQuestionListProps {
   onEdit: (question: QuizQuestion) => void;
   onDeleted: () => void;
   readOnly?: boolean;
+  subjectId?: string | null;
+  userId?: string | null;
 }
 
 export default function QuizQuestionList({
@@ -20,7 +22,9 @@ export default function QuizQuestionList({
   questions,
   onEdit,
   onDeleted,
-  readOnly = false
+  readOnly = false,
+  subjectId,
+  userId
 }: QuizQuestionListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -34,15 +38,18 @@ export default function QuizQuestionList({
       });
       if (res.ok) {
         if (deletedQuestion) {
-          recordLocalAuthoringEvent({
-            action: 'delete',
-            before: makeAuthoringQuestionSnapshot(
-              deletedQuestion.question_type === 'typed_answer' ? 'typed_answer' : 'multiple_choice',
-              deletedQuestion.question_text,
-              deletedQuestion.options || [],
-              deletedQuestion.explanation
-            )
-          });
+          recordLocalAuthoringEvent(
+            {
+              action: 'delete',
+              before: makeAuthoringQuestionSnapshot(
+                deletedQuestion.question_type === 'typed_answer' ? 'typed_answer' : 'multiple_choice',
+                deletedQuestion.question_text,
+                deletedQuestion.options || [],
+                deletedQuestion.explanation
+              )
+            },
+            { userId, subjectId }
+          );
         }
         setDeletingId(null);
         onDeleted();

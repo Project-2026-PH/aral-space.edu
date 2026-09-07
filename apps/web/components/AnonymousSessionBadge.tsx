@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { UserCheck, Shield, RotateCcw, X, Smartphone, ArrowRightLeft, Copy, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { setClientUserId } from '@/lib/authoringPreferences';
 
 interface AnonSessionData {
   isAnonymous: boolean;
   label: string;
+  userId?: string;
 }
 
 type TabType = 'info' | 'share' | 'link';
@@ -40,7 +42,13 @@ export default function AnonymousSessionBadge() {
     async function fetchSession() {
       try {
         const res = await fetch('/api/anonymous');
-        if (res.ok) setSession(await res.json());
+        if (res.ok) {
+          const data = await res.json();
+          setSession(data);
+          if (data.userId) {
+            setClientUserId(data.userId);
+          }
+        }
       } catch (err) {
         console.error('Failed to load anonymous session:', err);
       }

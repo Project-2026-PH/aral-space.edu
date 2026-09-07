@@ -47,6 +47,8 @@ interface QuizQuestionFormModalProps {
   onOpenChange: (open: boolean) => void;
   question?: QuizQuestion | null;
   quizId: string;
+  subjectId?: string | null;
+  userId?: string | null;
   onSaved: () => void;
 }
 
@@ -55,6 +57,8 @@ export default function QuizQuestionFormModal({
   onOpenChange,
   question,
   quizId,
+  subjectId,
+  userId,
   onSaved
 }: QuizQuestionFormModalProps) {
   const isEditing = Boolean(question);
@@ -217,18 +221,21 @@ export default function QuizQuestionFormModal({
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || (isEditing ? 'Failed to update question' : 'Failed to create question'));
 
-      recordLocalAuthoringEvent({
-        action: isEditing ? 'edit' : 'create',
-        before: question
-          ? makeAuthoringQuestionSnapshot(
-              detectQuestionType(question),
-              question.question_text,
-              question.options || [],
-              question.explanation
-            )
-          : undefined,
-        after: makeAuthoringQuestionSnapshot(type, questionText, cleanedOptions, explanation)
-      });
+      recordLocalAuthoringEvent(
+        {
+          action: isEditing ? 'edit' : 'create',
+          before: question
+            ? makeAuthoringQuestionSnapshot(
+                detectQuestionType(question),
+                question.question_text,
+                question.options || [],
+                question.explanation
+              )
+            : undefined,
+          after: makeAuthoringQuestionSnapshot(type, questionText, cleanedOptions, explanation)
+        },
+        { userId, subjectId }
+      );
       onOpenChange(false);
       onSaved();
     } catch (err: any) {

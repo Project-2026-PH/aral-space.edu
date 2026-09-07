@@ -75,7 +75,7 @@ export class AuthoringPreferenceEngine {
     state.editCount = clamp(Math.round(signals.editCount || 0), 0, MAX_OBSERVATIONS);
     state.deleteCount = clamp(Math.round(signals.deleteCount || 0), 0, MAX_OBSERVATIONS);
     state.averageQuestionLength = safeMetric(signals.averageQuestionLength || 0);
-    state.averageOptionCount = clamp(Math.round(signals.averageOptionCount || 0), 0, 20);
+    state.averageOptionCount = clamp(Number((signals.averageOptionCount || 0).toFixed(2)), 0, 20);
     state.averageExplanationLength = safeMetric(signals.averageExplanationLength || 0);
 
     for (const type of QUESTION_TYPES) {
@@ -105,10 +105,18 @@ export class AuthoringPreferenceEngine {
       const nextCount = Math.min(MAX_OBSERVATIONS, previousCount + 1);
       next.observationCount = nextCount;
       next.averageQuestionLength = this.average(previousCount, next.averageQuestionLength, safeMetric(event.after.questionLength));
-      next.averageOptionCount = this.average(previousCount, next.averageOptionCount, clamp(Math.round(event.after.optionCount), 0, 20));
+      next.averageOptionCount = this.average(previousCount, next.averageOptionCount, clamp(Number(event.after.optionCount.toFixed(2)), 0, 20));
       next.averageExplanationLength = this.average(previousCount, next.averageExplanationLength, safeMetric(event.after.explanationLength));
+
+      // Recency decay for question types: when history is substantial, decay older counts so new patterns can emerge
+      if (previousCount >= 15) {
+        for (const type of QUESTION_TYPES) {
+          next.questionTypeCounts[type] = Math.round(next.questionTypeCounts[type] * 0.92);
+        }
+      }
+
       next.questionTypeCounts[event.after.questionType] = clamp(
-        next.questionTypeCounts[event.after.questionType] + 1,
+        (next.questionTypeCounts[event.after.questionType] || 0) + 1,
         0,
         MAX_OBSERVATIONS
       );
@@ -118,7 +126,13 @@ export class AuthoringPreferenceEngine {
   }
 
   static toSignals(state: AuthoringPreferenceState | null | undefined): AuthoringPreferenceSignals {
-    return this.fromSignals(state);
+    const s = this.fromSignals(state);
+    return {
+      ...s,
+      averageQuestionLength: Math.round(s.averageQuestionLength),
+      averageOptionCount: Math.round(s.averageOptionCount),
+      averageExplanationLength: Math.round(s.averageExplanationLength)
+    };
   }
 
   static isConfident(signals: AuthoringPreferenceSignals | null | undefined): boolean {
@@ -176,6 +190,12 @@ export class AuthoringPreferenceEngine {
 
   private static average(previousCount: number, previousAverage: number, nextValue: number): number {
     if (previousCount <= 0) return nextValue;
-    return Math.round((previousAverage * previousCount + nextValue) / (previousCount + 1));
+    // Small sample sizes (<= 5) use standard arithmetic average for initial stability
+    if (previousCount <= 5) {
+      return Number(((previousAverage * previousCount + nextValue) / (previousCount + 1)).toFixed(2));
+    }
+    // Sample sizes >= 6 use Exponential Moving Average (EMA) with recency weight alpha >= 0.15
+    const alpha = Math.max(0.15, 1 / (previousCount + 1));
+    return Number((previousAverage * (1 - alpha) + nextValue * alpha).toFixed(2));
   }
 }

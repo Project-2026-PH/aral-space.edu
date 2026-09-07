@@ -335,6 +335,8 @@ export default function QuizOverviewClient({
 
         <QuizQuestionList
           quizId={quiz.id}
+          subjectId={quiz.subject_id}
+          userId={quiz.user_id}
           questions={questions}
           onEdit={(q) => {
             setEditingQuestion(q);
@@ -361,6 +363,8 @@ export default function QuizOverviewClient({
         onOpenChange={setShowQuestionModal}
         question={editingQuestion}
         quizId={quiz.id}
+        subjectId={quiz.subject_id}
+        userId={quiz.user_id}
         onSaved={refreshQuestions}
       />
 

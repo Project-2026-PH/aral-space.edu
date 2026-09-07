@@ -19,11 +19,13 @@ It does **not** replace explicit author choices. Source-grounding, required gene
 The implementation is split into four layers:
 
 1. **Core signal engine** — `packages/core/src/services/ai/AuthoringPreferenceEngine.ts`
-   - Maintains bounded aggregate counters and running averages.
+   - Maintains bounded aggregate counters and recency-weighted Exponential Moving Averages (EMA).
+   - Applies count decay on older question types to quickly adapt to habit shifts.
    - Applies a confidence threshold before preferences affect a profile.
    - Converts signals into the existing `UserAuthoringProfile` format.
 2. **Browser-local persistence** — `apps/web/lib/authoringPreferences.ts`
-   - Stores versioned signals under `quiz-creator:authoring-preferences:v1`.
+   - Stores versioned signals under `quiz-creator:authoring-preferences:v2:user:<userId>[:subject:<subjectId>]` with transparent legacy v1 migration.
+   - Dual-records into subject and global user buckets, with subject fallback when subject observations < 3.
    - Records only aggregate measurements.
    - Treats preference learning as optional; storage failures never block authoring.
 3. **Authoring event capture** — web question creation and editing components
@@ -145,12 +147,13 @@ The engine has focused coverage in:
 - `packages/core/src/services/ai/__tests__/AuthoringPreferenceEngine.test.ts`
 - `packages/core/src/services/ai/__tests__/UserAuthoringProfileService.test.ts`
 - `packages/controllers/src/__tests__/QuizGenerationController.test.ts`
+- `apps/web/lib/__tests__/authoringPreferences.test.ts`
 - `apps/web/lib/__tests__/requestValidation.test.ts`
 
 Recommended checks after changing the engine are:
 
 ```bash
 pnpm --filter @quiz-creator/web typecheck
-pnpm exec vitest run packages/core/src/services/ai/__tests__/AuthoringPreferenceEngine.test.ts packages/core/src/services/ai/__tests__/UserAuthoringProfileService.test.ts packages/controllers/src/__tests__/QuizGenerationController.test.ts apps/web/lib/__tests__/requestValidation.test.ts
+pnpm exec vitest run packages/core/src/services/ai/__tests__/AuthoringPreferenceEngine.test.ts packages/core/src/services/ai/__tests__/UserAuthoringProfileService.test.ts packages/controllers/src/__tests__/QuizGenerationController.test.ts apps/web/lib/__tests__/authoringPreferences.test.ts apps/web/lib/__tests__/requestValidation.test.ts
 git diff --check
 ```

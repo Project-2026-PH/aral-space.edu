@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
     if (rateLimit) return rateLimit;
     const response = NextResponse.json({
       isAnonymous: true,
-      label: anonymousLabel(anonId)
+      label: anonymousLabel(anonId),
+      userId: anonId
     });
     response.cookies.set(ANON_COOKIE_NAME, await createAnonymousSessionValue(anonId), anonymousCookieOptions());
     return response;
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({
       success: true,
       label: anonymousLabel(newAnonId),
+      userId: newAnonId,
       message: 'Anonymous session reset successfully'
     });
     response.cookies.set(ANON_COOKIE_NAME, await createAnonymousSessionValue(newAnonId), anonymousCookieOptions());

@@ -320,4 +320,43 @@ describe('QuizGenerationController - pipelineMode', () => {
     expect(reviewingEvent?.pipelineMode).toBe('auto');
     expect(reviewingEvent?.message).toBe('Polishing Distractors & Hardening Pedagogy');
   });
+
+  it('passes authoringSignals and subjectId to buildProfile during streaming generation', async () => {
+    const dto: GenerateQuizRequestDto = {
+      title: 'Adaptive Subject Quiz',
+      text: 'Sample notes for biology',
+      subjectId: 'sub-bio-1',
+      authoringSignals: {
+        version: 1,
+        observationCount: 5,
+        createCount: 5,
+        editCount: 0,
+        deleteCount: 0,
+        averageQuestionLength: 20,
+        averageOptionCount: 4,
+        averageExplanationLength: 50,
+        questionTypeCounts: {
+          multiple_choice: 5,
+          typed_answer: 0,
+          identification: 0,
+          true_false: 0,
+          enumeration: 0
+        }
+      }
+    };
+
+    await controller.handleStreamingGeneration(
+      dto,
+      () => {},
+      'user-1'
+    );
+
+    expect(mockGenService.generateQuiz).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authoringProfile: expect.objectContaining({
+          targetCount: expect.any(Number)
+        })
+      })
+    );
+  });
 });

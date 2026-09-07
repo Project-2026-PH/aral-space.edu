@@ -87,4 +87,39 @@ describe('UserAuthoringProfileService', () => {
     expect(profile.sampleQuestions).toHaveLength(1);
     expect(profile.styleSummary).toContain('15 questions');
   });
+
+  it('prioritizes quizzes matching subjectId over unrelated quizzes', async () => {
+    const mockRepo = {
+      listQuizzes: vi.fn().mockResolvedValue([
+        { id: 'bio-1', title: 'Biology Manual', subject_id: 'sub-bio', question_count: 5, source_model: 'manual' },
+        { id: 'hist-1', title: 'History Manual', subject_id: 'sub-history', question_count: 22, source_model: 'manual' }
+      ]),
+      getQuestionsByQuizId: vi.fn().mockImplementation(async (id: string) => {
+        if (id === 'bio-1') {
+          return [
+            {
+              id: 'b1',
+              question_text: 'Define osmosis in plant cells.',
+              options: ['Diffusion of water across a semipermeable membrane', 'Active transport of sodium', 'Protein synthesis', 'Cell division'],
+              correct_answer: 0,
+              explanation: 'Osmosis is the spontaneous net movement of water molecules.'
+            }
+          ];
+        }
+        return [];
+      })
+    } as unknown as IQuizRepository;
+
+    const profile = await UserAuthoringProfileService.buildProfile(
+      mockRepo,
+      'user-multisubject',
+      undefined,
+      'sub-bio'
+    );
+
+    // Should prioritize sub-bio quiz with targetCount 5 rather than history quiz with targetCount 22
+    expect(profile.targetCount).toBe(5);
+    expect(profile.totalReviewersAnalyzed).toBe(1);
+    expect(profile.sampleQuestions?.[0].question).toContain('osmosis');
+  });
 });

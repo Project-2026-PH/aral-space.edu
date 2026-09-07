@@ -93,4 +93,45 @@ describe('AuthoringPreferenceEngine', () => {
     expect(profile.avgOptionCount).toBe(3);
     expect(profile.styleSummary).toContain('usually authors about 3 visible options');
   });
+
+  it('adapts swiftly to style shifts via EMA and recency decay without freezing', () => {
+    let state = AuthoringPreferenceEngine.createState();
+
+    // 20 initial multiple choice questions with short stems and 4 options
+    for (let i = 0; i < 20; i++) {
+      state = AuthoringPreferenceEngine.recordEvent(state, {
+        action: 'create',
+        after: {
+          questionType: 'multiple_choice',
+          questionLength: 8,
+          optionCount: 4,
+          explanationLength: 10
+        }
+      });
+    }
+
+    let signals = AuthoringPreferenceEngine.toSignals(state);
+    expect(signals.preferredQuestionType || AuthoringPreferenceEngine.preferredQuestionType(signals)).toBe('multiple_choice');
+    expect(signals.averageQuestionLength).toBe(8);
+
+    // User shifts style: authoring 15 true_false questions with long stems and 2 options
+    for (let i = 0; i < 15; i++) {
+      state = AuthoringPreferenceEngine.recordEvent(state, {
+        action: 'create',
+        after: {
+          questionType: 'true_false',
+          questionLength: 30,
+          optionCount: 2,
+          explanationLength: 80
+        }
+      });
+    }
+
+    signals = AuthoringPreferenceEngine.toSignals(state);
+    // EMA ensures recent long questions pull averageQuestionLength up significantly
+    expect(signals.averageQuestionLength).toBeGreaterThanOrEqual(25);
+    expect(signals.averageOptionCount).toBeLessThanOrEqual(3);
+    // Recency decay on previous multiple_choice counts allows true_false to become dominant
+    expect(AuthoringPreferenceEngine.preferredQuestionType(signals)).toBe('true_false');
+  });
 });

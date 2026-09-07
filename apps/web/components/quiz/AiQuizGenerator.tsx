@@ -505,7 +505,7 @@ export default function AiQuizGenerator({
           pdfPages: aggregatedPages.length > 0 ? aggregatedPages : undefined,
           filesSummary,
           pipelineMode,
-          authoringSignals: loadLocalAuthoringSignals()
+          authoringSignals: loadLocalAuthoringSignals({ subjectId: selectedSubject || null })
         }),
       });
 

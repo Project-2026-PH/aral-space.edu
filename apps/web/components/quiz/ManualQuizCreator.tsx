@@ -532,15 +532,18 @@ export default function ManualQuizCreator({
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || 'Failed to create study set.');
       questions.forEach((question) => {
-        recordLocalAuthoringEvent({
-          action: 'create',
-          after: makeAuthoringQuestionSnapshot(
-            question.type,
-            question.question_text,
-            question.options,
-            question.explanation
-          )
-        });
+        recordLocalAuthoringEvent(
+          {
+            action: 'create',
+            after: makeAuthoringQuestionSnapshot(
+              question.type,
+              question.question_text,
+              question.options,
+              question.explanation
+            )
+          },
+          { subjectId: subjectId || null }
+        );
       });
       window.localStorage.removeItem(MANUAL_DRAFT_STORAGE_KEY);
       router.push(`/quizzes/${data.id}`);

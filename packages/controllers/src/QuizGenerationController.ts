@@ -46,7 +46,8 @@ export class QuizGenerationController {
     const authoringProfile = dto.authoringProfile || await UserAuthoringProfileService.buildProfile(
       this.quizRepo,
       userId,
-      dto.authoringSignals
+      dto.authoringSignals,
+      dto.subjectId || undefined
     );
 
     const uniqueChapters = Array.from(

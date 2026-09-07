@@ -8,7 +8,8 @@ export class UserAuthoringProfileService {
   static async buildProfile(
     quizRepo: IQuizRepository,
     userId?: string,
-    localSignals?: AuthoringPreferenceSignals
+    localSignals?: AuthoringPreferenceSignals,
+    subjectId?: string
   ): Promise<UserAuthoringProfile> {
     try {
       const allQuizzes = await quizRepo.listQuizzes(userId);
@@ -22,12 +23,16 @@ export class UserAuthoringProfileService {
         }, localSignals);
       }
 
+      // If subjectId is provided, prefer quizzes from that subject
+      const subjectQuizzes = subjectId ? allQuizzes.filter((q) => q.subject_id === subjectId) : [];
+      const pool = subjectQuizzes.length > 0 ? subjectQuizzes : allQuizzes;
+
       // Priority 1: Manual quizzes
-      const manualQuizzes = allQuizzes.filter((q) => q.source_model === 'manual');
+      const manualQuizzes = pool.filter((q) => q.source_model === 'manual');
       const useManual = manualQuizzes.length > 0;
       const targetQuizzes = useManual
         ? manualQuizzes
-        : allQuizzes.filter((q) => q.source_model !== 'manual');
+        : pool.filter((q) => q.source_model !== 'manual');
 
       if (targetQuizzes.length === 0) {
         return AuthoringPreferenceEngine.applyToProfile({

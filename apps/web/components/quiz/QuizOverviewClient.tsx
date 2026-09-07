@@ -152,9 +152,10 @@ export default function QuizOverviewClient({
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
             {isEditingTitle ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0 w-full">
                 <input
                   type="text"
+                  maxLength={50}
                   value={titleInput}
                   onChange={(e) => setTitleInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -164,14 +165,14 @@ export default function QuizOverviewClient({
                       setIsEditingTitle(false);
                     }
                   }}
-                  className="rounded-xl border border-primary bg-background px-3 py-1.5 text-lg font-bold text-foreground focus:outline-none flex-1"
+                  className="rounded-xl border border-primary bg-background px-3 py-1.5 text-lg font-bold text-foreground focus:outline-none flex-1 min-w-0"
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={handleSaveTitle}
                   disabled={savingTitle || !titleInput.trim()}
-                  className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-50 shrink-0"
                 >
                   <Check className="h-3.5 w-3.5" />
                   Save
@@ -182,20 +183,25 @@ export default function QuizOverviewClient({
                     setTitleInput(quiz.title);
                     setIsEditingTitle(false);
                   }}
-                  className="rounded-xl px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted"
+                  className="rounded-xl px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted shrink-0"
                 >
                   Cancel
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-extrabold text-foreground truncate">{quiz.title}</h1>
+              <div className="flex items-start gap-2 min-w-0 w-full">
+                <h1
+                  className="text-lg sm:text-xl font-extrabold text-foreground min-w-0 flex-1 break-words [overflow-wrap:anywhere] leading-snug"
+                  title={quiz.title}
+                >
+                  {quiz.title}
+                </h1>
                 <button
                   type="button"
                   onClick={() => setIsEditingTitle(true)}
                   title="Edit title"
                   aria-label="Edit title"
-                  className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+                  className="p-1 rounded-lg text-muted-foreground hover:text-foreground shrink-0 mt-0.5"
                 >
                   <Edit className="h-3.5 w-3.5" />
                 </button>

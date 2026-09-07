@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic';
 export default async function LibraryPage() {
   let quizzes: Quiz[] = [];
   let subjects: Subject[] = [];
+  let sharedQuizzes: Quiz[] = [];
+  let sharedSubjects: Subject[] = [];
   let userId = '';
 
   try {
@@ -18,6 +20,8 @@ export default async function LibraryPage() {
     const data = await controller.listQuizzesAndSubjects(userId);
     quizzes = data.quizzes || [];
     subjects = data.subjects || [];
+    sharedQuizzes = data.sharedQuizzes || [];
+    sharedSubjects = data.sharedSubjects || [];
   } catch (err) {
     console.error('Failed to load initial quizzes and subjects on library page:', err);
   }
@@ -26,6 +30,8 @@ export default async function LibraryPage() {
     <LibraryClient
       initialQuizzes={quizzes}
       initialSubjects={subjects}
+      initialSharedQuizzes={sharedQuizzes}
+      initialSharedSubjects={sharedSubjects}
       viewerId={userId}
     />
   );

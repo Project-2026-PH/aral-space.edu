@@ -12,6 +12,8 @@ interface QuizLibraryProps {
   subjects?: Subject[];
   selectedSubjectId?: string;
   onSubjectChange?: (subjectId: string) => void;
+  readOnly?: boolean;
+  heading?: string;
 }
 
 export default function QuizLibrary({
@@ -20,13 +22,16 @@ export default function QuizLibrary({
   subjects,
   selectedSubjectId = '',
   onSubjectChange,
+  readOnly = false,
+  heading = 'Reviewers',
 }: QuizLibraryProps) {
+  const headingId = readOnly ? 'shared-reviewer-library-heading' : 'quiz-library-heading';
   return (
-    <section className="space-y-4" aria-labelledby="quiz-library-heading">
+    <section className="space-y-4" aria-labelledby={headingId}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <h2 id="quiz-library-heading" className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-            Reviewers
+          <h2 id={headingId} className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+            {heading}
           </h2>
           {subjects !== undefined && (
             <div className="relative flex items-center">
@@ -133,14 +138,20 @@ export default function QuizLibrary({
                 </Link>
 
                 <div className="mt-3 flex items-center justify-between border-t-2 border-slate-900/20 dark:border-white/20 pt-3">
+                  {!readOnly ? (
+                    <Link
+                      href={`/quizzes/${quiz.id}`}
+                      className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
+                    >
+                      Manage
+                    </Link>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
+                      Read-only
+                    </span>
+                  )}
                   <Link
-                    href={`/quizzes/${quiz.id}`}
-                    className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
-                  >
-                    Manage
-                  </Link>
-                  <Link
-                    href={`/practice/${quiz.id}`}
+                    href={`/review/${quiz.id}`}
                     className="flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary px-3 py-1 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                   >
                     <Play className="h-3 w-3 fill-current" />

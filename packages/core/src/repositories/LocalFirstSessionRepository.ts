@@ -34,10 +34,10 @@ export class LocalFirstSessionRepository implements ISessionRepository {
     } catch (error) { console.warn('[LocalFirstSessionRepository] Failed to persist to storage:', error); }
   }
 
-  async getActiveSession(quizId: string, userId?: string) { return Array.from(this.sessions.values()).find((session) => session.quiz_id === quizId && session.status === 'in_progress' && (!userId || session.user_id === userId)) || null; }
-  async getScheduledSession(quizId: string, userId?: string) { return Array.from(this.sessions.values()).find((session) => session.quiz_id === quizId && session.status === 'scheduled' && (!userId || session.user_id === userId)) || null; }
-  async getLatestCompletedSession(quizId: string, userId?: string) { return Array.from(this.sessions.values()).filter((session) => session.quiz_id === quizId && session.status === 'completed' && (!userId || session.user_id === userId)).sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime())[0] || null; }
-  async listSessions(quizId: string, userId?: string) { return Array.from(this.sessions.values()).filter((session) => session.quiz_id === quizId && (!userId || session.user_id === userId)).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()); }
+  async getActiveSession(quizId: string, userId?: string) { return Array.from(this.sessions.values()).find((session) => session.quiz_id === quizId && session.status === 'in_progress' && (userId ? session.user_id === userId : !session.user_id)) || null; }
+  async getScheduledSession(quizId: string, userId?: string) { return Array.from(this.sessions.values()).find((session) => session.quiz_id === quizId && session.status === 'scheduled' && (userId ? session.user_id === userId : !session.user_id)) || null; }
+  async getLatestCompletedSession(quizId: string, userId?: string) { return Array.from(this.sessions.values()).filter((session) => session.quiz_id === quizId && session.status === 'completed' && (userId ? session.user_id === userId : !session.user_id)).sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime())[0] || null; }
+  async listSessions(quizId: string, userId?: string) { return Array.from(this.sessions.values()).filter((session) => session.quiz_id === quizId && (userId ? session.user_id === userId : !session.user_id)).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()); }
   async getSessionById(sessionId: string, userId?: string) { const session = this.sessions.get(sessionId); return session && (!userId || session.user_id === userId) ? session : null; }
 
   async createSession(quizId: string, sessionType: SessionType, availableAt?: string, userId?: string) {

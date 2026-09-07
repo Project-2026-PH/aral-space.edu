@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import NewSubjectModal from '@/components/subject/NewSubjectModal';
 import SubjectLibrary from '@/components/subject/SubjectLibrary';
 import QuizLibrary from '@/components/quiz/QuizLibrary';
+import SharedLibrary from '@/components/library/SharedLibrary';
 import { Sparkles, Plus, Search, LoaderCircle, FileText } from 'lucide-react';
 import Link from 'next/link';
 const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizModal'), {
@@ -15,10 +16,12 @@ import FloatingBottomNav from '@/components/navigation/FloatingBottomNav';
 export interface LibraryClientProps {
   initialQuizzes: Quiz[];
   initialSubjects: Subject[];
+  initialSharedQuizzes: Quiz[];
+  initialSharedSubjects: Subject[];
   viewerId: string;
 }
 
-export default function LibraryClient({ initialQuizzes, initialSubjects, viewerId }: LibraryClientProps) {
+export default function LibraryClient({ initialQuizzes, initialSubjects, initialSharedQuizzes, initialSharedSubjects, viewerId }: LibraryClientProps) {
   const [quizzes, setQuizzes] = useState<Quiz[]>(initialQuizzes);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
   const [loading] = useState(false);
@@ -155,6 +158,12 @@ export default function LibraryClient({ initialQuizzes, initialSubjects, viewerI
           onSubjectChange={setSelectedSubjectId}
         />
       </div>
+
+      <SharedLibrary
+        subjects={initialSharedSubjects}
+        quizzes={initialSharedQuizzes}
+        viewerId={viewerId}
+      />
 
       <NewSubjectModal
         open={showSubjectModal}

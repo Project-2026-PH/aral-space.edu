@@ -107,6 +107,9 @@ CREATE TABLE IF NOT EXISTS subject_collaborator_links (
   expires_at TIMESTAMPTZ,
   used_at TIMESTAMPTZ,
   used_by TEXT,
+  max_uses INTEGER NOT NULL DEFAULT 1,
+  uses_count INTEGER NOT NULL DEFAULT 0,
+  redeemed_by TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -119,7 +122,22 @@ CREATE TABLE IF NOT EXISTS subject_collaborators (
 
 CREATE INDEX IF NOT EXISTS idx_subject_collaborator_links_subject ON subject_collaborator_links(subject_id);
 CREATE INDEX IF NOT EXISTS idx_subject_collaborators_user ON subject_collaborators(user_id);
-ALTER TABLE subject_collaborator_links ADD COLUMN IF NOT EXISTS used_by UUID;
+
+-- Unique subject viewers are keyed by the stable anonymous user/device identity.
+CREATE TABLE IF NOT EXISTS subject_views (
+  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  viewer_id TEXT NOT NULL,
+  first_viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (subject_id, viewer_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_subject_views_subject ON subject_views(subject_id);
+CREATE INDEX IF NOT EXISTS idx_subject_views_viewer ON subject_views(viewer_id);
+ALTER TABLE subject_collaborator_links ADD COLUMN IF NOT EXISTS used_by TEXT;
+ALTER TABLE subject_collaborator_links ADD COLUMN IF NOT EXISTS max_uses INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE subject_collaborator_links ADD COLUMN IF NOT EXISTS uses_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE subject_collaborator_links ADD COLUMN IF NOT EXISTS redeemed_by TEXT[] NOT NULL DEFAULT '{}';
 
 
 -- Distributed request throttling for serverless API instances.

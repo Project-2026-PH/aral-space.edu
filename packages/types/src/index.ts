@@ -1,5 +1,6 @@
 export * from './models/Subject';
 export * from './models/Quiz';
+export * from './models/Library';
 export * from './models/QuizQuestion';
 export * from './models/QuizSession';
 export * from './models/QuestionProgress';

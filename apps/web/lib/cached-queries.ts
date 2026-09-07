@@ -1,7 +1,7 @@
 import { unstable_cache, revalidateTag } from 'next/cache';
 import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
 import { getQuizRepository } from '@/lib/db';
-import type { Quiz, Subject, PublicQuizDto, PublicSubjectDto } from '@quiz-creator/types';
+import type { Quiz, Subject, PublicQuizDto, PublicSubjectDto, LibraryData } from '@quiz-creator/types';
 
 /**
  * Cache duration constants
@@ -52,7 +52,7 @@ export async function getCachedQuiz(
  */
 export async function getCachedQuizzesAndSubjects(
   userId?: string
-): Promise<{ quizzes: Quiz[]; subjects: Subject[] }> {
+): Promise<LibraryData> {
   const uid = userId || 'anon';
   const fetcher = unstable_cache(
     async (currentUid: string) => {

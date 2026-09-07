@@ -4,13 +4,13 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 export class SupabaseSessionRepository implements ISessionRepository {
   constructor(private supabase: SupabaseClient) {}
-  async getActiveSession(quizId: string, userId?: string) { let query = this.supabase.from('quiz_sessions').select('*').eq('quiz_id', quizId).eq('status', 'in_progress').order('created_at', { ascending: false }).limit(1); if (userId) query = query.eq('user_id', userId); const { data, error } = await query.maybeSingle(); if (error) throw error; return data;
+  async getActiveSession(quizId: string, userId?: string) { let query = this.supabase.from('quiz_sessions').select('*').eq('quiz_id', quizId).eq('status', 'in_progress').order('created_at', { ascending: false }).limit(1); if (userId) query = query.eq('user_id', userId); else query = query.is('user_id', null); const { data, error } = await query.maybeSingle(); if (error) throw error; return data;
   }
-  async getScheduledSession(quizId: string, userId?: string) { let query = this.supabase.from('quiz_sessions').select('*').eq('quiz_id', quizId).eq('status', 'scheduled').order('available_at', { ascending: true }).limit(1); if (userId) query = query.eq('user_id', userId); const { data, error } = await query.maybeSingle(); if (error) throw error; return data;
+  async getScheduledSession(quizId: string, userId?: string) { let query = this.supabase.from('quiz_sessions').select('*').eq('quiz_id', quizId).eq('status', 'scheduled').order('available_at', { ascending: true }).limit(1); if (userId) query = query.eq('user_id', userId); else query = query.is('user_id', null); const { data, error } = await query.maybeSingle(); if (error) throw error; return data;
   }
-  async getLatestCompletedSession(quizId: string, userId?: string) { let query = this.supabase.from('quiz_sessions').select('*').eq('quiz_id', quizId).eq('status', 'completed').order('completed_at', { ascending: false }).limit(1); if (userId) query = query.eq('user_id', userId); const { data, error } = await query.maybeSingle(); if (error) throw error; return data;
+  async getLatestCompletedSession(quizId: string, userId?: string) { let query = this.supabase.from('quiz_sessions').select('*').eq('quiz_id', quizId).eq('status', 'completed').order('completed_at', { ascending: false }).limit(1); if (userId) query = query.eq('user_id', userId); else query = query.is('user_id', null); const { data, error } = await query.maybeSingle(); if (error) throw error; return data;
   }
-  async listSessions(quizId: string, userId?: string) { let query = this.supabase.from('quiz_sessions').select('*').eq('quiz_id', quizId).order('created_at', { ascending: false }); if (userId) query = query.eq('user_id', userId); const { data, error } = await query; if (error) throw error; return data || [];
+  async listSessions(quizId: string, userId?: string) { let query = this.supabase.from('quiz_sessions').select('*').eq('quiz_id', quizId).order('created_at', { ascending: false }); if (userId) query = query.eq('user_id', userId); else query = query.is('user_id', null); const { data, error } = await query; if (error) throw error; return data || [];
   }
   async getSessionById(sessionId: string, userId?: string) { let query = this.supabase.from('quiz_sessions').select('*').eq('id', sessionId); if (userId) query = query.eq('user_id', userId); const { data, error } = await query.maybeSingle(); if (error) throw error; return data;
   }

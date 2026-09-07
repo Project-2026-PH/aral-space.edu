@@ -1,19 +1,21 @@
-import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto, UpdateSubjectShareConfigDto, SubjectShareConfig, PublicSubjectDto, SubjectAccess, SubjectCollaboratorLink, UpdateSubjectDto } from '@quiz-creator/types';
+import { Quiz, QuizQuestion, CreateQuizDto, UpdateQuizDto, CreateQuestionDto, UpdateQuestionDto, Subject, UpdateShareConfigDto, PublicQuizDto, UpdateSubjectShareConfigDto, SubjectShareConfig, PublicSubjectDto, SubjectAccess, SubjectCollaboratorLink, UpdateSubjectDto, LibraryData } from '@quiz-creator/types';
 
 export interface IQuizRepository {
   listSubjects(userId?: string): Promise<Subject[]>;
   createSubject(name: string, color: string, userId?: string): Promise<Subject>;
+  recordSubjectView?(subjectId: string, viewerId: string): Promise<void>;
+  getSubjectViewerCount?(subjectId: string, ownerId: string): Promise<number>;
   updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string): Promise<Subject>;
   deleteSubject(subjectId: string, userId?: string): Promise<boolean>;
   getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null>;
   listQuizzesBySubject(subjectId: string, userId?: string): Promise<Quiz[]>;
-  createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string): Promise<SubjectCollaboratorLink>;
+  createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string, maxUses?: number): Promise<SubjectCollaboratorLink>;
   redeemSubjectCollaboratorLink(token: string, userId: string): Promise<SubjectAccess | null>;
   getSubjectShareConfig(subjectId: string, userId?: string): Promise<SubjectShareConfig>;
   updateSubjectShareConfig(subjectId: string, dto: UpdateSubjectShareConfigDto, userId?: string): Promise<SubjectShareConfig>;
   getSubjectByShareToken(shareToken: string): Promise<PublicSubjectDto | null>;
   listQuizzes(userId?: string): Promise<Quiz[]>;
-  listQuizzesAndSubjects?(userId?: string): Promise<{ quizzes: Quiz[]; subjects: Subject[] }>;
+  listQuizzesAndSubjects?(userId?: string): Promise<LibraryData>;
   getQuizById(id: string, userId?: string): Promise<Quiz | null>;
   createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz>;
   updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz>;

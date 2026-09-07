@@ -26,6 +26,7 @@ export default function ShareSubjectModal({
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [collaboratorExpiry, setCollaboratorExpiry] = useState('7d');
+  const [collaboratorMaxUses, setCollaboratorMaxUses] = useState('5');
   const [collaboratorUrl, setCollaboratorUrl] = useState('');
   const [collaboratorCopied, setCollaboratorCopied] = useState(false);
   const [creatingCollaborator, setCreatingCollaborator] = useState(false);
@@ -104,11 +105,15 @@ export default function ShareSubjectModal({
     try {
       const expiresAt = collaboratorExpiry === 'never'
         ? null
-        : new Date(Date.now() + Number(collaboratorExpiry) * 24 * 60 * 60 * 1000).toISOString();
+        : new Date(Date.now() + Number(collaboratorExpiry) * 24 * 60 * 1000).toISOString();
+      const maxUses = Math.min(5, Math.max(1, Number(collaboratorMaxUses) || 5));
       const response = await fetch(`/api/subjects/${subject.id}/collaborator-link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expires_at: expiresAt })
+        body: JSON.stringify({
+          expires_at: expiresAt,
+          max_uses: maxUses
+        })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to create collaborator link');
@@ -182,9 +187,8 @@ export default function ShareSubjectModal({
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 border-slate-900 px-4 py-2.5 text-xs font-black shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer ${
-                    copied ? 'bg-emerald-500 text-white' : 'bg-primary text-white'
-                  }`}
+                  className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 border-slate-900 px-4 py-2.5 text-xs font-black shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer ${copied ? 'bg-emerald-500 text-white' : 'bg-primary text-white'
+                    }`}
                 >
                   {copied ? <CopyCheck className="h-3.5 w-3.5 stroke-[2.5]" /> : <Copy className="h-3.5 w-3.5 stroke-[2.5]" />}
                   <span>{copied ? 'Copied!' : 'Copy'}</span>
@@ -192,75 +196,78 @@ export default function ShareSubjectModal({
               </div>
             </div>
 
-            {!readOnly && (
-              <div className="space-y-4 rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-slate-50 dark:bg-slate-900/60 p-4 shadow-brutal-sm">
-                <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">Access Permissions</h4>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-1.5 text-xs font-black text-foreground">
-                      {isPublic ? <Globe className="h-3.5 w-3.5 text-primary" /> : <Lock className="h-3.5 w-3.5 text-amber-500" />}
-                      <span>{isPublic ? 'Link Enabled' : 'Link Disabled'}</span>
-                    </div>
-                    <p className="text-[11px] font-medium leading-relaxed text-muted-foreground">
-                      {isPublic ? 'Anyone with the link can see this subject and its shared study sets.' : 'The shared link is disabled until you enable it again.'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isPublic}
-                    disabled={saving}
-                    onClick={() => updateConfig({ is_public: !isPublic })}
-                    className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 border-slate-900 shadow-brutal-sm transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${isPublic ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'}`}
-                  >
-                    <span className={`inline-block h-5 w-5 rounded-full border border-slate-900 bg-white shadow-sm transition-transform ${isPublic ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                  </button>
-                </div>
-              </div>
-            )}
-
+            {/* Collaborator link container */}
             {!readOnly && (
               <div className="space-y-4 rounded-2xl border-2 border-slate-900 bg-[#bfdbfe]/30 dark:bg-blue-950/40 p-4 shadow-brutal-sm">
                 <div className="flex items-center gap-2">
                   <UserPlus className="h-4 w-4 text-primary" />
                   <h4 className="text-[11px] font-black uppercase tracking-wider text-primary">Collaborator link</h4>
                 </div>
-                <p className="text-[11px] font-medium leading-relaxed text-muted-foreground">Create a single-use edit link. It becomes invalid as soon as someone accepts it.</p>
-                <div className="flex flex-wrap gap-2">
-                  <select
-                    value={collaboratorExpiry}
-                    onChange={(event) => setCollaboratorExpiry(event.target.value)}
-                    className="flex-1 rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3 py-2 text-xs font-black text-foreground shadow-brutal-sm outline-none focus:border-primary"
-                  >
-                    <option value="1">Expires in 1 day</option>
-                    <option value="7">Expires in 7 days</option>
-                    <option value="30">Expires in 30 days</option>
-                    <option value="never">No expiry until accessed</option>
-                  </select>
+                <p className="text-[11px] font-medium leading-relaxed text-muted-foreground">
+                  Create a read-only shared library link for up to 5 users. Each device/user is counted once in the owner’s viewer total.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400">Expiration</label>
+                    <select
+                      value={collaboratorExpiry}
+                      onChange={(event) => setCollaboratorExpiry(event.target.value)}
+                      className="rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3 py-2 text-xs font-black text-foreground shadow-brutal-sm outline-none focus:border-primary"
+                    >
+                      <option value="1">Expires in 1 day</option>
+                      <option value="7">Expires in 7 days</option>
+                      <option value="30">Expires in 30 days</option>
+                      <option value="never">No expiry</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400">Max Users / Devices</label>
+                    <select
+                      value={collaboratorMaxUses}
+                      onChange={(event) => setCollaboratorMaxUses(event.target.value)}
+                      className="rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3 py-2 text-xs font-black text-foreground shadow-brutal-sm outline-none focus:border-primary"
+                    >
+                      <option value="1">1 user / device</option>
+                      <option value="2">2 users / devices</option>
+                      <option value="3">3 users / devices</option>
+                      <option value="4">4 users / devices</option>
+                      <option value="5">5 users / devices (max)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-1">
                   <button
                     type="button"
                     onClick={createCollaboratorLink}
                     disabled={creatingCollaborator}
-                    className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-2 text-xs font-black text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-50 cursor-pointer"
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-2 text-xs font-black text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all disabled:opacity-50 cursor-pointer"
                   >
-                    <UserPlus className="h-3.5 w-3.5 stroke-[2.5]" /> {creatingCollaborator ? 'Creating...' : 'Create link'}
+                    <UserPlus className="h-3.5 w-3.5 stroke-[2.5]" /> {creatingCollaborator ? 'Creating...' : 'Create collaborator link'}
                   </button>
                 </div>
+
                 {collaboratorUrl && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      readOnly
-                      value={collaboratorUrl}
-                      onFocus={(event) => event.target.select()}
-                      className="min-w-0 flex-1 rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3 py-2 font-mono text-[11px] font-black text-foreground shadow-brutal-sm outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={copyCollaboratorLink}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
-                    >
-                      {collaboratorCopied ? <CopyCheck className="h-3.5 w-3.5 stroke-[2.5]" /> : <Copy className="h-3.5 w-3.5 stroke-[2.5]" />} {collaboratorCopied ? 'Copied' : 'Copy'}
-                    </button>
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-[10px] font-black text-slate-600 dark:text-slate-400">
+                      <span>Collaborator Link Ready</span>
+                      <span className="text-primary font-black">Valid for {collaboratorMaxUses} unique viewer(s)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={collaboratorUrl}
+                        onFocus={(event) => event.target.select()}
+                        className="min-w-0 flex-1 rounded-xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card px-3 py-2 font-mono text-[11px] font-black text-foreground shadow-brutal-sm outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={copyCollaboratorLink}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+                      >
+                        {collaboratorCopied ? <CopyCheck className="h-3.5 w-3.5 stroke-[2.5]" /> : <Copy className="h-3.5 w-3.5 stroke-[2.5]" />} {collaboratorCopied ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -17,8 +17,11 @@ export const POST = createApiRoute<{ subjectId: string }>(async ({ req, params, 
     if (!Number.isFinite(timestamp) || timestamp <= Date.now()) throw new RequestSecurityError(400, 'Expiry must be in the future.');
     expiresAt = new Date(timestamp).toISOString();
   }
+  const rawMaxUses = body.max_uses !== undefined ? Number(body.max_uses) : 5;
+  const maxUses = Number.isInteger(rawMaxUses) && rawMaxUses >= 1 && rawMaxUses <= 5 ? rawMaxUses : 5;
+
   const repository = await getQuizRepository();
   const controller = new QuizCrudController(repository);
-  const link = await controller.createSubjectCollaboratorLink(params.subjectId, expiresAt, userId);
+  const link = await controller.createSubjectCollaboratorLink(params.subjectId, expiresAt, userId, maxUses);
   return NextResponse.json(link, { status: 201 });
 });

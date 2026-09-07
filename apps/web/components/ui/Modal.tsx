@@ -41,8 +41,8 @@ export default function Modal({
         className="fixed inset-0 bg-background/80 backdrop-blur-md transition-opacity"
         onClick={() => onOpenChange(false)}
       />
-      <div className={`relative z-50 w-full ${maxWidth} rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] p-6 shadow-brutal animate-fade-in ${className}`}>
-        <div className="flex items-start justify-between pb-4 border-b-2 border-slate-900/20 dark:border-white/20">
+      <div className={`relative z-50 w-full ${maxWidth} max-h-[85vh] flex flex-col rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] p-6 shadow-brutal animate-fade-in ${className}`}>
+        <div className="flex items-start justify-between pb-4 border-b-2 border-slate-900/20 dark:border-white/20 shrink-0">
           <div>
             {title && <h3 className="text-lg font-black text-slate-900 dark:text-white">{title}</h3>}
             {description && <p className="text-xs font-medium text-muted-foreground mt-0.5">{description}</p>}
@@ -55,7 +55,7 @@ export default function Modal({
             <X className="h-4 w-4 stroke-[2.5]" />
           </button>
         </div>
-        <div className="mt-4">{children}</div>
+        <div className="mt-4 flex-1 min-h-0 overflow-y-auto custom-scrollbar-card-light dark:custom-scrollbar-card pr-1">{children}</div>
       </div>
     </div>
   );

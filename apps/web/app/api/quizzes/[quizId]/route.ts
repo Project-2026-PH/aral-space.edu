@@ -21,6 +21,10 @@ export const PATCH = createApiRoute<{ quizId: string }>(async ({ req, params, us
   const dto = parseUpdateQuiz(body);
   const quizRepo = await getQuizRepository();
   const controller = new QuizCrudController(quizRepo);
+  const accessibleQuiz = await controller.getQuiz(params.quizId, userId);
+  if (!accessibleQuiz || accessibleQuiz.user_id !== userId) {
+    return NextResponse.json({ error: 'This reviewer is read-only for you.' }, { status: 403 });
+  }
   const before = await controller.getShareConfig(params.quizId, userId).catch(() => null);
   const updated = await controller.updateQuiz(params.quizId, dto, userId);
   if (before?.share_token) revalidatePublicQuizTag(before.share_token);
@@ -36,6 +40,10 @@ export const DELETE = createApiRoute<{ quizId: string }>(async ({ req, params, u
   if (rateLimit) return rateLimit;
   const quizRepo = await getQuizRepository();
   const controller = new QuizCrudController(quizRepo);
+  const accessibleQuiz = await controller.getQuiz(params.quizId, userId);
+  if (!accessibleQuiz || accessibleQuiz.user_id !== userId) {
+    return NextResponse.json({ error: 'This reviewer is read-only for you.' }, { status: 403 });
+  }
   const before = await controller.getShareConfig(params.quizId, userId).catch(() => null);
   const success = await controller.deleteQuiz(params.quizId, userId);
   if (!success) return NextResponse.json({ error: 'Quiz not found' }, { status: 404 });

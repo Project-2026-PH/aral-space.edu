@@ -22,6 +22,7 @@ export default async function QuizDetailPage({
       quiz={quiz}
       questions={quiz.questions || []}
       sessions={[]}
+      readOnly={quiz.user_id !== userId}
     />
   );
 }

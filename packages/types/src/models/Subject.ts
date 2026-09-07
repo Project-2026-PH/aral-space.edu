@@ -8,6 +8,7 @@ export interface Subject {
   is_public?: boolean;
   share_expires_at?: string | null;
   share_revoked_at?: string | null;
+  viewer_count?: number;
 }
 
 export type SubjectAccessRole = 'owner' | 'collaborator';
@@ -23,4 +24,7 @@ export interface SubjectCollaboratorLink {
   token: string;
   expires_at: string | null;
   used_at?: string | null;
+  max_uses?: number;
+  uses_count?: number;
+  redeemed_by?: string[];
 }

@@ -177,6 +177,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const swipeTimerRef = useRef<number | null>(null);
   const frontContentRef = useRef<HTMLDivElement>(null);
   const backContentRef = useRef<HTMLDivElement>(null);
+  const lastReviewRefreshRef = useRef(0);
 
   useEffect(() => {
     quizAudio.preload();
@@ -185,6 +186,27 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
       setBestStreak(record.allTimeBestStreak);
     }
   }, [quiz.id]);
+
+  useEffect(() => {
+    const refreshReview = () => {
+      if (document.visibilityState !== 'visible') return;
+
+      const now = Date.now();
+      if (now - lastReviewRefreshRef.current < 1000) return;
+      lastReviewRefreshRef.current = now;
+      router.refresh();
+    };
+
+    window.addEventListener('focus', refreshReview);
+    window.addEventListener('pageshow', refreshReview);
+    document.addEventListener('visibilitychange', refreshReview);
+
+    return () => {
+      window.removeEventListener('focus', refreshReview);
+      window.removeEventListener('pageshow', refreshReview);
+      document.removeEventListener('visibilitychange', refreshReview);
+    };
+  }, [router]);
 
   useEffect(() => {
     setSessionHydrated(false);

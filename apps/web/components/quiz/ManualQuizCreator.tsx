@@ -542,6 +542,26 @@ export default function ManualQuizCreator({
   function applyPendingImport() {
     if (!pendingImport) return;
 
+    const targetIndex = pendingImport.questionIndex;
+    const appendOrReplaceEmptyTarget = (newCards: QuestionDraft[]) => {
+      setQuestions((prev) => {
+        const target = prev[targetIndex];
+        const isTargetEmpty = Boolean(
+          target &&
+          !hasRichTextContent(target.question_text) &&
+          target.options.every((option) => !option.trim())
+        );
+
+        if (!isTargetEmpty) return [...prev, ...newCards];
+
+        return [
+          ...prev.slice(0, targetIndex),
+          ...newCards,
+          ...prev.slice(targetIndex + 1)
+        ];
+      });
+    };
+
     if (pendingImport.type === 'bulk_terms') {
       const newCards: QuestionDraft[] = pendingImport.items.map((item) => ({
         type: 'identification',
@@ -551,13 +571,7 @@ export default function ManualQuizCreator({
         explanation: ''
       }));
 
-      // If existing list only contains 1 empty initial card, replace it
-      const isFirstEmpty =
-        questions.length === 1 &&
-        !questions[0].question_text.trim() &&
-        questions[0].options.every((o) => !o.trim());
-
-      setQuestions((prev) => (isFirstEmpty ? newCards : [...prev, ...newCards]));
+      appendOrReplaceEmptyTarget(newCards);
     } else if (pendingImport.type === 'question_answers') {
       const newCards: QuestionDraft[] = pendingImport.items.map((item) => ({
         type: 'identification',
@@ -567,12 +581,7 @@ export default function ManualQuizCreator({
         explanation: ''
       }));
 
-      const isFirstEmpty =
-        questions.length === 1 &&
-        !questions[0].question_text.trim() &&
-        questions[0].options.every((o) => !o.trim());
-
-      setQuestions((prev) => (isFirstEmpty ? newCards : [...prev, ...newCards]));
+      appendOrReplaceEmptyTarget(newCards);
     } else if (pendingImport.type === 'enumeration_blocks') {
       const newCards: QuestionDraft[] = pendingImport.blocks.map((block) => ({
         type: 'enumeration',
@@ -582,12 +591,7 @@ export default function ManualQuizCreator({
         explanation: ''
       }));
 
-      const isFirstEmpty =
-        questions.length === 1 &&
-        !questions[0].question_text.trim() &&
-        questions[0].options.every((o) => !o.trim());
-
-      setQuestions((prev) => (isFirstEmpty ? newCards : [...prev, ...newCards]));
+      appendOrReplaceEmptyTarget(newCards);
     }
 
     setPendingImport(null);

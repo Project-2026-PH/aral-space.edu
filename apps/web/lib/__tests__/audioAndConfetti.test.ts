@@ -99,7 +99,8 @@ describe('QuizAudioManager', () => {
     expect(globalThis.Audio).toHaveBeenCalledWith('/correct_sound.mp3');
     expect(globalThis.Audio).toHaveBeenCalledWith('/success_sound.mp3');
     expect(mockAudioInstance.volume).toBe(0.7);
-    expect(mockAudioInstance.preload).toBe('auto');
+    // Audio is intentionally deferred to avoid locking persistent background audio channels.
+    expect(mockAudioInstance.preload).toBe('none');
   });
 
   it('plays correct and success sounds when unmuted', async () => {

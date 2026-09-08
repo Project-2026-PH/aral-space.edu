@@ -140,8 +140,9 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   private async requireQuizWriteAccess(quizId: string, userId?: string): Promise<Quiz> {
+    if (!userId) throw new Error('Authenticated user required for quiz writes');
     const quiz = await this.requireQuizAccess(quizId, userId);
-    if (userId && quiz.user_id !== userId) {
+    if (quiz.user_id !== userId) {
       const access = quiz.subject_id ? await this.getSubjectAccess(quiz.subject_id, userId) : null;
       if (!access?.can_edit_reviewers) throw new Error('Reviewer is read-only for this user');
     }
@@ -149,14 +150,18 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   private async requireQuizOwnerAccess(quizId: string, userId?: string): Promise<Quiz> {
+    if (!userId) throw new Error('Authenticated user required for quiz management');
     const quiz = await this.requireQuizAccess(quizId, userId);
-    if (userId && quiz.user_id !== userId) throw new Error('Only the reviewer owner can manage this reviewer');
+    if (quiz.user_id !== userId) throw new Error('Only the reviewer owner can manage this reviewer');
     return quiz;
   }
 
   async listSubjects(userId?: string): Promise<Subject[]> {
     const list = Array.from(this.subjects.values());
-    return userId ? list.filter(s => s.user_id === userId || this.collaborators.get(s.id)?.has(userId)) : list;
+    return list.filter((subject) => {
+      if (userId && (subject.user_id === userId || this.collaborators.get(subject.id)?.has(userId))) return true;
+      return isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at);
+    });
   }
 
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {
@@ -176,19 +181,22 @@ export class MemoryQuizRepository implements IQuizRepository {
 
   async listQuizzes(userId?: string): Promise<Quiz[]> {
     const all = Array.from(this.quizzes.values());
-    const filtered = userId ? all.filter(q => !q.user_id || q.user_id === userId || Boolean(q.subject_id && this.collaborators.get(q.subject_id)?.has(userId))) : all;
-    return filtered.map(q => ({
-      ...q,
-      subject: q.subject_id ? this.subjects.get(q.subject_id) || null : null
+    const filtered = all.filter((quiz) => {
+      if (userId && (quiz.user_id === userId || Boolean(quiz.subject_id && this.collaborators.get(quiz.subject_id)?.has(userId)))) return true;
+      return isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at);
+    });
+    return filtered.map((quiz) => ({
+      ...quiz,
+      subject: quiz.subject_id ? this.subjects.get(quiz.subject_id) || null : null
     }));
   }
 
   async getQuizById(id: string, userId?: string): Promise<Quiz | null> {
     const quiz = this.quizzes.get(id);
     if (!quiz) return null;
-    if (userId && quiz.user_id && quiz.user_id !== userId) {
-      if (!quiz.subject_id || !(await this.getSubjectAccess(quiz.subject_id, userId))) return null;
-    }
+    const isOwner = Boolean(userId && quiz.user_id === userId);
+    const isCollaborator = Boolean(userId && quiz.subject_id && this.collaborators.get(quiz.subject_id)?.has(userId));
+    if (!isOwner && !isCollaborator && !isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)) return null;
     return {
       ...quiz,
       subject: quiz.subject_id ? this.subjects.get(quiz.subject_id) || null : null
@@ -257,8 +265,9 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async deleteQuiz(id: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Authenticated user required for quiz management');
     const quiz = await this.getQuizById(id, userId);
-    if (!quiz || (userId && quiz.user_id !== userId)) return false;
+    if (!quiz || quiz.user_id !== userId) return false;
     const deleted = this.quizzes.delete(quiz.id);
     for (const [qId, q] of this.questions.entries()) {
       if (q.quiz_id === id) this.questions.delete(qId);
@@ -401,20 +410,25 @@ export class MemoryQuizRepository implements IQuizRepository {
 
   async getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null> {
     const subject = this.subjects.get(subjectId);
-    if (!subject || !userId) return null;
-    if (subject.user_id === userId) {
+    if (!subject) return null;
+    if (userId && subject.user_id === userId) {
       return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
     }
-    if (this.collaborators.get(subjectId)?.has(userId)) {
+    if (userId && this.collaborators.get(subjectId)?.has(userId)) {
       return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+    }
+    if (isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)) {
+      return { subject_id: subjectId, role: 'public', can_edit: false, can_edit_reviewers: false, can_manage: false };
     }
     return null;
   }
 
   async listQuizzesBySubject(subjectId: string, userId?: string): Promise<Quiz[]> {
-    if (!(await this.getSubjectAccess(subjectId, userId))) throw new Error('Subject not found or access is restricted');
+    const access = await this.getSubjectAccess(subjectId, userId);
+    if (!access) throw new Error('Subject not found or access is restricted');
     return Array.from(this.quizzes.values())
       .filter((quiz) => quiz.subject_id === subjectId)
+      .filter((quiz) => access.role !== 'public' || isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at))
       .map((quiz) => ({ ...quiz, subject: this.subjects.get(subjectId) || null }));
   }
 
@@ -475,8 +489,9 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Authenticated user required for subject management');
     const subject = this.subjects.get(subjectId);
-    if (!subject || (userId && (!subject.user_id || subject.user_id !== userId))) return false;
+    if (!subject || !subject.user_id || subject.user_id !== userId) return false;
 
     for (const [quizId, quiz] of this.quizzes.entries()) {
       if (quiz.subject_id !== subjectId) continue;
@@ -511,9 +526,10 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
+    if (!userId) throw new Error('Authenticated user required for subject sharing');
     const subject = this.subjects.get(subjectId);
     if (!subject) throw new Error(`Subject ${subjectId} not found`);
-    if (userId && subject.user_id !== userId) throw new Error(`Subject ${subjectId} not found`);
+    if (subject.user_id !== userId) throw new Error(`Subject ${subjectId} not found`);
 
     if (!subject.share_token) {
       subject.share_token = generateShareToken();
@@ -531,8 +547,9 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async updateSubjectShareConfig(subjectId: string, dto: UpdateSubjectShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
+    if (!userId) throw new Error('Authenticated user required for subject sharing');
     const subject = this.subjects.get(subjectId);
-    if (!subject || (userId && subject.user_id !== userId)) throw new Error(`Subject ${subjectId} not found`);
+    if (!subject || subject.user_id !== userId) throw new Error(`Subject ${subjectId} not found`);
 
     const wasRevoked = Boolean(subject.share_revoked_at) || subject.is_public === false;
     if (dto.reset_token || !subject.share_token || (dto.is_public === true && wasRevoked)) {

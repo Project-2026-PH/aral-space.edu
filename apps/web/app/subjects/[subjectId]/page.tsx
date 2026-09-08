@@ -17,7 +17,7 @@ export default async function SubjectDetailPage({
   const controller = new QuizCrudController(repository);
   const access = await controller.getSubjectAccess(subjectId, userId);
   if (!access) notFound();
-  if (access.role === 'collaborator') {
+  if (access.role !== 'owner') {
     await controller.recordSubjectView(subjectId, userId);
   }
   const subjects = await controller.listSubjects(userId);

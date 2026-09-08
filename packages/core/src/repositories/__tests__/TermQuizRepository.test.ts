@@ -32,6 +32,7 @@ describe('Quiz Term Categorization', () => {
   });
 
   it('updates quiz term in MemoryQuizRepository', async () => {
+    const ownerId = 'term-owner';
     const created = await memoryRepo.createQuiz({
       title: 'Discrete Math Reviewer',
       term: 'Prelim',
@@ -42,15 +43,15 @@ describe('Quiz Term Categorization', () => {
           correct_answer: 0
         }
       ]
-    });
+    }, ownerId);
 
     const updated = await memoryRepo.updateQuiz(created.id, {
       term: 'Midterm'
-    });
+    }, ownerId);
 
     expect(updated.term).toBe('Midterm');
 
-    const fetched = await memoryRepo.getQuizById(created.id);
+    const fetched = await memoryRepo.getQuizById(created.id, ownerId);
     expect(fetched?.term).toBe('Midterm');
   });
 
@@ -90,6 +91,7 @@ describe('Quiz Term Categorization', () => {
   });
 
   it('handles term correctly in LocalFirstQuizRepository', async () => {
+    const ownerId = 'term-owner';
     const created = await localFirstRepo.createQuiz({
       title: 'Local First Network Reviewer',
       term: 'Finals',
@@ -100,16 +102,16 @@ describe('Quiz Term Categorization', () => {
           correct_answer: 0
         }
       ]
-    });
+    }, ownerId);
 
     expect(created.term).toBe('Finals');
 
     const updated = await localFirstRepo.updateQuiz(created.id, {
       term: 'Semi-Final'
-    });
+    }, ownerId);
     expect(updated.term).toBe('Semi-Final');
 
-    const fetched = await localFirstRepo.getQuizById(created.id);
+    const fetched = await localFirstRepo.getQuizById(created.id, ownerId);
     expect(fetched?.term).toBe('Semi-Final');
   });
 });

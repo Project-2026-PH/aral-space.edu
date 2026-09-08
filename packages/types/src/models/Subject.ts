@@ -11,10 +11,11 @@ export interface Subject {
   viewer_count?: number;
 }
 
-export type SubjectAccessRole = 'owner' | 'collaborator';
+export type SubjectAccessRole = 'owner' | 'collaborator' | 'public';
 
 export interface SubjectAccess {
   subject_id: string;
+  /** Public access is read-only; it is never a collaboration membership. */
   role: SubjectAccessRole;
   /** Can edit subject name and color. Owner-only. */
   can_edit: boolean;

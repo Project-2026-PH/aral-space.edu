@@ -14,12 +14,12 @@ describe('Anonymous User Data Isolation', () => {
     sessionRepo = new MemorySessionRepository();
   });
 
-  it('allows anonymous user to see default quizzes and their own created quizzes', async () => {
+  it('allows anonymous users to see public default and created quizzes', async () => {
     // Initial: default quiz exists
     const initialQuizzes = await quizRepo.listQuizzes(userA);
     expect(initialQuizzes.length).toBeGreaterThan(0);
 
-    // User A creates a private quiz
+    // User A creates a public quiz by default
     const createdA = await quizRepo.createQuiz({
       title: 'User A Custom Chemistry Quiz',
       questions: [
@@ -35,12 +35,12 @@ describe('Anonymous User Data Isolation', () => {
     const userAQuizzes = await quizRepo.listQuizzes(userA);
     expect(userAQuizzes.some(q => q.id === createdA.id)).toBe(true);
 
-    // User B should NOT see User A's custom quiz
+    // User B can read User A's public quiz but does not receive edit access
     const userBQuizzes = await quizRepo.listQuizzes(userB);
-    expect(userBQuizzes.some(q => q.id === createdA.id)).toBe(false);
+    expect(userBQuizzes.some(q => q.id === createdA.id)).toBe(true);
   });
 
-  it('isolates quiz fetch, update, and delete per anonymous user', async () => {
+  it('allows public quiz reads while isolating writes per anonymous user', async () => {
     const createdA = await quizRepo.createQuiz({
       title: 'Secret Biology Quiz',
       questions: [
@@ -57,9 +57,10 @@ describe('Anonymous User Data Isolation', () => {
     expect(quizForA).not.toBeNull();
     expect(quizForA?.title).toBe('Secret Biology Quiz');
 
-    // User B cannot fetch User A's quiz
+    // User B can fetch the public quiz by its opaque ID
     const quizForB = await quizRepo.getQuizById(createdA.id, userB);
-    expect(quizForB).toBeNull();
+    expect(quizForB).not.toBeNull();
+    expect(quizForB?.title).toBe('Secret Biology Quiz');
 
     // User B cannot update User A's quiz
     await expect(quizRepo.updateQuiz(createdA.id, { title: 'Hacked Title' }, userB))

@@ -387,7 +387,7 @@ const EVIDENCE_STOP_WORDS = new Set([
 
 export function stemToken(token: string): string {
   return token
-    .replace(/(?:ing|tion|sion|ment|able|ible|ness|ous|ive|ize|ise|ity|ied|ies|ed|es|er|al|ly|s)$/, '');
+    .replace(/(?:ing|ion|ment|able|ible|ness|ous|ive|ize|ise|ity|ied|ies|ed|es|er|al|ly|s)$/, '');
 }
 
 export function hasAnswerOverlap(output: string, answer: string): boolean {

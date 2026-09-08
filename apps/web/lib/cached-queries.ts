@@ -63,7 +63,7 @@ export async function getCachedQuizzesAndSubjects(
     ['user-quizzes-subjects', uid],
     {
       revalidate: CACHE_TTL.SHORT,
-      tags: [CacheTags.userQuizzes(uid), CacheTags.userSubjects(uid)],
+      tags: [CacheTags.userQuizzes(uid), CacheTags.userSubjects(uid), CacheTags.allPublicSubjects],
     }
   );
 

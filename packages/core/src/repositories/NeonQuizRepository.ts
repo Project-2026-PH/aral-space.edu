@@ -38,8 +38,9 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   private async requireQuizWriteAccess(quizId: string, userId?: string): Promise<Quiz> {
+    if (!userId) throw new Error('Authenticated user required for quiz writes');
     const quiz = await this.requireQuizAccess(quizId, userId);
-    if (userId && quiz.user_id !== userId) {
+    if (quiz.user_id !== userId) {
       const access = quiz.subject_id ? await this.getSubjectAccess(quiz.subject_id, userId) : null;
       if (!access?.can_edit_reviewers) throw new Error('Reviewer is read-only for this user');
     }
@@ -47,27 +48,41 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   private async requireQuizOwnerAccess(quizId: string, userId?: string): Promise<Quiz> {
+    if (!userId) throw new Error('Authenticated user required for quiz management');
     const quiz = await this.requireQuizAccess(quizId, userId);
-    if (userId && quiz.user_id !== userId) throw new Error('Only the reviewer owner can manage this reviewer');
+    if (quiz.user_id !== userId) throw new Error('Only the reviewer owner can manage this reviewer');
     return quiz;
   }
 
   async listSubjects(userId?: string): Promise<Subject[]> {
-    if (!userId) return [];
-    const rows = await this.sql`
-      SELECT s.*,
-        CASE WHEN s.user_id = ${userId}
-          THEN COALESCE((SELECT COUNT(*)::int FROM subject_views sv WHERE sv.subject_id = s.id), 0)
-          ELSE 0
-        END AS viewer_count
-      FROM subjects s
-      WHERE s.user_id = ${userId}
-         OR EXISTS (
-           SELECT 1 FROM subject_collaborators sc
-           WHERE sc.subject_id = s.id AND sc.user_id = ${userId}
-         )
-      ORDER BY s.name ASC
-    `;
+    const rows = userId
+      ? await this.sql`
+          SELECT s.*,
+            CASE WHEN s.user_id = ${userId}
+              THEN COALESCE((SELECT COUNT(*)::int FROM subject_views sv WHERE sv.subject_id = s.id), 0)
+              ELSE 0
+            END AS viewer_count
+          FROM subjects s
+          WHERE s.user_id = ${userId}
+             OR (
+               COALESCE(s.is_public, TRUE) = TRUE
+               AND s.share_revoked_at IS NULL
+               AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
+             )
+             OR EXISTS (
+               SELECT 1 FROM subject_collaborators sc
+               WHERE sc.subject_id = s.id AND sc.user_id = ${userId}
+             )
+          ORDER BY s.name ASC, s.id ASC
+        `
+      : await this.sql`
+          SELECT s.*
+          FROM subjects s
+          WHERE COALESCE(s.is_public, TRUE) = TRUE
+            AND s.share_revoked_at IS NULL
+            AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
+          ORDER BY s.name ASC, s.id ASC
+        `;
     return rows as Subject[];
   }
 
@@ -131,30 +146,74 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null> {
-    if (!userId) return null;
-    const rows = await this.sql`
-      SELECT s.id, s.user_id,
-        EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = s.id AND sc.user_id = ${userId}) AS is_collaborator
-      FROM subjects s
-      WHERE s.id = ${subjectId}
-        AND (s.user_id = ${userId} OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = s.id AND sc.user_id = ${userId}))
-      LIMIT 1
-    `;
+    const rows = userId
+      ? await this.sql`
+          SELECT s.id, s.user_id,
+            COALESCE(s.is_public, TRUE) = TRUE
+              AND s.share_revoked_at IS NULL
+              AND (s.share_expires_at IS NULL OR s.share_expires_at > now()) AS is_public,
+            EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = s.id AND sc.user_id = ${userId}) AS is_collaborator
+          FROM subjects s
+          WHERE s.id = ${subjectId}
+            AND (
+              s.user_id = ${userId}
+              OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = s.id AND sc.user_id = ${userId})
+              OR (
+                COALESCE(s.is_public, TRUE) = TRUE
+                AND s.share_revoked_at IS NULL
+                AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
+              )
+            )
+          LIMIT 1
+        `
+      : await this.sql`
+          SELECT s.id, s.user_id,
+            COALESCE(s.is_public, TRUE) = TRUE
+              AND s.share_revoked_at IS NULL
+              AND (s.share_expires_at IS NULL OR s.share_expires_at > now()) AS is_public,
+            FALSE AS is_collaborator
+          FROM subjects s
+          WHERE s.id = ${subjectId}
+            AND COALESCE(s.is_public, TRUE) = TRUE
+            AND s.share_revoked_at IS NULL
+            AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
+          LIMIT 1
+        `;
     if (!rows || rows.length === 0) return null;
     const row = rows[0] as any;
-    const role = row.user_id === userId ? 'owner' : 'collaborator';
-    return { subject_id: subjectId, role, can_edit: role === 'owner', can_edit_reviewers: true, can_manage: role === 'owner' };
+    if (userId && row.user_id === userId) {
+      return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
+    }
+    if (userId && row.is_collaborator) {
+      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+    }
+    if (row.is_public) {
+      return { subject_id: subjectId, role: 'public', can_edit: false, can_edit_reviewers: false, can_manage: false };
+    }
+    return null;
   }
 
   async listQuizzesBySubject(subjectId: string, userId?: string): Promise<Quiz[]> {
-    if (!(await this.getSubjectAccess(subjectId, userId))) throw new Error('Subject not found or access is restricted');
-    const rows = await this.sql`
-      SELECT q.*, json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id) AS subject
-      FROM quizzes q
-      JOIN subjects s ON s.id = q.subject_id
-      WHERE q.subject_id = ${subjectId}
-      ORDER BY q.generated_at DESC
-    `;
+    const access = await this.getSubjectAccess(subjectId, userId);
+    if (!access) throw new Error('Subject not found or access is restricted');
+    const rows = access.role === 'public'
+      ? await this.sql`
+          SELECT q.*, json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id) AS subject
+          FROM quizzes q
+          JOIN subjects s ON s.id = q.subject_id
+          WHERE q.subject_id = ${subjectId}
+            AND COALESCE(q.is_public, TRUE) = TRUE
+            AND q.share_revoked_at IS NULL
+            AND (q.share_expires_at IS NULL OR q.share_expires_at > now())
+          ORDER BY q.generated_at DESC, q.id ASC
+        `
+      : await this.sql`
+          SELECT q.*, json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id) AS subject
+          FROM quizzes q
+          JOIN subjects s ON s.id = q.subject_id
+          WHERE q.subject_id = ${subjectId}
+          ORDER BY q.generated_at DESC, q.id ASC
+        `;
     return rows as Quiz[];
   }
 
@@ -248,55 +307,41 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
-    const rows = userId
-      ? await this.sql`
-          WITH target_subject AS (
-            SELECT id FROM subjects WHERE id = ${subjectId} AND user_id = ${userId}
-          ), deleted_quizzes AS (
-            DELETE FROM quizzes
-            WHERE subject_id IN (SELECT id FROM target_subject)
-            RETURNING id
-          )
-          DELETE FROM subjects
-          WHERE id IN (SELECT id FROM target_subject)
-          RETURNING id
-        `
-      : await this.sql`
-          WITH deleted_quizzes AS (
-            DELETE FROM quizzes WHERE subject_id = ${subjectId} RETURNING id
-          )
-          DELETE FROM subjects WHERE id = ${subjectId} RETURNING id
-        `;
+    if (!userId) throw new Error('Authenticated user required for subject management');
+    const rows = await this.sql`
+      WITH target_subject AS (
+        SELECT id FROM subjects WHERE id = ${subjectId} AND user_id = ${userId}
+      ), deleted_quizzes AS (
+        DELETE FROM quizzes
+        WHERE subject_id IN (SELECT id FROM target_subject)
+        RETURNING id
+      )
+      DELETE FROM subjects
+      WHERE id IN (SELECT id FROM target_subject)
+      RETURNING id
+    `;
 
     return Boolean(rows && rows.length > 0);
   }
 
   async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
-    const rows = userId
-      ? await this.sql`
-          SELECT share_token, is_public, share_expires_at, share_revoked_at
-          FROM subjects
-          WHERE id = ${subjectId}
-            AND user_id = ${userId}
-          LIMIT 1
-        `
-      : await this.sql`SELECT share_token, is_public, share_expires_at, share_revoked_at FROM subjects WHERE id = ${subjectId} LIMIT 1`;
-    if (!rows.length) throw new Error(`Subject ${subjectId} not found`);
+    if (!userId) throw new Error('Authenticated user required for subject sharing');
+    const rows = await this.sql`
+      SELECT share_token, is_public, share_expires_at, share_revoked_at
+      FROM subjects
+      WHERE id = ${subjectId}
+        AND user_id = ${userId}
+      LIMIT 1
+    `;
     const subject = rows[0] as any;
     if (!subject.share_token) {
       const share_token = generateShareToken();
-      const updatedRows = userId
-        ? await this.sql`
-            UPDATE subjects SET share_token = ${share_token}, is_public = true, share_revoked_at = NULL
-            WHERE id = ${subjectId}
-              AND user_id = ${userId}
-            RETURNING share_token, is_public, share_expires_at, share_revoked_at
-          `
-        : await this.sql`
-            UPDATE subjects SET share_token = ${share_token}, is_public = true, share_revoked_at = NULL
-            WHERE id = ${subjectId}
-            RETURNING share_token, is_public, share_expires_at, share_revoked_at
-          `;
+      const updatedRows = await this.sql`
+        UPDATE subjects SET share_token = ${share_token}, is_public = true, share_revoked_at = NULL
+        WHERE id = ${subjectId}
+          AND user_id = ${userId}
+        RETURNING share_token, is_public, share_expires_at, share_revoked_at
+      `;
       if (!updatedRows.length) throw new Error('Subject not found or update failed');
       return updatedRows[0] as any;
     }
@@ -317,20 +362,13 @@ export class NeonQuizRepository implements IQuizRepository {
     const isPublic = dto.is_public !== undefined ? dto.is_public : current.is_public;
     const shareExpiresAt = dto.share_expires_at !== undefined ? dto.share_expires_at : current.share_expires_at;
     const shareRevokedAt = isPublic ? null : new Date().toISOString();
-    const rows = userId
-      ? await this.sql`
-          UPDATE subjects
-          SET share_token = ${newShareToken}, is_public = ${isPublic}, share_expires_at = ${shareExpiresAt}, share_revoked_at = ${shareRevokedAt}
-          WHERE id = ${subjectId}
-            AND user_id = ${userId}
-          RETURNING share_token, is_public, share_expires_at, share_revoked_at
-        `
-      : await this.sql`
-          UPDATE subjects
-          SET share_token = ${newShareToken}, is_public = ${isPublic}, share_expires_at = ${shareExpiresAt}, share_revoked_at = ${shareRevokedAt}
-          WHERE id = ${subjectId}
-          RETURNING share_token, is_public, share_expires_at, share_revoked_at
-        `;
+    const rows = await this.sql`
+      UPDATE subjects
+      SET share_token = ${newShareToken}, is_public = ${isPublic}, share_expires_at = ${shareExpiresAt}, share_revoked_at = ${shareRevokedAt}
+      WHERE id = ${subjectId}
+        AND user_id = ${userId}
+      RETURNING share_token, is_public, share_expires_at, share_revoked_at
+    `;
     if (!rows.length) throw new Error('Subject not found or update failed');
     return rows[0] as any;
   }
@@ -364,35 +402,50 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async listQuizzes(userId?: string): Promise<Quiz[]> {
-    if (!userId) {
-      const rows = await this.sql`
-        SELECT 
-          q.*,
-          CASE 
-            WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
-            ELSE NULL 
-          END AS subject
-        FROM quizzes q
-        LEFT JOIN subjects s ON q.subject_id = s.id
-        WHERE q.user_id IS NULL AND COALESCE(q.is_public, TRUE) = TRUE
-        ORDER BY q.generated_at DESC
-      `;
-      return rows as Quiz[];
-    }
-    const rows = await this.sql`
-      SELECT 
-        q.*,
-        CASE 
-          WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
-          ELSE NULL 
-        END AS subject
-      FROM quizzes q
-      LEFT JOIN subjects s ON q.subject_id = s.id
-      WHERE q.user_id = ${userId}
-         OR (q.user_id IS NULL AND COALESCE(q.is_public, TRUE) = TRUE)
-         OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId})
-      ORDER BY q.generated_at DESC
-    `;
+    const rows = userId
+      ? await this.sql`
+          SELECT
+            q.*,
+            CASE
+              WHEN s.id IS NOT NULL AND (
+                s.user_id = ${userId}
+                OR (
+                  COALESCE(s.is_public, TRUE) = TRUE
+                  AND s.share_revoked_at IS NULL
+                  AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
+                )
+                OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = s.id AND sc.user_id = ${userId})
+              ) THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
+              ELSE NULL
+            END AS subject
+          FROM quizzes q
+          LEFT JOIN subjects s ON q.subject_id = s.id
+          WHERE q.user_id = ${userId}
+             OR (
+               COALESCE(q.is_public, TRUE) = TRUE
+               AND q.share_revoked_at IS NULL
+               AND (q.share_expires_at IS NULL OR q.share_expires_at > now())
+             )
+             OR EXISTS (
+               SELECT 1 FROM subject_collaborators sc
+               WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId}
+             )
+          ORDER BY q.generated_at DESC, q.id ASC
+        `
+      : await this.sql`
+          SELECT
+            q.*,
+            CASE
+              WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
+              ELSE NULL
+            END AS subject
+          FROM quizzes q
+          LEFT JOIN subjects s ON q.subject_id = s.id
+          WHERE COALESCE(q.is_public, TRUE) = TRUE
+            AND q.share_revoked_at IS NULL
+            AND (q.share_expires_at IS NULL OR q.share_expires_at > now())
+          ORDER BY q.generated_at DESC, q.id ASC
+        `;
     return rows as Quiz[];
   }
 
@@ -403,45 +456,64 @@ export class NeonQuizRepository implements IQuizRepository {
     ]);
     const sharedSubjects = userId
       ? allSubjects.filter((subject) => Boolean(subject.user_id && subject.user_id !== userId))
-      : [];
+      : allSubjects;
     const sharedSubjectIds = new Set(sharedSubjects.map((subject) => subject.id));
+    const sharedQuizzes = allQuizzes.filter((quiz) => {
+      if (quiz.subject_id) return sharedSubjectIds.has(quiz.subject_id);
+      return !userId || quiz.user_id !== userId;
+    });
     return {
       subjects: allSubjects.filter((subject) => !sharedSubjectIds.has(subject.id)),
-      quizzes: allQuizzes.filter((quiz) => !quiz.subject_id || !sharedSubjectIds.has(quiz.subject_id)),
+      quizzes: allQuizzes.filter((quiz) => !sharedQuizzes.includes(quiz)),
       sharedSubjects,
-      sharedQuizzes: allQuizzes.filter((quiz) => Boolean(quiz.subject_id && sharedSubjectIds.has(quiz.subject_id)))
+      sharedQuizzes
     };
   }
 
   async getQuizById(id: string, userId?: string): Promise<Quiz | null> {
     const rows = userId
       ? await this.sql`
-          SELECT 
+          SELECT
             q.*,
-            CASE 
-              WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
-              ELSE NULL 
+            CASE
+              WHEN s.id IS NOT NULL AND (
+                s.user_id = ${userId}
+                OR (
+                  COALESCE(s.is_public, TRUE) = TRUE
+                  AND s.share_revoked_at IS NULL
+                  AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
+                )
+                OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = s.id AND sc.user_id = ${userId})
+              ) THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
+              ELSE NULL
             END AS subject
           FROM quizzes q
           LEFT JOIN subjects s ON q.subject_id = s.id
           WHERE q.id = ${id}
             AND (
               q.user_id = ${userId}
-              OR (q.user_id IS NULL AND COALESCE(q.is_public, TRUE) = TRUE)
+              OR (
+                COALESCE(q.is_public, TRUE) = TRUE
+                AND q.share_revoked_at IS NULL
+                AND (q.share_expires_at IS NULL OR q.share_expires_at > now())
+              )
               OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId})
             )
           LIMIT 1
         `
       : await this.sql`
-          SELECT 
+          SELECT
             q.*,
-            CASE 
+            CASE
               WHEN s.id IS NOT NULL THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
-              ELSE NULL 
+              ELSE NULL
             END AS subject
           FROM quizzes q
           LEFT JOIN subjects s ON q.subject_id = s.id
           WHERE q.id = ${id}
+            AND COALESCE(q.is_public, TRUE) = TRUE
+            AND q.share_revoked_at IS NULL
+            AND (q.share_expires_at IS NULL OR q.share_expires_at > now())
           LIMIT 1
         `;
 
@@ -585,17 +657,12 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async deleteQuiz(id: string, userId?: string): Promise<boolean> {
-    const rows = userId
-      ? await this.sql`
-          DELETE FROM quizzes
-          WHERE id = ${id} AND user_id = ${userId}
-          RETURNING id
-        `
-      : await this.sql`
-          DELETE FROM quizzes
-          WHERE id = ${id}
-          RETURNING id
-        `;
+    if (!userId) throw new Error('Authenticated user required for quiz management');
+    const rows = await this.sql`
+      DELETE FROM quizzes
+      WHERE id = ${id} AND user_id = ${userId}
+      RETURNING id
+    `;
     return Boolean(rows && rows.length > 0);
   }
 
@@ -700,11 +767,14 @@ export class NeonQuizRepository implements IQuizRepository {
     share_expires_at?: string | null;
     share_revoked_at?: string | null;
   }> {
-    if (userId) await this.requireQuizOwnerAccess(quizId, userId);
-    const rows = userId
-      ? await this.sql`SELECT share_token, is_public, allow_cloning, allow_public_answer_key, share_expires_at, share_revoked_at FROM quizzes WHERE id = ${quizId} AND user_id = ${userId} LIMIT 1`
-      : await this.sql`SELECT share_token, is_public, allow_cloning, allow_public_answer_key, share_expires_at, share_revoked_at FROM quizzes WHERE id = ${quizId} LIMIT 1`;
-
+    if (!userId) throw new Error('Authenticated user required for quiz sharing');
+    await this.requireQuizOwnerAccess(quizId, userId);
+    const rows = await this.sql`
+      SELECT share_token, is_public, allow_cloning, allow_public_answer_key, share_expires_at, share_revoked_at
+      FROM quizzes
+      WHERE id = ${quizId} AND user_id = ${userId}
+      LIMIT 1
+    `;
     if (!rows || rows.length === 0) throw new Error(`Quiz ${quizId} not found`);
     const quiz = rows[0] as any;
 
@@ -723,7 +793,7 @@ export class NeonQuizRepository implements IQuizRepository {
     await this.sql`
       UPDATE quizzes
       SET share_token = ${share_token}, is_public = true, allow_cloning = true
-      WHERE id = ${quizId}
+      WHERE id = ${quizId} AND user_id = ${userId}
     `;
 
     return {
@@ -757,21 +827,13 @@ export class NeonQuizRepository implements IQuizRepository {
       shareRevokedAt = null;
     }
 
-    const rows = userId
-      ? await this.sql`
-          UPDATE quizzes
-          SET share_token = ${newShareToken}, is_public = ${isPublic}, allow_cloning = ${allowCloning},
-              allow_public_answer_key = ${allowAnswerKey}, share_expires_at = ${shareExpiresAt}, share_revoked_at = ${shareRevokedAt}
-          WHERE id = ${quizId} AND user_id = ${userId}
-          RETURNING share_token, is_public, allow_cloning, allow_public_answer_key, share_expires_at, share_revoked_at
-        `
-      : await this.sql`
-          UPDATE quizzes
-          SET share_token = ${newShareToken}, is_public = ${isPublic}, allow_cloning = ${allowCloning},
-              allow_public_answer_key = ${allowAnswerKey}, share_expires_at = ${shareExpiresAt}, share_revoked_at = ${shareRevokedAt}
-          WHERE id = ${quizId}
-          RETURNING share_token, is_public, allow_cloning, allow_public_answer_key, share_expires_at, share_revoked_at
-        `;
+    const rows = await this.sql`
+      UPDATE quizzes
+      SET share_token = ${newShareToken}, is_public = ${isPublic}, allow_cloning = ${allowCloning},
+          allow_public_answer_key = ${allowAnswerKey}, share_expires_at = ${shareExpiresAt}, share_revoked_at = ${shareRevokedAt}
+      WHERE id = ${quizId} AND user_id = ${userId}
+      RETURNING share_token, is_public, allow_cloning, allow_public_answer_key, share_expires_at, share_revoked_at
+    `;
 
     if (!rows || rows.length === 0) throw new Error('Quiz not found or update failed');
     return {

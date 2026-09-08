@@ -22,8 +22,12 @@ export class QuizCrudController {
     ]);
     const sharedSubjects = userId
       ? subjects.filter((subject) => Boolean(subject.user_id && subject.user_id !== userId))
-      : [];
+      : subjects;
     const sharedSubjectIds = new Set(sharedSubjects.map((subject) => subject.id));
+    const sharedQuizzes = quizzes.filter((quiz) => {
+      if (quiz.subject_id) return sharedSubjectIds.has(quiz.subject_id);
+      return quiz.is_public === true && quiz.user_id !== userId && quiz.user_id !== undefined;
+    });
     const ownedSubjects = subjects.filter((subject) => !sharedSubjectIds.has(subject.id));
     const subjectsWithCounts = await Promise.all(ownedSubjects.map(async (subject) => ({
       ...subject,
@@ -32,9 +36,9 @@ export class QuizCrudController {
         : subject.viewer_count || 0
     })));
     return {
-      quizzes: quizzes.filter((quiz) => !quiz.subject_id || !sharedSubjectIds.has(quiz.subject_id)),
+      quizzes: quizzes.filter((quiz) => !sharedQuizzes.includes(quiz)),
       subjects: subjectsWithCounts,
-      sharedQuizzes: quizzes.filter((quiz) => Boolean(quiz.subject_id && sharedSubjectIds.has(quiz.subject_id))),
+      sharedQuizzes,
       sharedSubjects
     };
   }

@@ -103,15 +103,19 @@ CREATE INDEX IF NOT EXISTS idx_quiz_question_progress_question ON quiz_question_
 -- Safe additions for databases created from an earlier schema version.
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_token TEXT;
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE subjects ALTER COLUMN is_public SET DEFAULT TRUE;
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_expires_at TIMESTAMPTZ;
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_revoked_at TIMESTAMPTZ;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_token TEXT;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes ALTER COLUMN is_public SET DEFAULT TRUE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS allow_cloning BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS allow_public_answer_key BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_expires_at TIMESTAMPTZ;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_revoked_at TIMESTAMPTZ;
+UPDATE subjects SET is_public = TRUE WHERE is_public IS NULL;
+UPDATE quizzes SET is_public = TRUE WHERE is_public IS NULL;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS answer_text TEXT;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type TEXT NOT NULL DEFAULT 'multiple_choice';
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS correct_explanation TEXT;

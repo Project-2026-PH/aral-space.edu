@@ -116,6 +116,7 @@ export class CachedQuizRepository implements IQuizRepository {
   ) {
     const config = await this.underlying.updateSubjectShareConfig(subjectId, dto, userId);
     this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('quizzes:');
     this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('public_subject:');
     return config;
@@ -160,10 +161,14 @@ export class CachedQuizRepository implements IQuizRepository {
       ? sourceSubjects.filter((subject) => Boolean(subject.user_id && subject.user_id !== userId))
       : []);
     const sharedSubjectIds = new Set(sharedSubjects.map((subject) => subject.id));
+    const sharedQuizzes = data.sharedQuizzes || sourceQuizzes.filter((quiz) => {
+      if (quiz.subject_id) return sharedSubjectIds.has(quiz.subject_id);
+      return quiz.is_public === true && quiz.user_id !== userId && quiz.user_id !== undefined;
+    });
     const result: LibraryData = {
-      quizzes: sourceQuizzes.filter((quiz) => !quiz.subject_id || !sharedSubjectIds.has(quiz.subject_id)),
+      quizzes: sourceQuizzes.filter((quiz) => !sharedQuizzes.includes(quiz)),
       subjects: sourceSubjects.filter((subject) => !sharedSubjectIds.has(subject.id)),
-      sharedQuizzes: data.sharedQuizzes || sourceQuizzes.filter((quiz) => Boolean(quiz.subject_id && sharedSubjectIds.has(quiz.subject_id))),
+      sharedQuizzes,
       sharedSubjects
     };
     this.cache.set(key, result);
@@ -269,6 +274,8 @@ export class CachedQuizRepository implements IQuizRepository {
   async updateShareConfig(quizId: string, dto: UpdateShareConfigDto, userId?: string): Promise<{ share_token: string; is_public: boolean; allow_cloning: boolean }> {
     const res = await this.underlying.updateShareConfig(quizId, dto, userId);
     this.cache.delete(this.quizKey(quizId, userId));
+    this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
     this.cache.deleteByPrefix('public_quiz:');
     this.cache.deleteByPrefix('public_subject:');
     return res;

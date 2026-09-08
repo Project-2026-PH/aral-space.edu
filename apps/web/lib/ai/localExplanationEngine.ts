@@ -199,12 +199,30 @@ function safeAnswerLabel(value: string, fallback: string): string {
   return cleaned && !containsUnresolvedAnswerPlaceholder(cleaned) ? cleaned : fallback;
 }
 
+function formatCorrectDefinition(label: string, value?: string | null): string {
+  const cleaned = cleanReferenceText(value);
+  if (!cleaned) return '';
+
+  // Replace a leading "This" with the answer label so "This is ..." becomes
+  // "<answer> is ..." instead of repeating the subject.
+  const subjectReplaced = cleaned.replace(/^this\b/i, label);
+  if (subjectReplaced !== cleaned) return subjectReplaced;
+
+  // The question definition may begin with "is". Keep that linking verb once
+  // after the answer label instead of producing awkward duplicated wording.
+  if (/^is\b/i.test(cleaned)) {
+    return `${label} ${cleaned}`;
+  }
+
+  return `${label} is defined as ${cleaned}`;
+}
+
 export function buildFallbackExplanation(
   correctAnswer: string,
   wrongAnswer: string,
   correctExplanation?: string | null,
   distractorExplanation?: string | null,
-  _questionText?: string | null
+  questionText?: string | null
 ): string {
   const correctLabel = safeAnswerLabel(correctAnswer, 'the answer-key choice');
   const wrongLabel = safeAnswerLabel(wrongAnswer, 'the submitted choice');
@@ -215,8 +233,13 @@ export function buildFallbackExplanation(
     return `Think of ${correctLabel} as ${cleanCorrect}, while ${wrongLabel} is ${cleanWrong || 'a different concept'}. ${correctLabel} is the answer recorded in the answer key.`;
   }
 
+  const correctDefinition = formatCorrectDefinition(correctLabel, questionText);
+  if (correctDefinition) {
+    return `${correctDefinition}, while ${wrongLabel} is defined as ${cleanWrong || 'a different concept'}.`;
+  }
+
   // Do not invent a reason from the question text when no trusted explanation exists.
-  return `The answer key identifies ${correctLabel} as correct, while ${wrongLabel} was the submitted choice. Review the principle shown with the question for the supporting reason.`;
+  return `${correctLabel} is defined as the answer-key choice, while ${wrongLabel} is defined as the submitted choice. Review the principle shown with the question for the supporting reason.`;
 }
 
 export async function generateLocalExplanation(
@@ -235,8 +258,8 @@ export async function generateLocalExplanation(
           text: buildFallbackExplanation(
             req.correctAnswer,
             req.wrongAnswer,
-            null,
-            null,
+            req.correctExplanation,
+            req.distractorExplanation,
             req.questionText
           ),
           isAi: false,

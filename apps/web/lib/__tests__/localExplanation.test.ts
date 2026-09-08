@@ -45,10 +45,10 @@ describe('localExplanationEngine', () => {
       expect(sentenceCount).toBe(2);
     });
 
-    it('injects Think of prefix if model missed it', () => {
+    it('preserves clean two sentences when Think of is not at the start', () => {
       const input = 'WEP is an outdated standard. EAP is an authentication framework.';
       const result = enforceTwoSentences(input, 'WEP', 'EAP');
-      expect(result.startsWith('Think of WEP as the correct standard, while EAP serves a different function.')).toBe(true);
+      expect(result).toBe('WEP is an outdated standard. EAP is an authentication framework.');
     });
 
     it('cleans assistant tags and markdown code blocks', () => {

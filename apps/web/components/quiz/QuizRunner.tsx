@@ -251,7 +251,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
   );
   const resetSavedReview = () => {
     removeQuizProgressSnapshot(quiz.id, props.initialSession.id);
-    window.location.assign(`/practice/${quiz.id}?mode=learn`);
+    window.location.assign(`/practice/${quiz.id}?mode=${encodeURIComponent(currentMode)}`);
   };
   const resumePrompt = (
     <ResumePracticeModal

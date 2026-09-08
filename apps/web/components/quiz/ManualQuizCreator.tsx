@@ -23,6 +23,11 @@ interface QuestionDraft {
   explanation?: string;
 }
 
+type PendingClipboardImport = ParsedClipboard & {
+  rawText: string;
+  questionIndex: number;
+};
+
 interface ManualQuizDraft {
   version: 1;
   updatedAt: string;
@@ -106,7 +111,7 @@ export default function ManualQuizCreator({
   const [subjectId, setSubjectId] = useState(subjects?.[0]?.id || '');
   const [subjectsLoading, setSubjectsLoading] = useState(!subjects || subjects.length === 0);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
-  const [pendingImport, setPendingImport] = useState<ParsedClipboard | null>(null);
+  const [pendingImport, setPendingImport] = useState<PendingClipboardImport | null>(null);
   const [questions, setQuestions] = useState<QuestionDraft[]>([
     {
       type: 'identification',
@@ -380,6 +385,30 @@ export default function ManualQuizCreator({
     setQuestions(next);
   }
 
+  function queuePendingImport(parsed: ParsedClipboard, text: string, html: string, questionIndex: number) {
+    setPendingImport({
+      ...parsed,
+      rawText: text.trim() ? text : html,
+      questionIndex
+    } as PendingClipboardImport);
+  }
+
+  function cancelPendingImport() {
+    if (!pendingImport) return;
+
+    const { rawText, questionIndex } = pendingImport;
+    setQuestions((prev) => {
+      if (!prev[questionIndex] || !rawText) return prev;
+      const next = [...prev];
+      next[questionIndex] = {
+        ...next[questionIndex],
+        question_text: rawText
+      };
+      return next;
+    });
+    setPendingImport(null);
+  }
+
   function handlePromptPaste(qIdx: number, e: React.ClipboardEvent<HTMLElement>) {
     const text = e.clipboardData.getData('text');
     const html = e.clipboardData.getData('text/html');
@@ -413,7 +442,7 @@ export default function ManualQuizCreator({
 
     if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
-      setPendingImport(parsed);
+      queuePendingImport(parsed, text, html, qIdx);
       return;
     }
 
@@ -467,7 +496,7 @@ export default function ManualQuizCreator({
 
     if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
-      setPendingImport(parsed);
+      queuePendingImport(parsed, text, html, qIdx);
       return;
     }
 
@@ -494,6 +523,8 @@ export default function ManualQuizCreator({
 
   function handleContainerPaste(e: React.ClipboardEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement;
+    const questionCard = target.closest<HTMLElement>('[data-question-index]');
+    const questionIndex = questionCard ? Number(questionCard.dataset.questionIndex) : null;
     // If user is pasting into title, description, or subject selector, do not intercept
     if (target.closest('[data-skip-clipboard-intercept="true"]')) return;
 
@@ -502,9 +533,9 @@ export default function ManualQuizCreator({
     if (!text && !html) return;
 
     const parsed = parseSmartClipboard(text, html);
-    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
+    if (parsed && questionIndex !== null && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
-      setPendingImport(parsed);
+      queuePendingImport(parsed, text, html, questionIndex);
     }
   }
 
@@ -704,7 +735,7 @@ export default function ManualQuizCreator({
 
             <button
               type="button"
-              onClick={() => setPendingImport(null)}
+              onClick={cancelPendingImport}
               className="text-muted-foreground hover:text-foreground p-1 rounded-xl hover:bg-muted transition-colors cursor-pointer"
               title="Dismiss"
             >
@@ -715,7 +746,7 @@ export default function ManualQuizCreator({
           <div className="flex items-center justify-end gap-2.5 pt-1">
             <button
               type="button"
-              onClick={() => setPendingImport(null)}
+              onClick={cancelPendingImport}
               className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all cursor-pointer"
             >
               Cancel
@@ -1027,6 +1058,7 @@ export default function ManualQuizCreator({
           return (
             <div
               key={qIdx}
+              data-question-index={qIdx}
               onDragOver={(e) => {
                 e.preventDefault();
                 setDragOverIdx(qIdx);

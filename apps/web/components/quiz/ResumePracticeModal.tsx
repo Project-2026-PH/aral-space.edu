@@ -89,8 +89,8 @@ export default function ResumePracticeModal({
           <button
             type="button"
             onClick={onReset}
-            title="Restart Learn mode and clear the saved review point. Mastery progress stays safe."
-            aria-label="Restart Learn mode and clear the saved review point"
+            title="Restart this practice mode and clear the saved review point. Mastery progress stays safe."
+            aria-label="Restart this practice mode and clear the saved review point"
             className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10 focus:outline-none focus:ring-2 focus:ring-destructive/30 focus:ring-offset-2 focus:ring-offset-card sm:w-auto sm:px-3 sm:py-1.5 sm:text-sm"
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />

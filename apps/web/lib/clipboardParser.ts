@@ -37,10 +37,18 @@ function isAppositiveDefinition(clause: string, term: string): boolean {
  * Used to decide whether a 2-line paste is `Term \n Definition` or just wrapped prose.
  */
 function isLabelLike(value: string): boolean {
-  if (/[,;:]/.test(value)) return false;
-  if (/[.!?]$/.test(value)) return false;
-  if (/\b(?:and|or|the|is|are|was|were|that|which)\b$/i.test(value)) return false;
-  return value.length <= 80 && value.split(/\s+/).length <= 10;
+  const line = value.trim();
+  if (!line) return false;
+  if (/[,;:]/.test(line)) return false;
+  if (/[.!?]/.test(line)) return false;
+  if (FINITE_VERB.test(line)) return false;
+  if (/^(?:as|because|although|while|when|where|if|since|unless|after|before|and|but|or)\b/i.test(line)) {
+    return false;
+  }
+  if (/\b(?:and|or|but|as|of|for|with|to|from|by|in|on|at|into|onto|through|via|than|without|within|between|among|during|over|under|the|that|which)\s*$/i.test(line)) {
+    return false;
+  }
+  return line.length <= 80 && line.split(/\s+/).length <= 10;
 }
 
 /**
@@ -50,6 +58,161 @@ function isLabelLike(value: string): boolean {
 function isDefinitionLikeLine(value: string): boolean {
   const line = value.trim();
   return line.length >= 40 || /[,.;!?]/.test(line) || /^(?:a|an|the|this|that|these|those|often|when|where|developers?|it|they)\b/i.test(line);
+}
+
+const HEADING_STOP_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'as',
+  'at',
+  'by',
+  'for',
+  'from',
+  'in',
+  'into',
+  'of',
+  'on',
+  'or',
+  'the',
+  'to',
+  'with'
+]);
+
+const SECTION_HEADING_PATTERN =
+  /^(?:overview|introduction|background|summary|history|features?|requirements?|benefits?|limitations?|advantages?|disadvantages?|pricing|services?|key\s+points?|objectives?|steps?|examples?|causes?|effects?)\b/i;
+
+function isTitleCaseHeading(line: string): boolean {
+  const words = line.split(/\s+/).filter((word) => /[A-Za-z]/.test(word));
+  if (words.length === 0) return false;
+
+  const hasCapitalizedWord = words.some((word) => /^[A-Z][A-Za-z0-9'’/&()\-/]*$/.test(word));
+  return (
+    hasCapitalizedWord &&
+    words.every(
+      (word) =>
+        HEADING_STOP_WORDS.has(word.toLowerCase()) || /^[A-Z][A-Za-z0-9'’/&()\-/]*$/.test(word)
+    )
+  );
+}
+
+/**
+ * Recognizes a structural heading without treating an arbitrary short prose
+ * fragment as a term. Title Case/all-caps, known section cues, or a terminal
+ * colon provide the heading evidence; finite verbs and sentence punctuation
+ * disqualify the line.
+ */
+function isHeadingShape(value: string): boolean {
+  const rawLine = value.trim();
+  const line = rawLine.replace(/:\s*$/, '').trim();
+  if (!line || line.length > 80 || line.split(/\s+/).length > 10) return false;
+  if (/[,;.!?]/.test(line) || FINITE_VERB.test(line)) return false;
+
+  const allCaps = /[A-Z]/.test(line) && line === line.toUpperCase();
+  const sectionCue = SECTION_HEADING_PATTERN.test(line);
+  const titleCase = isTitleCaseHeading(line);
+  const colonEvidence = /:\s*$/.test(rawLine);
+
+  return allCaps || titleCase || sectionCue || colonEvidence;
+}
+
+/**
+ * Joins only PDF-style soft wraps. Sentence boundaries, bullets, and
+ * heading-shaped lines remain boundaries so explicit structures and sections
+ * are not flattened together.
+ */
+function shouldJoinPdfSoftWrap(previous: string, next: string): boolean {
+  if (!previous || !next || BULLET_PREFIX.test(next)) return false;
+  if (isHeadingShape(previous)) return false;
+  if (/[.!?]["'”’)]*\s*$/.test(previous)) return false;
+  if (/-\s*$/.test(previous) && /^[a-z]/.test(next)) return true;
+  if (/^[a-z]/.test(next)) return true;
+
+  return /(?:[,;:]|\b(?:and|or|but|as|to|of|for|with|from|by|in|on|at|into|onto|through|via|than|without|within|between|among|during|over|under)\s*)$/i.test(
+    previous
+  );
+}
+
+function joinPdfSoftWrap(previous: string, next: string): string {
+  if (/-\s*$/.test(previous) && /^[a-z]/.test(next)) {
+    return `${previous.replace(/-\s*$/, '')}${next}`;
+  }
+  return `${previous} ${next}`.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Normalizes a plain-text clipboard working copy while preserving structural
+ * line boundaries. Raw clipboard text is never mutated; callers can retain it
+ * for cancellation or other fallbacks.
+ */
+function normalizePdfSoftWraps(text: string): string {
+  const sourceLines = text.split(/\r?\n/);
+  const normalizedLines: string[] = [];
+  let lastContentIndex = -1;
+  let blankSinceLastContent = false;
+
+  for (const sourceLine of sourceLines) {
+    const line = sourceLine.trim();
+    if (!line) {
+      if (lastContentIndex >= 0) blankSinceLastContent = true;
+      continue;
+    }
+
+    if (lastContentIndex >= 0 && shouldJoinPdfSoftWrap(normalizedLines[lastContentIndex], line)) {
+      normalizedLines[lastContentIndex] = joinPdfSoftWrap(normalizedLines[lastContentIndex], line);
+    } else {
+      if (blankSinceLastContent && normalizedLines[normalizedLines.length - 1] !== '') {
+        normalizedLines.push('');
+      }
+      normalizedLines.push(line);
+      lastContentIndex = normalizedLines.length - 1;
+    }
+    blankSinceLastContent = false;
+  }
+
+  return normalizedLines.join('\n').trim();
+}
+
+/**
+ * Extracts standalone heading + paragraph blocks from handout-style text.
+ * Explicit delimiters and list formats are intentionally handled earlier.
+ */
+function extractHeadingBlocks(text: string): Array<{ term: string; definition: string }> {
+  const normalized = normalizePdfSoftWraps(text);
+  const lines = normalized.split(/\r?\n/);
+  const headingIndexes: number[] = [];
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index].trim();
+    if (!line) continue;
+    const followingLine = nextNonEmptyLine(lines, index);
+    if (followingLine && isHeadingShape(line) && isDefinitionLikeLine(followingLine)) {
+      headingIndexes.push(index);
+    }
+  }
+
+  const blocks: Array<{ term: string; definition: string }> = [];
+  for (let headingIndex = 0; headingIndex < headingIndexes.length; headingIndex++) {
+    const start = headingIndexes[headingIndex];
+    const end = headingIndexes[headingIndex + 1] ?? lines.length;
+    const term = lines[start].trim().replace(/:\s*$/, '').trim();
+    const definition = lines
+      .slice(start + 1, end)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (
+      term &&
+      definition.length >= 15 &&
+      definition.split(/\s+/).length >= 3 &&
+      isDefinitionLikeLine(definition)
+    ) {
+      blocks.push({ term, definition });
+    }
+  }
+
+  return blocks;
 }
 
 /**
@@ -176,7 +339,7 @@ function splitTitleCaseTerm(body: string): { term: string; rest: string } | null
 }
 
 const DEFINITION_VERB_REGEX =
-  /^([A-Za-z0-9][A-Za-z0-9\s.\-_/()&'’]{1,50}?)\s+\b(is\s+defined\s+as|refers\s+to|is\s+the\s+process\s+of|is\s+the\s+study\s+of|is\s+the\s+practice\s+of|is\s+the\s+science\s+of|is\s+used\s+to|describes|deals\s+with|focuses\s+on|means|consists\s+of|involves)\b\s+([\s\S]+)$/i;
+  /^([A-Za-z0-9][A-Za-z0-9\s.\-_/()&'’]{1,50}?)\s+\b(is\s+defined\s+as|refers\s+to|is\s+the\s+process\s+of|is\s+the\s+study\s+of|is\s+the\s+practice\s+of|is\s+the\s+science\s+of|is\s+used\s+to|describes|deals\s+with|focuses\s+on|means|consists\s+of|involves|is\s+(?:a|an|the))\b\s+([\s\S]+)$/i;
 
 /**
  * Splits delimiter-free sentences where a connecting verb links the term to its definition.
@@ -217,6 +380,44 @@ export function splitDefinitionVerb(body: string): { term: string; definition: s
     term: cleanTerm,
     definition: formattedDefinition
   };
+}
+
+/**
+ * Extracts one or more definition-verb records without mistaking a sentence
+ * inside a definition for another card. Sentence boundaries are preferred for
+ * pasted records on one line; line-start anchors handle wrapped records that
+ * do not end with punctuation before the next term.
+ */
+function extractDefinitionVerbPairs(text: string): Array<{ term: string; definition: string }> {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+
+  const sentenceSegments = normalized.split(/(?<=[.!?])\s+(?=[A-Z0-9])/);
+  if (sentenceSegments.length >= 2) {
+    const sentencePairs = sentenceSegments.map((segment) => splitDefinitionVerb(segment));
+    if (sentencePairs.every((pair): pair is { term: string; definition: string } => Boolean(pair))) {
+      return sentencePairs;
+    }
+  }
+
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const definitionStartIndexes = lines.reduce<number[]>((indexes, line, index) => {
+    if (splitDefinitionVerb(line)) indexes.push(index);
+    return indexes;
+  }, []);
+
+  if (definitionStartIndexes.length >= 2) {
+    const linePairs = definitionStartIndexes.map((startIndex, pairIndex) => {
+      const endIndex = definitionStartIndexes[pairIndex + 1] ?? lines.length;
+      return splitDefinitionVerb(lines.slice(startIndex, endIndex).join(' '));
+    });
+    if (linePairs.every((pair): pair is { term: string; definition: string } => Boolean(pair))) {
+      return linePairs;
+    }
+  }
+
+  const singlePair = splitDefinitionVerb(normalized);
+  return singlePair ? [singlePair] : [];
 }
 
 const PASSIVE_DEFINITION_REGEX =
@@ -535,8 +736,12 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
   const trimmedHtml = (html || '').trim();
   if (!trimmed && !trimmedHtml) return null;
 
+  // Keep `trimmed` untouched for raw-text fallbacks while using a structural
+  // working copy for deterministic extraction from PDF clipboard text.
+  const normalizedText = trimmed ? normalizePdfSoftWraps(trimmed) : '';
+
   if (trimmed) {
-    const numberedQuestionAnswers = extractNumberedQuestionAnswers(trimmed);
+    const numberedQuestionAnswers = extractNumberedQuestionAnswers(normalizedText);
     if (numberedQuestionAnswers.length > 0) {
       if (numberedQuestionAnswers.length === 1) {
         return { type: 'question_answer', ...numberedQuestionAnswers[0] };
@@ -544,7 +749,7 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
       return { type: 'question_answers', items: numberedQuestionAnswers };
     }
 
-    const numberedTermDefinitions = extractNumberedTermDefinitions(trimmed);
+    const numberedTermDefinitions = extractNumberedTermDefinitions(normalizedText);
     if (numberedTermDefinitions.length > 0) {
       if (numberedTermDefinitions.length === 1) {
         return { type: 'single_pair', ...numberedTermDefinitions[0] };
@@ -559,7 +764,7 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
     const normalizedHtml = normalizeHtmlClipboard(trimmedHtml);
     boldCandidates = extractBoldTerms(normalizedHtml);
   } else if (trimmed.includes('**')) {
-    boldCandidates = extractBoldTerms(trimmed);
+    boldCandidates = extractBoldTerms(normalizedText);
   }
 
   if (boldCandidates.length >= 2) {
@@ -573,11 +778,11 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
 
   // 1. Check for Bulk Bulleted Term/Definition List first
   // Supports `:`, ` - `, ` – `, ` — ` delimiters and multi-line wrapped definitions.
-  let bulkMatches = extractBulkTerms(trimmed);
+  let bulkMatches = extractBulkTerms(normalizedText);
   if (bulkMatches.length >= 1) {
     // At least one delimited term proves this is a definition list, so delimiter-less
     // bulleted siblings can safely be recovered via the Title Case heuristic.
-    const withFallback = extractBulkTerms(trimmed, true);
+    const withFallback = extractBulkTerms(normalizedText, true);
     if (withFallback.length > bulkMatches.length) bulkMatches = withFallback;
   }
   if (bulkMatches.length === 1) {
@@ -589,7 +794,7 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
 
   // 2. Check for Category Heading + Enumeration Blocks
   // Format: Non-bullet header followed by >= 2 bulleted lines (o, •, -, *, 1., a., etc.)
-  const lines = trimmed.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = normalizedText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const enumBlocks: Array<{ header: string; items: string[] }> = [];
   let currentBlock: { header: string; items: string[] } | null = null;
   // Requires a real marker followed by whitespace, so prose lines are never mistaken for bullets
@@ -617,10 +822,10 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
     return { type: 'enumeration_blocks', blocks: enumBlocks };
   }
 
-  // 3. Check for Single Term/Definition Pair (TSV, Key-Value, or 2-line break)
+  // 3. Check for Single Term/Definition Pair (TSV, Key-Value, heading blocks, or 2-line break)
   // 3a. TSV
-  if (trimmed.includes('\t')) {
-    const parts = trimmed.split('\t');
+  if (normalizedText.includes('\t')) {
+    const parts = normalizedText.split('\t');
     if (parts.length >= 2 && parts[0].trim() && parts[1].trim()) {
       return {
         type: 'single_pair',
@@ -633,7 +838,7 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
   // 3b. Key-Value Delimiters (: , - , – , — , =)
   // Protects compound words like "Object-oriented" by requiring spaces around dashes
   // Also avoids matching protocol URLs like "http://" by demanding whitespace or isolated symbol
-  const kvMatch = trimmed.match(/^([^\n]+?)\s*(?::\s+|\s[-–—]\s|=)\s*([\s\S]+)$/);
+  const kvMatch = normalizedText.match(/^([^\n]+?)\s*(?::\s+|\s[-–—]\s|=)\s*([\s\S]+)$/);
   if (kvMatch && kvMatch[1].trim() && kvMatch[2].trim()) {
     return {
       type: 'single_pair',
@@ -643,7 +848,16 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
     };
   }
 
-  // 3c. Two-line break — only when line 1 is a label, not a wrapped clause of prose.
+  // 3c. Conservative standalone heading + paragraph extraction for PDF handouts.
+  const headingMatches = extractHeadingBlocks(normalizedText);
+  if (headingMatches.length === 1) {
+    return { type: 'single_pair', ...headingMatches[0] };
+  }
+  if (headingMatches.length >= 2) {
+    return { type: 'bulk_terms', items: headingMatches };
+  }
+
+  // 3d. Two-line break — only when line 1 is a label, not a wrapped clause of prose.
   // Without this guard, a sentence that happens to wrap once ("...for people and things,\nand the
   // marketspace, ...") would be mistaken for a term/definition pair.
   if (lines.length === 2 && isLabelLike(lines[0]) && lines[1]) {
@@ -654,9 +868,14 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
     };
   }
 
-  // 3d. Natural Definition Verb Split (e.g. "computer graphics describes the use of...")
+  // 3e. Natural Definition Verb Split (e.g. "computer graphics describes the use of...")
   // Captures textbook definitions copied from PDFs where all styling and punctuation delimiters are absent.
-  const verbMatch = splitDefinitionVerb(trimmed) || splitPassiveDefinition(trimmed);
+  const verbMatches = extractDefinitionVerbPairs(normalizedText);
+  if (verbMatches.length >= 2) {
+    return { type: 'bulk_terms', items: verbMatches };
+  }
+
+  const verbMatch = verbMatches[0] || splitPassiveDefinition(normalizedText);
   if (verbMatch) {
     return {
       type: 'single_pair',
@@ -670,7 +889,7 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
   // "the marketplace, the physical world for people and things, and the marketspace, a virtual world of information."
   // or "Front-end, the client-facing presentation layer; Back-end, the server-side logic and database operations."
   // Soft line wraps from PDF/slide copies are joined first so clause detection is not line-bound.
-  const cleaned = trimmed.replace(/\s*\r?\n\s*/g, ' ').replace(/\s+/g, ' ').replace(/\.+$/, '').trim();
+  const cleaned = normalizedText.replace(/\s*\r?\n\s*/g, ' ').replace(/\s+/g, ' ').replace(/\.+$/, '').trim();
 
   // 4a. Strict alternating clauses: term, definition, term, definition…
   // Handles any number of items and needs no "and" joiner.

@@ -63,6 +63,7 @@ interface SharedQuestionProps {
   onDontKnow?: () => void;
   desktopViewport?: boolean;
   aiExplanation?: string | null;
+  aiExplanationIsAiGenerated?: boolean;
   aiMotivationalStim?: string | null;
   isAiExplaining?: boolean;
   onRateAiExplanation?: (rating: 'up' | 'down') => void;
@@ -129,6 +130,7 @@ function highlightKeywords(
 
 function AiExplanationCard({
   explanation,
+  isAiGenerated,
   motivationalStim,
   correctAnswer,
   wrongAnswer,
@@ -136,6 +138,7 @@ function AiExplanationCard({
   onRate,
 }: {
   explanation: string;
+  isAiGenerated?: boolean;
   motivationalStim?: string | null;
   correctAnswer?: string;
   wrongAnswer?: string;
@@ -148,7 +151,7 @@ function AiExplanationCard({
         <div className="flex items-center gap-2 text-primary flex-wrap">
           <div className="flex items-center gap-1.5">
             <Sparkles className="h-4 w-4" />
-            <span>Simplified Explanation</span>
+            <span>{isAiGenerated ? 'AI Explanation' : 'Reference Explanation'}</span>
           </div>
         </div>
         <div className="flex items-center gap-1 text-muted-foreground">
@@ -203,6 +206,7 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
     onDontKnow,
     desktopViewport,
     aiExplanation,
+    aiExplanationIsAiGenerated,
     aiMotivationalStim,
     onRateAiExplanation,
     aiRating
@@ -328,6 +332,7 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
               <div className="pt-2 text-left">
                 <AiExplanationCard
                   explanation={aiExplanation}
+                  isAiGenerated={aiExplanationIsAiGenerated}
                   motivationalStim={aiMotivationalStim}
                   correctAnswer={getQuestionAnswer(question)}
                   wrongAnswer={identificationInput.trim()}
@@ -484,6 +489,7 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
     onDontKnow,
     desktopViewport,
     aiExplanation,
+    aiExplanationIsAiGenerated,
     aiMotivationalStim,
     onRateAiExplanation,
     aiRating
@@ -596,6 +602,7 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
               <div className="pt-2 text-left">
                 <AiExplanationCard
                   explanation={aiExplanation}
+                  isAiGenerated={aiExplanationIsAiGenerated}
                   motivationalStim={aiMotivationalStim}
                   correctAnswer={getQuestionAnswer(question)}
                   wrongAnswer={identificationInput.trim()}
@@ -642,6 +649,7 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
     onDontKnow,
     desktopViewport,
     aiExplanation,
+    aiExplanationIsAiGenerated,
     aiMotivationalStim,
     onRateAiExplanation,
     aiRating
@@ -803,6 +811,7 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
         <div className="shrink-0 space-y-2 pr-1">
           <AiExplanationCard
             explanation={aiExplanation}
+            isAiGenerated={aiExplanationIsAiGenerated}
             motivationalStim={aiMotivationalStim}
             correctAnswer={currentOptions.find((opt) => opt.isCorrect)?.text || getQuestionAnswer(question)}
             wrongAnswer={currentOptions.find((opt) => opt.optionId === selectedOptionId)?.text}

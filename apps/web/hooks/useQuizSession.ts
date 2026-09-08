@@ -185,6 +185,7 @@ export function useQuizSession({
   const [identificationSubmitted, setIdentificationSubmitted] = useState(false);
   const [typedAnswerCorrect, setTypedAnswerCorrect] = useState<boolean | null>(null);
   const [answerResult, setAnswerResult] = useState<boolean | null>(null);
+  const [answerResultQuestionId, setAnswerResultQuestionId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [isHintVisible, setIsHintVisible] = useState(false);
   const [isExplanationVisible, setIsExplanationVisible] = useState(false);
@@ -256,6 +257,7 @@ export function useQuizSession({
         setIdentificationSubmitted(snapshot.identificationSubmitted);
         setTypedAnswerCorrect(snapshot.typedAnswerCorrect);
         setAnswerResult(snapshot.answerResult);
+        setAnswerResultQuestionId(snapshot.answerResult !== null ? snapshot.queueState.activeQueue[0] || null : null);
         setCorrectAnswerIds(new Set(snapshot.correctAnswerIds));
         setFeedbackMessage(snapshot.feedbackMessage);
         setIsHintVisible(snapshot.isHintVisible);
@@ -428,6 +430,7 @@ export function useQuizSession({
       setIdentificationSubmitted(restoredSnapshot.identificationSubmitted);
       setTypedAnswerCorrect(restoredSnapshot.typedAnswerCorrect);
       setAnswerResult(restoredSnapshot.answerResult);
+      setAnswerResultQuestionId(restoredSnapshot.answerResult !== null ? activeQuestion.id : null);
       setFeedbackMessage(restoredSnapshot.feedbackMessage);
       setIsHintVisible(restoredSnapshot.isHintVisible);
       setIsExplanationVisible(restoredSnapshot.isExplanationVisible);
@@ -442,6 +445,7 @@ export function useQuizSession({
     setIdentificationSubmitted(false);
     setTypedAnswerCorrect(null);
     setAnswerResult(null);
+    setAnswerResultQuestionId(null);
     setFeedbackMessage(null);
     setIsHintVisible(false);
     setIsExplanationVisible(false);
@@ -463,6 +467,7 @@ export function useQuizSession({
     setIsEvaluating(true);
     setSelectedOptionId(option.optionId);
     setAnswerResult(option.isCorrect);
+    setAnswerResultQuestionId(activeQuestion.id);
     const personalizedMessages = option.isCorrect
       ? personalizedFeedback?.correct
       : personalizedFeedback?.incorrect;
@@ -544,6 +549,7 @@ export function useQuizSession({
     setIsEvaluating(false);
     setSelectedOptionId(null);
     setAnswerResult(null);
+    setAnswerResultQuestionId(null);
     setFeedbackMessage(null);
     setIsHintVisible(false);
     setIsExplanationVisible(false);
@@ -757,6 +763,7 @@ export function useQuizSession({
     setIdentificationSubmitted(false);
     setTypedAnswerCorrect(null);
     setAnswerResult(null);
+    setAnswerResultQuestionId(null);
     setFeedbackMessage(null);
     setIsHintVisible(false);
     setIsExplanationVisible(false);
@@ -805,6 +812,7 @@ export function useQuizSession({
     identificationSubmitted,
     typedAnswerCorrect,
     answerResult,
+    answerResultQuestionId,
     correctAnswerIds,
     currentStreak,
     bestStreak,

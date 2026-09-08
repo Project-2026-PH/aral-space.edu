@@ -26,8 +26,9 @@ import ResumePracticeModal from '@/components/quiz/ResumePracticeModal';
 import { removeQuizProgressSnapshot } from '@/lib/quizProgressPersistence';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { generateLocalExplanation } from '@/lib/ai/localExplanationEngine';
+import { generateLocalExplanation, prewarmLocalAi } from '@/lib/ai/localExplanationEngine';
 import { recordExplanationFeedback } from '@/lib/ai/explanationPreferences';
+import { getQuestionAnswer } from '@/lib/quizAnswerEvaluation';
 import { getClientUserId } from '@/lib/authoringPreferences';
 
 interface QuizRunnerProps {
@@ -51,9 +52,15 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const resumePromptShownRef = useRef(false);
   const [aiExplanations, setAiExplanations] = useState<Record<string, string>>({});
+  const [aiExplanationSources, setAiExplanationSources] = useState<Record<string, boolean>>({});
   const [aiMotivationalStims, setAiMotivationalStims] = useState<Record<string, string>>({});
   const [isAiExplaining, setIsAiExplaining] = useState(false);
   const [aiRatings, setAiRatings] = useState<Record<string, 'up' | 'down'>>({});
+  const explanationRequestVersionRef = useRef(0);
+
+  useEffect(() => {
+    prewarmLocalAi();
+  }, []);
 
   const session = useQuizSession({ ...props, mode: currentMode });
   const {
@@ -75,6 +82,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
     identificationSubmitted,
     typedAnswerCorrect,
     answerResult,
+    answerResultQuestionId,
     correctAnswerIds,
     currentStreak,
     bestStreak,
@@ -103,6 +111,14 @@ export default function QuizRunner(props: QuizRunnerProps) {
     giveUp
   } = session;
 
+  useEffect(() => {
+    explanationRequestVersionRef.current += 1;
+    setAiExplanations({});
+    setAiExplanationSources({});
+    setAiMotivationalStims({});
+    setAiRatings({});
+  }, [activeQuestion?.id, currentMode]);
+
   const handleConfirmReset = () => {
     resetProgress();
     setShowSettingsModal(false);
@@ -112,17 +128,18 @@ export default function QuizRunner(props: QuizRunnerProps) {
     if (!activeQuestion || isAiExplaining) return;
 
     const questionId = activeQuestion.id;
+    const requestVersion = explanationRequestVersionRef.current;
     let correctAnswerText = '';
     let wrongAnswerText = '';
 
     if (currentOptions && currentOptions.length > 0) {
       const correctOpt = currentOptions.find((opt) => opt.isCorrect);
-      correctAnswerText = correctOpt?.text || String(activeQuestion.correct_answer);
+      correctAnswerText = correctOpt?.text || getQuestionAnswer(activeQuestion);
 
       const wrongOpt = currentOptions.find((opt) => opt.optionId === selectedOptionId);
       wrongAnswerText = wrongOpt?.text || (selectedOptionId !== null ? String(selectedOptionId) : 'selected choice');
     } else {
-      correctAnswerText = String(activeQuestion.correct_answer || activeQuestion.answer_text || '');
+      correctAnswerText = getQuestionAnswer(activeQuestion);
       wrongAnswerText = identificationInput.trim() || 'submitted answer';
     }
 
@@ -143,9 +160,15 @@ export default function QuizRunner(props: QuizRunnerProps) {
             : null,
       });
 
+      if (requestVersion !== explanationRequestVersionRef.current) return;
+
       setAiExplanations((prev) => ({
         ...prev,
         [questionId]: result.explanation,
+      }));
+      setAiExplanationSources((prev) => ({
+        ...prev,
+        [questionId]: result.isAiGenerated,
       }));
       if (result.motivationalStim) {
         setAiMotivationalStims((prev) => ({
@@ -362,6 +385,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
             onAdvance={advance}
             onDontKnow={() => giveUp(currentMode === 'learn' || currentMode === 'identification' ? currentMode : undefined)}
             aiExplanation={activeQuestion ? aiExplanations[activeQuestion.id] : null}
+            aiExplanationIsAiGenerated={activeQuestion ? aiExplanationSources[activeQuestion.id] : false}
             aiMotivationalStim={activeQuestion ? aiMotivationalStims[activeQuestion.id] : null}
             isAiExplaining={isAiExplaining}
             onRateAiExplanation={handleRateAiExplanation}
@@ -378,7 +402,11 @@ export default function QuizRunner(props: QuizRunnerProps) {
               ? 'Tap anywhere to open your seven-card recap'
               : 'Press anywhere to continue'
           }
-          showAiExplain={answerResult === false || (identificationSubmitted && typedAnswerCorrect === false)}
+          showAiExplain={Boolean(
+            activeQuestion &&
+            answerResultQuestionId === activeQuestion.id &&
+            (answerResult === false || (identificationSubmitted && typedAnswerCorrect === false))
+          )}
           isAiExplaining={isAiExplaining}
           hasAiExplanation={Boolean(activeQuestion && aiExplanations[activeQuestion.id])}
           onExplainWithAi={handleExplainWithAi}

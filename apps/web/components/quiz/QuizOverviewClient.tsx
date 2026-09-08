@@ -546,6 +546,7 @@ export default function QuizOverviewClient({
         subjectId={quiz.subject_id}
         userId={quiz.user_id}
         onSaved={handleQuestionSaved}
+        onDeleted={handleQuestionDeleted}
       />
 
       <QuizStartConfigModal

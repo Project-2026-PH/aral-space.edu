@@ -684,15 +684,23 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
 
     const updateScrollState = () => {
       // Five lines at the component's 1.5rem line-height threshold.
-      setIsDefinitionScrollable(content.scrollHeight > 5 * 1.5 * 16);
+      const shouldScroll = content.scrollHeight > 5 * 1.5 * 16;
+      setIsDefinitionScrollable((prev) => (prev !== shouldScroll ? shouldScroll : prev));
     };
 
     updateScrollState();
     if (typeof ResizeObserver === 'undefined') return;
 
-    const observer = new ResizeObserver(updateScrollState);
+    let frameId: number | null = null;
+    const observer = new ResizeObserver(() => {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(updateScrollState);
+    });
     observer.observe(content);
-    return () => observer.disconnect();
+    return () => {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
   }, [question.question_text]);
 
   return (

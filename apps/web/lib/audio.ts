@@ -51,7 +51,14 @@ export class QuizAudioManager {
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
-        this.audioContext = new AudioContextClass();
+        const ctx = new AudioContextClass();
+        ctx.onstatechange = () => {
+          if (ctx.state === 'closed') {
+            this.audioContext = null;
+            this.audioContextInitialized = false;
+          }
+        };
+        this.audioContext = ctx;
         this.audioContextInitialized = true;
       }
     } catch (err) {
@@ -78,25 +85,21 @@ export class QuizAudioManager {
   }
 
   /**
-   * Preload audio files so playback has zero latency upon answering or finishing.
-   * Attempts Web Audio API first, falls back to HTML5 <audio> elements.
+   * Preload audio metadata without locking persistent background audio HAL channels.
+   * AudioContext is strictly deferred to playback on user interaction.
    */
   public preload(): void {
     if (typeof window === 'undefined') return;
 
     try {
-      // Initialize AudioContext for Web Audio API (deferred to first user interaction)
-      this.ensureAudioContext();
-
-      // Fallback: preload HTML5 audio elements
       if (!this.correctAudio && typeof Audio !== 'undefined') {
         this.correctAudio = new Audio('/correct_sound.mp3');
-        this.correctAudio.preload = 'auto';
+        this.correctAudio.preload = 'none';
         this.correctAudio.volume = DEFAULT_VOLUME;
       }
       if (!this.successAudio && typeof Audio !== 'undefined') {
         this.successAudio = new Audio('/success_sound.mp3');
-        this.successAudio.preload = 'auto';
+        this.successAudio.preload = 'none';
         this.successAudio.volume = DEFAULT_VOLUME;
       }
     } catch (err) {
@@ -167,6 +170,14 @@ export class QuizAudioManager {
 
     // Ensure AudioContext is initialized on first playback
     this.ensureAudioContext();
+
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume();
+      } catch {
+        // Continue to source or fallback
+      }
+    }
 
     // Try Web Audio API first (preferred for iOS compatibility)
     if (this.audioContext && audioBuffer) {

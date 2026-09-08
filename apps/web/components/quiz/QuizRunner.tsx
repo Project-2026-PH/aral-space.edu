@@ -26,9 +26,7 @@ import ResumePracticeModal from '@/components/quiz/ResumePracticeModal';
 import { removeQuizProgressSnapshot } from '@/lib/quizProgressPersistence';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { generateLocalExplanation, prewarmLocalAi } from '@/lib/ai/localExplanationEngine';
 import { recordExplanationFeedback } from '@/lib/ai/explanationPreferences';
-import { getQuestionAnswer } from '@/lib/quizAnswerEvaluation';
 import { getClientUserId } from '@/lib/authoringPreferences';
 
 interface QuizRunnerProps {
@@ -57,10 +55,6 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const [isAiExplaining, setIsAiExplaining] = useState(false);
   const [aiRatings, setAiRatings] = useState<Record<string, 'up' | 'down'>>({});
   const explanationRequestVersionRef = useRef(0);
-
-  useEffect(() => {
-    prewarmLocalAi();
-  }, []);
 
   const session = useQuizSession({ ...props, mode: currentMode });
   const {
@@ -129,55 +123,65 @@ export default function QuizRunner(props: QuizRunnerProps) {
 
     const questionId = activeQuestion.id;
     const requestVersion = explanationRequestVersionRef.current;
-    let correctAnswerText = '';
-    let wrongAnswerText = '';
-
-    if (currentOptions && currentOptions.length > 0) {
-      const correctOpt = currentOptions.find((opt) => opt.isCorrect);
-      correctAnswerText = correctOpt?.text || getQuestionAnswer(activeQuestion);
-
-      const wrongOpt = currentOptions.find((opt) => opt.optionId === selectedOptionId);
-      wrongAnswerText = wrongOpt?.text || (selectedOptionId !== null ? String(selectedOptionId) : 'selected choice');
-    } else {
-      correctAnswerText = getQuestionAnswer(activeQuestion);
-      wrongAnswerText = identificationInput.trim() || 'submitted answer';
-    }
-
-    const guestId = props.viewerId || getClientUserId();
+    const isTypedAnswerMode = currentMode === 'learn' || currentMode === 'identification';
+    const serverSelectedOptionId = isTypedAnswerMode || selectedOptionId === null || selectedOptionId < 0
+      ? null
+      : selectedOptionId;
 
     setIsAiExplaining(true);
+
     try {
-      const result = await generateLocalExplanation({
-        questionId,
-        questionText: activeQuestion.question_text,
-        correctAnswer: correctAnswerText,
-        wrongAnswer: wrongAnswerText,
-        guestId,
-        correctExplanation: activeQuestion.correct_explanation || activeQuestion.explanation,
-        distractorExplanation:
-          selectedOptionId !== null
-            ? activeQuestion.distractor_explanations?.[selectedOptionId]
-            : null,
+      const serverResponse = await fetch('/api/ai/explanation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quizId: quiz.id,
+          questionId,
+          selectedOptionId: serverSelectedOptionId,
+          typedAnswer: isTypedAnswerMode ? identificationInput : null,
+        }),
       });
+
+      if (!serverResponse.ok) {
+        const errorBody = await serverResponse.json().catch(() => null);
+        throw new Error(errorBody?.error || `explanation request failed (${serverResponse.status})`);
+      }
+
+      const serverResult = await serverResponse.json() as {
+        explanation?: unknown;
+        isAiGenerated?: unknown;
+        latencyMs?: unknown;
+        cacheHit?: unknown;
+        source?: unknown;
+        provider?: unknown;
+        model?: unknown;
+      };
+      if (typeof serverResult.explanation !== 'string' || !serverResult.explanation.trim()) {
+        throw new Error('server returned an invalid explanation');
+      }
+
+      const isAiGenerated = serverResult.isAiGenerated === true && serverResult.source === 'groq';
+      const logPrefix = isAiGenerated ? '[GroqExplanation]' : '[ReferenceExplanation]';
+      console.log(
+        `${logPrefix} source=${String(serverResult.source || 'database')}`,
+        `provider=${String(serverResult.provider || 'database')}`,
+        `model=${String(serverResult.model || 'none')}`,
+        `latency=${String(serverResult.latencyMs || 'unknown')}ms`,
+        `cacheHit=${Boolean(serverResult.cacheHit)}`
+      );
 
       if (requestVersion !== explanationRequestVersionRef.current) return;
 
       setAiExplanations((prev) => ({
         ...prev,
-        [questionId]: result.explanation,
+        [questionId]: serverResult.explanation as string,
       }));
       setAiExplanationSources((prev) => ({
         ...prev,
-        [questionId]: result.isAiGenerated,
+        [questionId]: isAiGenerated,
       }));
-      if (result.motivationalStim) {
-        setAiMotivationalStims((prev) => ({
-          ...prev,
-          [questionId]: result.motivationalStim!,
-        }));
-      }
     } catch (err) {
-      console.error('Error generating AI explanation:', err);
+      console.error('Error loading explanation:', err);
     } finally {
       setIsAiExplaining(false);
     }
@@ -194,10 +198,28 @@ export default function QuizRunner(props: QuizRunnerProps) {
     });
   };
 
+  const activeProgressMap = pendingAdvance?.progressMap || progressMap;
+  const totalLockedCount = questions.filter((question) => activeProgressMap.get(question.id)?.locked).length;
+  const correctAnswerCount = correctAnswerIds.size;
+  const overallPercent = Math.round((totalLockedCount / (questions.length || 1)) * 100);
+  const questionsPerReviewRound = 7;
+  const reviewRoundCount = Math.max(1, Math.ceil(questions.length / questionsPerReviewRound));
+  const progressSegments = Array.from({ length: reviewRoundCount }, (_, index) => {
+    const segmentStart = index * questionsPerReviewRound;
+    const segmentSize = Math.min(questionsPerReviewRound, questions.length - segmentStart);
+    const completedInSegment = Math.min(Math.max(totalLockedCount - segmentStart, 0), segmentSize);
+    return { id: index, fillPercent: segmentSize > 0 ? (completedInSegment / segmentSize) * 100 : 0 };
+  });
+  const progressPercent = progressSegments.reduce((sum, segment) => sum + segment.fillPercent, 0) / reviewRoundCount;
+  const questionsUntilNextCheckIn = Math.min(
+    questionsPerReviewRound,
+    Math.max(questions.length - totalLockedCount, 0)
+  );
+
   const isMultipleChoiceMode = currentMode === 'multiple_choice';
   const isDesktopViewportMode = isMultipleChoiceMode || currentMode === 'identification';
   const isResumePromptMode = mode === 'multiple_choice' || mode === 'identification';
-  const hasExistingMasteryProgress = props.initialProgress.some((progress) => progress.locked);
+  const hasExistingMasteryProgress = totalLockedCount > 0;
 
   useEffect(() => {
     if (
@@ -211,6 +233,21 @@ export default function QuizRunner(props: QuizRunnerProps) {
     resumePromptShownRef.current = true;
     setShowResumePrompt(true);
   }, [hasExistingMasteryProgress, hasRestoredProgress, isCompleted, isProgressHydrated, isResumePromptMode]);
+
+  const resetSavedReview = () => {
+    resetProgress();
+    setShowResumePrompt(false);
+  };
+  const resumePrompt = (
+    <ResumePracticeModal
+      open={showResumePrompt}
+      progressPercent={overallPercent}
+      completedQuestions={totalLockedCount}
+      questionsUntilNextCheckIn={questionsUntilNextCheckIn}
+      onContinue={() => setShowResumePrompt(false)}
+      onReset={resetSavedReview}
+    />
+  );
 
   if (!isProgressHydrated) {
     return <div className="mx-auto flex min-h-[50vh] max-w-md items-center justify-center text-center text-xs text-muted-foreground">Restoring your quiz progress...</div>;
@@ -231,38 +268,6 @@ export default function QuizRunner(props: QuizRunnerProps) {
       />
     );
   }
-
-  const activeProgressMap = pendingAdvance?.progressMap || progressMap;
-  const totalLockedCount = questions.filter((question) => activeProgressMap.get(question.id)?.locked).length;
-  const correctAnswerCount = correctAnswerIds.size;
-  const overallPercent = Math.round((totalLockedCount / (questions.length || 1)) * 100);
-  const questionsPerReviewRound = 7;
-  const reviewRoundCount = Math.max(1, Math.ceil(questions.length / questionsPerReviewRound));
-  const progressSegments = Array.from({ length: reviewRoundCount }, (_, index) => {
-    const segmentStart = index * questionsPerReviewRound;
-    const segmentSize = Math.min(questionsPerReviewRound, questions.length - segmentStart);
-    const completedInSegment = Math.min(Math.max(totalLockedCount - segmentStart, 0), segmentSize);
-    return { id: index, fillPercent: segmentSize > 0 ? (completedInSegment / segmentSize) * 100 : 0 };
-  });
-  const progressPercent = progressSegments.reduce((sum, segment) => sum + segment.fillPercent, 0) / reviewRoundCount;
-  const questionsUntilNextCheckIn = Math.min(
-    questionsPerReviewRound,
-    Math.max(questions.length - totalLockedCount, 0)
-  );
-  const resetSavedReview = () => {
-    removeQuizProgressSnapshot(quiz.id, props.initialSession.id);
-    window.location.assign(`/practice/${quiz.id}?mode=${encodeURIComponent(currentMode)}`);
-  };
-  const resumePrompt = (
-    <ResumePracticeModal
-      open={showResumePrompt}
-      progressPercent={overallPercent}
-      completedQuestions={totalLockedCount}
-      questionsUntilNextCheckIn={questionsUntilNextCheckIn}
-      onContinue={() => setShowResumePrompt(false)}
-      onReset={resetSavedReview}
-    />
-  );
 
   if (isRecapVisible && pendingAdvance) {
     return (

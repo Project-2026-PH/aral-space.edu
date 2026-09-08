@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
+import ConfirmModal from '../ui/ConfirmModal';
 import { QuizQuestion } from '@quiz-creator/types';
 import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
-import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered } from 'lucide-react';
+import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, Trash2 } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { hasRichTextContent } from '@/lib/richText';
 
@@ -49,6 +50,7 @@ interface QuizQuestionFormModalProps {
   subjectId?: string | null;
   userId?: string | null;
   onSaved: (savedQuestion?: QuizQuestion) => void;
+  onDeleted?: (deletedId?: string) => void;
 }
 
 export default function QuizQuestionFormModal({
@@ -58,7 +60,8 @@ export default function QuizQuestionFormModal({
   quizId,
   subjectId,
   userId,
-  onSaved
+  onSaved,
+  onDeleted
 }: QuizQuestionFormModalProps) {
   const isEditing = Boolean(question);
   const [type, setType] = useState<QuestionType>('identification');
@@ -68,6 +71,8 @@ export default function QuizQuestionFormModal({
   const [answerText, setAnswerText] = useState<string>('');
   const [explanation, setExplanation] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -103,6 +108,8 @@ export default function QuizQuestionFormModal({
       setExplanation('');
     }
     setError(null);
+    setDeleting(false);
+    setShowDeleteConfirm(false);
   }, [question, open]);
 
   function handleTypeChange(newType: QuestionType) {
@@ -236,6 +243,40 @@ export default function QuizQuestionFormModal({
       setError(err.message || 'Error saving question');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!question) return;
+
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}/questions/${question.id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || 'Failed to delete question');
+
+      recordLocalAuthoringEvent(
+        {
+          action: 'delete',
+          before: makeAuthoringQuestionSnapshot(
+            detectQuestionType(question),
+            question.question_text,
+            question.options || [],
+            question.explanation
+          )
+        },
+        { userId, subjectId }
+      );
+      onOpenChange(false);
+      onDeleted?.(question.id);
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete question');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -497,24 +538,50 @@ export default function QuizQuestionFormModal({
           />
         </div>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="rounded-xl px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Question'}
-          </button>
+        <div className="flex items-center justify-between gap-2 pt-2">
+          {isEditing ? (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={saving || deleting}
+              className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-destructive hover:bg-destructive/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deleting ? 'Deleting...' : 'Delete Question'}
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              disabled={saving || deleting}
+              className="rounded-xl px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || deleting}
+              className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Question'}
+            </button>
+          </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        onConfirm={handleDelete}
+        title="Delete Question"
+        message="Are you sure you want to permanently remove this question from the quiz?"
+        destructive
+        confirmText="Delete Question"
+      />
     </Modal>
   );
 }

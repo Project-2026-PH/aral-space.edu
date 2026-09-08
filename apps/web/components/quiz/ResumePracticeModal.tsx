@@ -24,7 +24,7 @@ export default function ResumePracticeModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex min-h-dvh w-screen items-center justify-center overflow-y-auto bg-background/80 p-3 backdrop-blur-md animate-modal-backdrop sm:p-4"
+      className="fixed inset-0 z-[60] flex min-h-dvh w-screen items-center justify-center overflow-y-auto bg-background/85 p-3 backdrop-blur-sm sm:backdrop-blur-md animate-modal-backdrop sm:p-4"
       style={{
         position: 'fixed',
         inset: 0,

@@ -53,14 +53,40 @@ export default function QuizRecap({
   const effectiveProgressPercent = progressPercent ?? (effectiveSegments.reduce((sum, segment) => sum + segment.fillPercent, 0) / reviewRoundCount);
   const isSegmented = mode === 'multiple_choice' || mode === 'reverse' || Boolean(progressSegments);
 
+  const pointerStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = React.useRef(false);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointerStartRef.current = { x: event.clientX, y: event.clientY };
+    isDraggingRef.current = false;
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerStartRef.current) return;
+    const dx = Math.abs(event.clientX - pointerStartRef.current.x);
+    const dy = Math.abs(event.clientY - pointerStartRef.current.y);
+    if (dx > 6 || dy > 6) {
+      isDraggingRef.current = true;
+    }
+  };
+
+  const handleSurfaceClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (isDraggingRef.current) {
+      event.stopPropagation();
+      return;
+    }
+    onSurfaceClick(event);
+  };
+
   return (
     <div
-      role="button"
       tabIndex={0}
-      onClick={onSurfaceClick}
+      onClick={handleSurfaceClick}
       onKeyDown={onSurfaceKeyDown}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
       aria-label="Quick recap. Press any key or select Continue to resume."
-      className="mx-auto min-h-[calc(100dvh-2rem)] max-w-3xl w-full space-y-8 pb-40 sm:min-h-[calc(100vh-2rem)] sm:pb-40 outline-none px-2 sm:px-0"
+      className="mx-auto w-full max-w-3xl min-h-[calc(100dvh-5rem)] max-h-[calc(100dvh-4.5rem)] sm:max-h-none sm:min-h-[calc(100vh-2rem)] space-y-8 pb-48 sm:pb-40 outline-none px-3 sm:px-0 overflow-y-auto sm:overflow-visible overscroll-y-contain touch-pan-y"
     >
       <section className="space-y-3">
         <div className="flex items-center justify-between">

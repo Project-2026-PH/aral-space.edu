@@ -734,6 +734,7 @@ export function useQuizSession({
 
   function resetProgress() {
     removeQuizProgressSnapshot(quiz.id, session.id);
+    void syncClientRef.current.completeSession(session, quiz.id, telemetry.generateSummary(questions));
 
     const freshProgressMap = new Map<string, QuestionProgress>();
     for (const q of questions) {

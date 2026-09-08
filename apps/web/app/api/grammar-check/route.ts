@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
+import { AiModelConfig } from '@quiz-creator/core/services';
 import { runLocalGrammarRules } from '@/lib/grammar/localRules';
 import { GrammarCheckResponse, GrammarIssue, RuleType } from '@/lib/grammar/types';
 
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GrammarCheckR
 
         const completion = await groq.chat.completions.create(
           {
-            model: 'llama-3.3-70b-versatile',
+            model: AiModelConfig.getGroqModel(),
             messages: [
               {
                 role: 'system',

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   enforceTwoSentences,
   buildFallbackExplanation,
+  composeExplanation,
+  findQuestionSetWrongChoiceExplanation,
 } from '../ai/localExplanationEngine';
 import {
   getExplanationPreferences,
@@ -59,15 +61,67 @@ describe('localExplanationEngine', () => {
   });
 
   describe('buildFallbackExplanation', () => {
-    it('builds clear 2-sentence explanation from database strings', () => {
+    it('resolves statement-style stems to the supplied correct answer', () => {
       const fallback = buildFallbackExplanation(
-        'WEP',
-        'EAP',
-        'Wired Equivalent Privacy was designed to provide data confidentiality.',
-        'Extensible Authentication Protocol provides key transport.'
+        'AWS Points of Presence',
+        'Edge locations',
+        null,
+        null,
+        'This extends selected AWS services closer to end users.'
       );
-      expect(fallback).toContain('Think of WEP as Wired Equivalent Privacy was designed to provide data confidentiality');
-      expect(fallback).toContain('while EAP is Extensible Authentication Protocol provides key transport');
+
+      expect(fallback).toBe(
+        'AWS Points of Presence extends selected AWS services closer to end users. No trusted explanation is stored for why Edge locations is incorrect.'
+      );
+    });
+
+    it('keeps the correct answer visible for question-style stems without an explanation', () => {
+      const fallback = buildFallbackExplanation(
+        'Mitochondria',
+        'Ribosome',
+        null,
+        null,
+        'Which organelle produces most of the cell chemical energy?'
+      );
+
+      expect(fallback).toContain('Mitochondria is the answer for');
+      expect(fallback).toContain('no trusted explanation is stored for why Ribosome is incorrect');
+    });
+    it('states when no trusted wrong-choice explanation is available', () => {
+      const explanation = composeExplanation(
+        'Amazon CloudFront is a content delivery network.',
+        'Amazon CloudFront',
+        'Regional edge caches',
+        ''
+      );
+
+      expect(explanation).toContain('no trusted explanation is stored for why Regional edge caches is incorrect');
+    });
+
+    it('finds where a wrong choice is correct in the designated question set', () => {
+      const evidence = findQuestionSetWrongChoiceExplanation(
+        'Regional edge caches',
+        'current-question',
+        [
+          {
+            id: 'current-question',
+            question_text: 'This is a content delivery network.',
+            options: ['Amazon CloudFront', 'Regional edge caches'],
+            correct_answer: 0,
+          },
+          {
+            id: 'other-question',
+            question_text: 'Which AWS feature caches content near users?',
+            options: ['Regional edge caches', 'Amazon CloudFront'],
+            correct_answer: 0,
+            correct_explanation: 'Regional edge caches store content closer to users before it reaches edge locations.',
+          },
+        ]
+      );
+
+      expect(evidence).toContain('"Regional edge caches" states "Which AWS feature caches content near users"');
+      expect(evidence).toContain('Which AWS feature caches content near users');
+      expect(evidence).toContain('Regional edge caches store content closer to users');
     });
   });
 });

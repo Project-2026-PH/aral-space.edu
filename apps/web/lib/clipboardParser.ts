@@ -16,7 +16,7 @@ const TERM_SHAPE = /^[A-Z0-9][A-Za-z0-9\s.\-_/()&'’]*$/;
 
 /** Finite verbs — their presence means a clause is a statement, not a term label. */
 const FINITE_VERB =
-  /\b(?:is|are|was|were|be|been|being|am|has|have|had|do|does|did|can|could|will|would|shall|should|may|might|must|refers|means|includes|consists|focuses|allows|provides)\b/i;
+  /\b(?:is|are|was|were|be|been|being|am|has|have|had|do|does|did|can|could|will|would|shall|should|may|might|must|refers|means|includes|consists|focuses|allows|provides|describes|involves|deals)\b/i;
 
 /** Term side of an appositive clause: a short noun phrase, e.g. "the marketspace". */
 function isAppositiveTerm(clause: string): boolean {
@@ -175,6 +175,50 @@ function splitTitleCaseTerm(body: string): { term: string; rest: string } | null
   return { term: match[1].trim(), rest: match[2].trim() };
 }
 
+const DEFINITION_VERB_REGEX =
+  /^([A-Za-z0-9][A-Za-z0-9\s.\-_/()&'’]{1,50}?)\s+\b(is\s+defined\s+as|refers\s+to|is\s+the\s+process\s+of|is\s+the\s+study\s+of|is\s+the\s+practice\s+of|is\s+the\s+science\s+of|is\s+used\s+to|describes|deals\s+with|focuses\s+on|means|consists\s+of|involves)\b\s+([\s\S]+)$/i;
+
+/**
+ * Splits delimiter-free sentences where a connecting verb links the term to its definition.
+ * Common in textbook paragraphs and PDF copies where all bolding and delimiters are stripped.
+ * e.g., "computer graphics describes the use of computers to create and manipulate images"
+ */
+export function splitDefinitionVerb(body: string): { term: string; definition: string } | null {
+  const match = body.match(DEFINITION_VERB_REGEX);
+  if (!match) return null;
+
+  const rawTerm = match[1].trim();
+  const verb = match[2].trim();
+  const rest = match[3].trim();
+
+  const cleanTerm = rawTerm.replace(/^(?:the|a|an)\s+/i, '').trim();
+
+  // Guard 1: Term shape & length (at least 2 chars, max 50 chars, max 5 words, no punctuation)
+  if (!cleanTerm || cleanTerm.length < 2 || cleanTerm.length > 50) return null;
+  const termWords = cleanTerm.split(/\s+/);
+  if (termWords.length > 5) return null;
+  if (/[.!?:]/.test(cleanTerm)) return null;
+
+  // Guard 2: Disallowed leading pronouns / question words
+  if (/^(?:it|this|that|these|those|there|what|which|who|when|where|why|how)\b/i.test(cleanTerm)) {
+    return null;
+  }
+
+  // Guard 3: No finite verbs inside the term candidate itself
+  if (FINITE_VERB.test(cleanTerm)) return null;
+
+  // Guard 4: Substantive definition remainder (at least 15 chars, at least 3 words)
+  if (rest.length < 15 || rest.split(/\s+/).length < 3) return null;
+
+  const combined = `${verb} ${rest}`.replace(/\s+/g, ' ').trim();
+  const formattedDefinition = combined.charAt(0).toUpperCase() + combined.slice(1);
+
+  return {
+    term: cleanTerm,
+    definition: formattedDefinition
+  };
+}
+
 /**
  * Line-oriented scan for `[bullet] Term: Definition` blocks.
  *
@@ -231,6 +275,15 @@ function extractBulkTerms(
       if (titleCase) {
         flush();
         current = { term: titleCase.term, parts: [titleCase.rest] };
+        continue;
+      }
+    }
+
+    if (isBulleted) {
+      const verbSplit = splitDefinitionVerb(body);
+      if (verbSplit) {
+        flush();
+        current = { term: verbSplit.term, parts: [verbSplit.definition] };
         continue;
       }
     }
@@ -531,6 +584,17 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
       type: 'single_pair',
       term: lines[0],
       definition: lines[1]
+    };
+  }
+
+  // 3d. Natural Definition Verb Split (e.g. "computer graphics describes the use of...")
+  // Captures textbook definitions copied from PDFs where all styling and punctuation delimiters are absent.
+  const verbMatch = splitDefinitionVerb(trimmed);
+  if (verbMatch) {
+    return {
+      type: 'single_pair',
+      term: verbMatch.term,
+      definition: verbMatch.definition
     };
   }
 

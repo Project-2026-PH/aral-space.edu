@@ -431,4 +431,68 @@ and the marketspace, a virtual world of information`;
       });
     });
   });
+
+  describe('Natural Definition Verb Splitting (Delimiter-Free PDF Text)', () => {
+    it('parses unstyled PDF sentence using "describes" into term and definition', () => {
+      const pdfText =
+        'computer graphics describes the use of computers to create and manipulate images';
+      const res = parseSmartClipboard(pdfText);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'computer graphics',
+        definition: 'Describes the use of computers to create and manipulate images'
+      });
+    });
+
+    it('parses unstyled PDF text with "deals with" and soft line break', () => {
+      const pdfText =
+        'Modeling deals with the mathematical specification of shape and\nappearance properties in a way that can be stored on the computer';
+      const res = parseSmartClipboard(pdfText);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'Modeling',
+        definition:
+          'Deals with the mathematical specification of shape and appearance properties in a way that can be stored on the computer'
+      });
+    });
+
+    it('strips leading article from term in definition verb sentences', () => {
+      const pdfText =
+        'The compiler refers to a specialized program that translates source code into machine language';
+      const res = parseSmartClipboard(pdfText);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'compiler',
+        definition:
+          'Refers to a specialized program that translates source code into machine language'
+      });
+    });
+
+    it('parses bulleted list of definition verb items without colons or dashes', () => {
+      const raw = `
+        • computer graphics describes the use of computers to create and manipulate images
+        • image processing involves algorithms for enhancing and analyzing digital images
+      `;
+      const res = parseSmartClipboard(raw);
+      expect(res).toEqual({
+        type: 'bulk_terms',
+        items: [
+          {
+            term: 'computer graphics',
+            definition: 'Describes the use of computers to create and manipulate images'
+          },
+          {
+            term: 'image processing',
+            definition: 'Involves algorithms for enhancing and analyzing digital images'
+          }
+        ]
+      });
+    });
+
+    it('guardrail: rejects prose sentences starting with pronouns or question words', () => {
+      expect(parseSmartClipboard('This describes the experimental findings from yesterday.')).toBeNull();
+      expect(parseSmartClipboard('What describes the exact state of this system?')).toBeNull();
+      expect(parseSmartClipboard('I think that this framework deals with latency issues.')).toBeNull();
+    });
+  });
 });

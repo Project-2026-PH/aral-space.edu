@@ -53,6 +53,7 @@ quiz-creator/
 - **Smart Note Import & Question Shaping**:
   - **Copy-Paste Import**: Paste notes directly from PDFs, slides, websites, or spreadsheets. Automatically separates terms and definitions from bulleted lists, TSV spreadsheets, and key-value pairs.
   - **Bold-Based Term Extraction**: Captures terms formatted in Markdown bold (`**Term**`) or rich HTML (`<b>`, `<strong>`, `font-weight: 700`) without requiring colons or dashes.
+  - **Natural Definition Verb Splitting**: Automatically extracts terms and definitions from unstyled PDF copies where bolding and delimiters are absent, identifying subject terms linked by verbs like *describes*, *refers to*, *is defined as*, and *deals with*.
   - **Zero-Infra Mitigations**: Built-in deterministic heuristics filter out inline emphasis, editorial meta-labels (`Note:`, `Warning:`), whole-sentence bolding, and glue fragmented adjacent spans from Google Docs/Microsoft Word.
   - **Instant Study Modes**: Turns single definition-answer pairs into flashcards, 4-option multiple-choice quizzes, or reverse-prompt questions without extra typing.
   - **Natural True or False Cards**: Rewrites definitions into natural statements, swapping in concepts from other cards to generate realistic False questions (see [CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md)).

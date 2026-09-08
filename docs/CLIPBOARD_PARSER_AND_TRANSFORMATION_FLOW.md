@@ -76,13 +76,15 @@ Raw Text / HTML Clipboard
    │     ├── Rich HTML Normalization (glues fragmented spans, converts blocks to newlines)
    │     └── Heuristic Mitigations (inline emphasis, meta labels, whole-sentence guards)
    │
-   ├── [3. Bulk Bulleted Terms] ─── (• Term: Definition / Title Case Fallback)
+   ├── [3. Bulk Bulleted Terms] ─── (• Term: Definition / Title Case & Verb Split Fallback)
    │
    ├── [4. Category Enumeration] ── (Header + >= 2 bullets)
    │
    ├── [5. Single Pair] ─────────── (TSV, Key-Value Delimiter, 2-line break)
    │
-   └── [6. Inline Appositives] ──── ("Term, definition, and term, definition...")
+   ├── [6. Natural Definition Verbs] (Term connects via "describes", "refers to", "deals with"...)
+   │
+   └── [7. Inline Appositives] ──── ("Term, definition, and term, definition...")
 ```
 
 #### Tier 1: Numbered Question/Answers & Numbered Definitions
@@ -105,6 +107,7 @@ Raw Text / HTML Clipboard
 * **Delimiter Pattern:** `TERM_DELIMITER = /^(.{2,80}?)(?:\s*:(?:\s+|$)|\s+[–—](?:\s+|$)|\s+-(?:\s+|$))([\s\S]*)$/`
 * **Multiline Continuity:** Lines following a term line without a new bullet marker are treated as continuation of the preceding definition.
 * **Title Case Fallback:** If a list uses bullets without delimiters (e.g. `• Business Relationship Management focuses on...`), once a delimited sibling confirms a list context, leading Title Case runs are extracted as terms.
+* **Definition Verb Fallback:** Recognizes bullet lines connecting a term through natural definition verbs without requiring colons or hyphens.
 
 #### Tier 4: Category Heading + Enumeration Blocks
 * Detects category headers followed by two or more bulleted items.
@@ -115,7 +118,25 @@ Raw Text / HTML Clipboard
 * **Key-Value Delimiters:** Matches `:`, ` - `, ` – `, ` — `, or `=`.
 * **Two-Line Heuristic:** If text is exactly two lines, line 1 is verified with `isLabelLike(line1)` (length $\le 80$, word count $\le 10$, no terminating periods or conjunctions) to prevent wrapped prose sentences from being mistaken for cards.
 
-#### Tier 6: Inline Appositive Compound Definitions
+#### Tier 6: Natural Definition Verb Splitting (`splitDefinitionVerb`)
+* **Purpose:** Solves the unstyled PDF reader problem. When users copy textbook definitions from PDF viewers (Adobe Acrobat, Chrome PDF, Foxit), all visual bolding and HTML tags are stripped by the viewer. Sentences often lack punctuation delimiters (colons or dashes).
+* **Regex Pattern:** Matches subject noun phrases linked by common academic definition verbs:
+  * `describes` (e.g. `"computer graphics describes the use of computers to create and manipulate images"`)
+  * `refers to` (e.g. `"compiler refers to a specialized program that translates..."`)
+  * `is defined as`
+  * `deals with` (e.g. `"Modeling deals with the mathematical specification..."`)
+  * `focuses on`
+  * `is the process of` / `is the study of` / `is the practice of` / `is the science of`
+  * `is used to` / `means` / `consists of` / `involves`
+* **Heuristic Guardrails:**
+  * Clean term length $\le 50$ characters and $\le 5$ words.
+  * Strips leading articles (`the`, `a`, `an`).
+  * Rejects clauses starting with pronouns (`it`, `this`, `that`, `there`) or question words (`what`, `which`, `who`, `how`).
+  * Rejects candidate terms that contain internal finite verbs (`FINITE_VERB`).
+  * Requires a substantive definition remainder ($\ge 15$ characters and $\ge 3$ words).
+  * Automatically capitalizes the resulting definition clause for natural question phrasing in [`QuizTransformService`](file:///c:/Users/User/IntelliJ/quiz-creator/packages/core/src/services/QuizTransformService.ts).
+
+#### Tier 7: Inline Appositive Compound Definitions
 * Detects complex grammatical structures like:
   > *"the marketplace, the physical world for people and things, and the marketspace, a virtual world of information."*
 * Pairs alternating noun phrases and descriptive clauses with strict length and verb validation.

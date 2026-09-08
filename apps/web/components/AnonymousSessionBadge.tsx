@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { UserCheck, Shield, RotateCcw, X, Smartphone, ArrowRightLeft, Copy, Check, AlertCircle, Loader2, Unplug } from 'lucide-react';
+import { UserCheck, Shield, RotateCcw, X, Smartphone, ArrowRightLeft, Copy, Check, AlertCircle, Loader2, Unplug, Link2 } from 'lucide-react';
 import { setClientUserId } from '@/lib/authoringPreferences';
 import { QRCodeSVG } from 'qrcode.react';
+import { buildPairingUrl } from '@/lib/pairingUrl';
+import AutoPairModal from '@/components/AutoPairModal';
 
 const PAIRING_CONNECTION_STORAGE_KEY = 'quizmaster_pairing_connection';
 
@@ -34,7 +36,15 @@ export default function AnonymousSessionBadge() {
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [generatingCode, setGeneratingCode] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [origin, setOrigin] = useState<string>('');
   const [shareError, setShareError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin);
+    }
+  }, []);
 
   // Connect state (Device 2)
   const [inputTicketId, setInputTicketId] = useState('');
@@ -208,6 +218,21 @@ export default function AnonymousSessionBadge() {
     }
   }
 
+  const pairingQrValue = (pairingTicketId && pairingPasscode)
+    ? buildPairingUrl(origin, pairingTicketId, pairingPasscode)
+    : (pairingFullCode || '');
+
+  async function handleCopyLink() {
+    if (!pairingQrValue) return;
+    try {
+      await navigator.clipboard.writeText(pairingQrValue);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (err) {
+      console.error('Copy link failed:', err);
+    }
+  }
+
   function handlePasteOrSplitInput(val: string, field: 'ticket' | 'passcode') {
     const trimmed = val.trim();
     // Check if user pasted full code like A7B2-123456 or A7B2 123456
@@ -273,7 +298,9 @@ export default function AnonymousSessionBadge() {
   }
 
   return (
-    <div className="relative" ref={popoverRef}>
+    <>
+      <AutoPairModal />
+      <div className="relative" ref={popoverRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 rounded-full border border-border/80 bg-card/80 px-3 py-1.5 text-xs font-semibold text-foreground backdrop-blur-md hover:border-primary/50 hover:bg-muted/50 transition-all shadow-2xs group"
@@ -439,17 +466,17 @@ export default function AnonymousSessionBadge() {
 
                     <div className="flex flex-col items-center justify-center gap-4">
                       <div className="flex flex-col items-center gap-2 rounded-2xl border border-border/70 bg-card p-3 shadow-2xs">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Scan to connect</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Scan to auto-connect</span>
                         <QRCodeSVG
-                          value={pairingFullCode || `${pairingTicketId}-${pairingPasscode}`}
+                          value={pairingQrValue}
                           size={144}
                           level="M"
                           includeMargin
                           bgColor="#ffffff"
                           fgColor="#111827"
-                          title="Scan this QR code to copy the pairing code"
+                          title="Scan this QR code with your phone camera to auto-connect"
                         />
-                        <span className="text-[10px] text-muted-foreground">Then paste the code in Connect</span>
+                        <span className="text-[10px] text-muted-foreground">Scan with phone camera to open website</span>
                       </div>
 
                       <div className="flex items-center justify-center gap-3">
@@ -469,13 +496,22 @@ export default function AnonymousSessionBadge() {
                           </div>
                         </div>
 
-                        <button
-                          onClick={handleCopyCode}
-                          className="mt-4 p-2.5 rounded-xl border border-border/70 bg-card hover:bg-muted/50 transition-all text-muted-foreground hover:text-foreground shadow-2xs"
-                          title="Copy full code"
-                        >
-                          {copiedCode ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-                        </button>
+                        <div className="flex items-center gap-1.5 mt-4">
+                          <button
+                            onClick={handleCopyCode}
+                            className="p-2.5 rounded-xl border border-border/70 bg-card hover:bg-muted/50 transition-all text-muted-foreground hover:text-foreground shadow-2xs"
+                            title="Copy pairing code"
+                          >
+                            {copiedCode ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                          </button>
+                          <button
+                            onClick={handleCopyLink}
+                            className="p-2.5 rounded-xl border border-border/70 bg-card hover:bg-muted/50 transition-all text-muted-foreground hover:text-foreground shadow-2xs"
+                            title="Copy direct sync link"
+                          >
+                            {copiedLink ? <Check className="h-4 w-4 text-emerald-500" /> : <Link2 className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -636,7 +672,8 @@ export default function AnonymousSessionBadge() {
           </div>
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

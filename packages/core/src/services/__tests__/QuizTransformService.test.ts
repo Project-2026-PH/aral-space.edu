@@ -145,3 +145,21 @@ describe('QuizTransformService.convertToTrueFalse & generateTrueFalseQuestions',
     expect(result[2].question_text).toContain('Stage 3:New Synthesis is defined as');
   });
 });
+
+describe('QuizTransformService.phraseIdentificationPrompt', () => {
+  it('paraphrases leading term sentences with "This deals with..."', () => {
+    const res = QuizTransformService.phraseIdentificationPrompt(
+      'Modeling deals with the mathematical specification of shape and appearance properties',
+      'Modeling'
+    );
+    expect(res).toBe('This deals with the mathematical specification of shape and appearance properties');
+  });
+
+  it('paraphrases passive subject sentence into "This is stored in a region of memory"', () => {
+    const res = QuizTransformService.phraseIdentificationPrompt(
+      'Pixel data is stored in a region of memory',
+      'framebuffer'
+    );
+    expect(res).toBe('This is stored in a region of memory');
+  });
+});

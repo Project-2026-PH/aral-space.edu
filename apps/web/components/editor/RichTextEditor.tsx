@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import RichTextToolbar from './RichTextToolbar';
 import GrammarOverlay from './GrammarOverlay';
 import GrammarSuggestionPopup from './GrammarSuggestionPopup';
-import { normalizeRichTextHtml, sanitizeRichTextHtml } from '@/lib/richText';
+import { normalizeRichTextHtml, sanitizeRichTextHtml, hasRichTextContent } from '@/lib/richText';
 import { GrammarIssue, GrammarCheckResponse } from '@/lib/grammar/types';
 import { extractTextWithOffsets, createRangeFromOffsets } from '@/lib/grammar/domOffsetMapper';
 
@@ -27,7 +27,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
   const savedSelectionRef = useRef<Range | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{ top: number; left: number } | null>(null);
-  const lastValue = useRef(value);
+  const lastValue = useRef<string | null>(null);
 
   const [grammarIssues, setGrammarIssues] = useState<GrammarIssue[]>([]);
   const [activeGrammarIssue, setActiveGrammarIssue] = useState<GrammarIssue | null>(null);
@@ -149,7 +149,6 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
 
   useEffect(() => {
     if (!editorRef.current) return;
-    if (value === lastValue.current) return;
     const normalized = normalizeRichTextHtml(value);
     if (editorRef.current.innerHTML === normalized) {
       lastValue.current = value;
@@ -184,6 +183,17 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
     lastValue.current = next;
     onChange(next);
     scheduleGrammarCheck();
+  }
+
+  function handleBlur() {
+    if (!editorRef.current) return;
+    const text = editorRef.current.textContent?.trim() || '';
+    // If DOM text was lost or unmounted while incoming value has content, resync rather than wiping state
+    if (!text && hasRichTextContent(value) && !hasRichTextContent(editorRef.current.innerHTML)) {
+      editorRef.current.innerHTML = normalizeRichTextHtml(value);
+      return;
+    }
+    handleInput();
   }
 
   useEffect(() => {
@@ -500,7 +510,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
         aria-multiline="true"
         data-placeholder={placeholder}
         onInput={handleInput}
-        onBlur={handleInput}
+        onBlur={handleBlur}
         onSelect={floatingToolbar ? updateSelectionToolbar : undefined}
         onContextMenu={(event) => {
           if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {

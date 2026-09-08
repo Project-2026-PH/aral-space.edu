@@ -45,7 +45,7 @@ const MODEL_ID = 'HuggingFaceTB/SmolLM2-360M-Instruct';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let textGenPipelinePromise: Promise<any> | null = null;
 
-async function getPipeline() {
+export async function getPipeline() {
   if (typeof window === 'undefined') return null;
   if (!textGenPipelinePromise) {
     textGenPipelinePromise = (async () => {

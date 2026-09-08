@@ -495,4 +495,46 @@ and the marketspace, a virtual world of information`;
       expect(parseSmartClipboard('I think that this framework deals with latency issues.')).toBeNull();
     });
   });
+
+  describe('Passive Definition Splitting and Trailing Bold Extraction', () => {
+    it('parses passive definition sentence with naming verb at end', () => {
+      const raw = 'Pixel data is stored in a region of memory called the framebuffer.';
+      const res = parseSmartClipboard(raw);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'framebuffer',
+        definition: 'Pixel data is stored in a region of memory'
+      });
+    });
+
+    it('parses passive definition with "known as" naming phrase', () => {
+      const raw = 'A volatile computer memory where currently active instructions reside is known as RAM.';
+      const res = parseSmartClipboard(raw);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'RAM',
+        definition: 'A volatile computer memory where currently active instructions reside'
+      });
+    });
+
+    it('parses passive definition with bold term at the end', () => {
+      const raw = 'Pixel data is stored in a region of memory called the **framebuffer**.';
+      const res = parseSmartClipboard(raw);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'framebuffer',
+        definition: 'Pixel data is stored in a region of memory'
+      });
+    });
+
+    it('parses bold term from rich HTML with bold tag at the end', () => {
+      const html = '<p>Pixel data is stored in a region of memory called the <strong>framebuffer</strong>.</p>';
+      const res = parseSmartClipboard('', html);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'framebuffer',
+        definition: 'Pixel data is stored in a region of memory'
+      });
+    });
+  });
 });

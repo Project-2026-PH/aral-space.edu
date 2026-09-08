@@ -148,24 +148,18 @@ function AiExplanationCard({
         <div className="flex items-center gap-2 text-primary flex-wrap">
           <div className="flex items-center gap-1.5">
             <Sparkles className="h-4 w-4" />
-            <span>AI Simplified Explanation</span>
+            <span>Simplified Explanation</span>
           </div>
-          {motivationalStim && (
-            <span className="inline-flex items-center rounded-lg bg-primary/20 px-2 py-0.5 text-[11px] font-black text-primary">
-              {motivationalStim}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-1 text-muted-foreground">
           <span className="text-[10px] font-medium mr-0.5">Helpful?</span>
           <button
             type="button"
             onClick={() => onRate?.('up')}
-            className={`p-1 rounded-md transition-colors ${
-              aiRating === 'up'
-                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                : 'hover:bg-muted hover:text-foreground'
-            }`}
+            className={`p-1 rounded-md transition-colors ${aiRating === 'up'
+              ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+              : 'hover:bg-muted hover:text-foreground'
+              }`}
             aria-label="Thumbs up"
           >
             <ThumbsUp className="h-3.5 w-3.5" />
@@ -173,11 +167,10 @@ function AiExplanationCard({
           <button
             type="button"
             onClick={() => onRate?.('down')}
-            className={`p-1 rounded-md transition-colors ${
-              aiRating === 'down'
-                ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
-                : 'hover:bg-muted hover:text-foreground'
-            }`}
+            className={`p-1 rounded-md transition-colors ${aiRating === 'down'
+              ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+              : 'hover:bg-muted hover:text-foreground'
+              }`}
             aria-label="Thumbs down"
           >
             <ThumbsDown className="h-3.5 w-3.5" />
@@ -762,45 +755,45 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
 
         <div className="min-h-0 flex-none overflow-visible pr-1 lg:flex-1 lg:overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
-          {currentOptions.map((option, index) => {
-            const isSelected = selectedOptionId === option.optionId;
-            let style = 'border-border bg-background/50 hover:border-primary/50 hover:bg-card';
-            if (isEvaluating) {
-              if (option.isCorrect) {
-                const userSelectedWrong = selectedOptionId !== null && selectedOptionId !== option.optionId;
-                style = userSelectedWrong
-                  ? 'border-2 border-dashed border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30 font-semibold'
-                  : 'border-2 border-solid border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30 font-semibold';
-              } else if (isSelected && !option.isCorrect) {
-                style = 'border-destructive bg-destructive/10 text-destructive ring-1 ring-destructive font-semibold';
-              } else {
-                style = 'border-border/60 bg-muted/30 opacity-50';
+            {currentOptions.map((option, index) => {
+              const isSelected = selectedOptionId === option.optionId;
+              let style = 'border-border bg-background/50 hover:border-primary/50 hover:bg-card';
+              if (isEvaluating) {
+                if (option.isCorrect) {
+                  const userSelectedWrong = selectedOptionId !== null && selectedOptionId !== option.optionId;
+                  style = userSelectedWrong
+                    ? 'border-2 border-dashed border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30 font-semibold'
+                    : 'border-2 border-solid border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30 font-semibold';
+                } else if (isSelected && !option.isCorrect) {
+                  style = 'border-destructive bg-destructive/10 text-destructive ring-1 ring-destructive font-semibold';
+                } else {
+                  style = 'border-border/60 bg-muted/30 opacity-50';
+                }
               }
-            }
 
-            return (
-              <button
-                type="button"
-                key={option.optionId}
-                onClick={() => onAnswer(option)}
-                disabled={isEvaluating}
-                aria-keyshortcuts={String(index + 1)}
-                className={`flex min-h-[3.5rem] items-start gap-3 rounded-2xl border p-3 sm:p-3.5 text-left transition-all active:scale-[0.98] lg:p-2.5 ${style}`}
-              >
-                <span className={`flex items-center justify-center w-6 h-6 rounded-lg text-xs font-bold shrink-0 transition-colors ${isEvaluating && option.isCorrect
-                  ? 'bg-emerald-500 text-white'
-                  : isEvaluating && isSelected && !option.isCorrect
-                    ? 'bg-destructive text-white'
-                    : 'bg-muted text-muted-foreground'
-                  }`}>
-                  {index + 1}
-                </span>
-                <span className="text-xs font-semibold text-foreground pt-0.5 leading-snug">
-                  {option.text}
-                </span>
-              </button>
-            );
-          })}
+              return (
+                <button
+                  type="button"
+                  key={option.optionId}
+                  onClick={() => onAnswer(option)}
+                  disabled={isEvaluating}
+                  aria-keyshortcuts={String(index + 1)}
+                  className={`flex min-h-[3.5rem] items-start gap-3 rounded-2xl border p-3 sm:p-3.5 text-left transition-all active:scale-[0.98] lg:p-2.5 ${style}`}
+                >
+                  <span className={`flex items-center justify-center w-6 h-6 rounded-lg text-xs font-bold shrink-0 transition-colors ${isEvaluating && option.isCorrect
+                    ? 'bg-emerald-500 text-white'
+                    : isEvaluating && isSelected && !option.isCorrect
+                      ? 'bg-destructive text-white'
+                      : 'bg-muted text-muted-foreground'
+                    }`}>
+                    {index + 1}
+                  </span>
+                  <span className="text-xs font-semibold text-foreground pt-0.5 leading-snug">
+                    {option.text}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

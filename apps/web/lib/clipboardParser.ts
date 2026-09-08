@@ -219,6 +219,42 @@ export function splitDefinitionVerb(body: string): { term: string; definition: s
   };
 }
 
+const PASSIVE_DEFINITION_REGEX =
+  /^([\s\S]+?)\s+\b(?:is\s+|are\s+)?(?:called|known\s+as|referred\s+to\s+as|termed|designated\s+as|named)\s+(?:the\s+|a\s+|an\s+)?([A-Za-z0-9][A-Za-z0-9\s.\-_/()&'’]{1,50}?)[.]?$/i;
+
+/**
+ * Splits passive definition sentences where the term appears at the end following a naming verb.
+ * e.g., "Pixel data is stored in a region of memory called the framebuffer."
+ */
+export function splitPassiveDefinition(body: string): { term: string; definition: string } | null {
+  const match = body.trim().match(PASSIVE_DEFINITION_REGEX);
+  if (!match) return null;
+
+  const rawPrefix = match[1].replace(/\*\*/g, '').trim();
+  const rawTerm = match[2].replace(/\*\*/g, '').trim();
+
+  const cleanTerm = rawTerm.replace(/^(?:the|a|an)\s+/i, '').replace(/[.!?:]+$/, '').trim();
+  if (!cleanTerm || cleanTerm.length < 2 || cleanTerm.length > 50) return null;
+  const termWords = cleanTerm.split(/\s+/);
+  if (termWords.length > 5) return null;
+  if (/[.!?:]/.test(cleanTerm)) return null;
+
+  if (/^(?:it|this|that|these|those|there|what|which|who|when|where|why|how)\b/i.test(cleanTerm)) {
+    return null;
+  }
+  if (FINITE_VERB.test(cleanTerm)) return null;
+
+  if (rawPrefix.length < 15 || rawPrefix.split(/\s+/).length < 3) return null;
+
+  let formattedDefinition = rawPrefix.replace(/\s+/g, ' ').trim();
+  formattedDefinition = formattedDefinition.charAt(0).toUpperCase() + formattedDefinition.slice(1);
+
+  return {
+    term: cleanTerm,
+    definition: formattedDefinition
+  };
+}
+
 /**
  * Line-oriented scan for `[bullet] Term: Definition` blocks.
  *
@@ -280,7 +316,7 @@ function extractBulkTerms(
     }
 
     if (isBulleted) {
-      const verbSplit = splitDefinitionVerb(body);
+      const verbSplit = splitDefinitionVerb(body) || splitPassiveDefinition(body);
       if (verbSplit) {
         flush();
         current = { term: verbSplit.term, parts: [verbSplit.definition] };
@@ -454,6 +490,37 @@ export function extractBoldTerms(text: string): Array<{ term: string; definition
       }
     }
 
+    const trailBoldMatch = line.match(/^([\s\S]+?)\s+\*\*([^*]+)\*\*\s*[.!?:]*$/);
+    if (trailBoldMatch) {
+      const candidateTerm = trailBoldMatch[2].replace(/\*\*/g, '').trim();
+      let prefix = trailBoldMatch[1].trim();
+
+      // Strip trailing delimiters like : , - , – , —
+      prefix = prefix.replace(/\s*[:=]\s*$|\s*[-–—]\s*$/, '').trim();
+      // Strip passive lead before term if present (e.g. "called the", "known as", "termed")
+      prefix = prefix.replace(
+        /\b(?:is\s+|are\s+)?(?:called|known\s+as|referred\s+to\s+as|termed|designated\s+as|named)(?:\s+(?:the|a|an))?\s*$/i,
+        ''
+      ).trim();
+
+      const isValidCandidate =
+        candidateTerm.length >= 2 &&
+        candidateTerm.length <= 80 &&
+        candidateTerm.split(/\s+/).length <= 8 &&
+        !/[.!?]$/.test(candidateTerm) &&
+        !META_BOLD_LABEL.test(candidateTerm) &&
+        !isDisallowedTermWord(candidateTerm) &&
+        !FINITE_VERB.test(candidateTerm);
+
+      if (isValidCandidate && prefix.length >= 8) {
+        flush();
+        let formattedPrefix = prefix.replace(/\s+/g, ' ').trim();
+        formattedPrefix = formattedPrefix.charAt(0).toUpperCase() + formattedPrefix.slice(1);
+        items.push({ term: candidateTerm, definition: formattedPrefix });
+        continue;
+      }
+    }
+
     if (current) {
       current.parts.push(line);
     }
@@ -589,7 +656,7 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
 
   // 3d. Natural Definition Verb Split (e.g. "computer graphics describes the use of...")
   // Captures textbook definitions copied from PDFs where all styling and punctuation delimiters are absent.
-  const verbMatch = splitDefinitionVerb(trimmed);
+  const verbMatch = splitDefinitionVerb(trimmed) || splitPassiveDefinition(trimmed);
   if (verbMatch) {
     return {
       type: 'single_pair',

@@ -7,10 +7,11 @@ import { useRouter } from 'next/navigation';
 import NewSubjectModal from '../subject/NewSubjectModal';
 import StickyActionDock from '../ui/StickyActionDock';
 import { parseSmartClipboard, type ParsedClipboard } from '@/lib/clipboardParser';
+import { parseWithSmolLM2 } from '@/lib/ai/localClipboardParser';
 import { QuizTransformService } from '@quiz-creator/core';
 import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
 import RichTextEditor from '@/components/editor/RichTextEditor';
-import { hasRichTextContent, richTextToPlainText } from '@/lib/richText';
+import { hasRichTextContent, richTextToPlainText, normalizeRichTextHtml } from '@/lib/richText';
 
 export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
 
@@ -215,7 +216,7 @@ export default function ManualQuizCreator({
     );
     if (!hasContent) return;
 
-    const timeout = window.setTimeout(() => {
+    const saveDraft = () => {
       try {
         const draft: ManualQuizDraft = {
           version: 1,
@@ -231,9 +232,14 @@ export default function ManualQuizCreator({
       } catch {
         setDraftStatus('error');
       }
-    }, 500);
+    };
 
-    return () => window.clearTimeout(timeout);
+    const timeout = window.setTimeout(saveDraft, 500);
+
+    return () => {
+      window.clearTimeout(timeout);
+      saveDraft();
+    };
   }, [draftHydrated, title, description, term, subjectId, questions]);
 
   function restoreDraft() {
@@ -388,11 +394,16 @@ export default function ManualQuizCreator({
 
     if (parsed && parsed.type === 'single_pair') {
       e.preventDefault();
+      const phrasedPrompt = QuizTransformService.phraseIdentificationPrompt(parsed.definition, parsed.term);
+      const targetEditor = (e.target as HTMLElement).closest('[contenteditable="true"]') as HTMLElement | null;
+      if (targetEditor) {
+        targetEditor.innerHTML = normalizeRichTextHtml(phrasedPrompt);
+      }
       const next = [...questions];
       next[qIdx] = {
         ...next[qIdx],
         type: 'identification',
-        question_text: QuizTransformService.phraseIdentificationPrompt(parsed.definition, parsed.term),
+        question_text: phrasedPrompt,
         options: [parsed.term],
         correct_answer: 0
       };
@@ -403,6 +414,28 @@ export default function ManualQuizCreator({
     if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
       setPendingImport(parsed);
+      return;
+    }
+
+    // Local SmolLM2 AI Fallback for unstructured/passive text
+    if (text && text.trim().length >= 15 && text.trim().length <= 800) {
+      parseWithSmolLM2(text).then((aiParsed) => {
+        if (aiParsed && aiParsed.type === 'single_pair') {
+          const phrasedPrompt = QuizTransformService.phraseIdentificationPrompt(aiParsed.definition, aiParsed.term);
+          setQuestions((prev) => {
+            const updated = [...prev];
+            if (!updated[qIdx]) return prev;
+            updated[qIdx] = {
+              ...updated[qIdx],
+              type: 'identification',
+              question_text: phrasedPrompt,
+              options: [aiParsed.term],
+              correct_answer: 0
+            };
+            return updated;
+          });
+        }
+      });
     }
   }
 
@@ -435,6 +468,27 @@ export default function ManualQuizCreator({
     if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
       setPendingImport(parsed);
+      return;
+    }
+
+    // Local SmolLM2 AI Fallback
+    if (text && text.trim().length >= 15 && text.trim().length <= 800) {
+      parseWithSmolLM2(text).then((aiParsed) => {
+        if (aiParsed && aiParsed.type === 'single_pair') {
+          setQuestions((prev) => {
+            const updated = [...prev];
+            if (!updated[qIdx]) return prev;
+            updated[qIdx] = {
+              ...updated[qIdx],
+              type: 'identification',
+              question_text: QuizTransformService.phraseIdentificationPrompt(aiParsed.definition, aiParsed.term),
+              options: [aiParsed.term],
+              correct_answer: 0
+            };
+            return updated;
+          });
+        }
+      });
     }
   }
 

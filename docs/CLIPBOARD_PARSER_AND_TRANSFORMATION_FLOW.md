@@ -96,8 +96,11 @@ Raw Text / HTML Clipboard
   * Extracts styling from `<b\b>`, `<strong\b>`, and `<span style="font-weight: bold|700">`.
   * **Fragmented Span Merging:** Google Docs and Microsoft Word frequently split bold words across adjacent spans (e.g. `<span style="font-weight:700">Mod</span><span style="font-weight:bold">eling</span>`). The normalizer automatically glues contiguous bold markers into `**Modeling**`.
   * Preserves list structure by converting `<li>` elements to bullet lines and `<p>`/`<div>`/`<br>` to newlines.
+* **Bidirectional Position Support:**
+  * **Leading Bold:** `**Modeling** – deals with...` or `**Polymorphism** allows objects to...`
+  * **Trailing Bold:** `Pixel data is stored in a region of memory called the **framebuffer**.` (automatically strips naming phrases like `called the`, `known as`).
 * **Zero-Infrastructure Deterministic Mitigations:**
-  1. **Inline Emphasis Rejection:** Anchors pattern matching to the start of a line or bullet marker (`BOLD_LEAD_PATTERN = /^(?:(?:[•▪‣◦●○*]|[-–—]|\(?\d+[.)]|[a-zA-Z][.)])\s+)?\*\*([^*]+)\*\*(.*)$/`). Mid-sentence bold words (e.g., `"The process is **strictly** sequential"`) are discarded as emphasis.
+  1. **Inline Emphasis Rejection:** Anchors pattern matching to the start or end of a line or bullet marker. Mid-sentence single-word emphasis (`"The process is **strictly** sequential"`) is discarded.
   2. **Editorial Meta-Label Blacklist:** Blocks common advisory and structural headings (`Note:`, `Warning:`, `Tip:`, `Caution:`, `Chapter \d+`, `Figure \d+`).
   3. **Whole-Sentence Bold Mitigation:** Rejects bold segments if they end with terminal punctuation (`/[.!?]$/`), contain finite predicate verbs (`FINITE_VERB`), exceed 8 words, or consume $> 45\%$ of the total text block length.
 * **Delimiter Agnostic:** Works both with delimiters (`**Modeling** – deals with...`) and without delimiters (`**Polymorphism** allows objects to...`).
@@ -118,9 +121,9 @@ Raw Text / HTML Clipboard
 * **Key-Value Delimiters:** Matches `:`, ` - `, ` – `, ` — `, or `=`.
 * **Two-Line Heuristic:** If text is exactly two lines, line 1 is verified with `isLabelLike(line1)` (length $\le 80$, word count $\le 10$, no terminating periods or conjunctions) to prevent wrapped prose sentences from being mistaken for cards.
 
-#### Tier 6: Natural Definition Verb Splitting (`splitDefinitionVerb`)
+#### Tier 6: Natural Definition Verb & Passive Splitting (`splitDefinitionVerb` & `splitPassiveDefinition`)
 * **Purpose:** Solves the unstyled PDF reader problem. When users copy textbook definitions from PDF viewers (Adobe Acrobat, Chrome PDF, Foxit), all visual bolding and HTML tags are stripped by the viewer. Sentences often lack punctuation delimiters (colons or dashes).
-* **Regex Pattern:** Matches subject noun phrases linked by common academic definition verbs:
+* **Active Verb Patterns (`splitDefinitionVerb`):** Matches subject noun phrases linked by common academic definition verbs:
   * `describes` (e.g. `"computer graphics describes the use of computers to create and manipulate images"`)
   * `refers to` (e.g. `"compiler refers to a specialized program that translates..."`)
   * `is defined as`
@@ -128,6 +131,11 @@ Raw Text / HTML Clipboard
   * `focuses on`
   * `is the process of` / `is the study of` / `is the practice of` / `is the science of`
   * `is used to` / `means` / `consists of` / `involves`
+* **Passive Verb Patterns (`splitPassiveDefinition`):** Matches inverted sentences where the term appears at the end:
+  * `... is called [the] [Term]` (e.g. `"Pixel data is stored in a region of memory called the framebuffer."` $\rightarrow$ Term: `framebuffer`, Definition: `Pixel data is stored in a region of memory`)
+  * `... is known as [the] [Term]`
+  * `... is referred to as [the] [Term]`
+  * `... termed [Term]` / `designated as [Term]`
 * **Heuristic Guardrails:**
   * Clean term length $\le 50$ characters and $\le 5$ words.
   * Strips leading articles (`the`, `a`, `an`).
@@ -138,6 +146,14 @@ Raw Text / HTML Clipboard
 
 #### Tier 7: Inline Appositive Compound Definitions
 * Detects complex grammatical structures like:
+  `"the marketplace, the physical world for people and things, and the marketspace, a virtual world of information."`
+* Separates alternating appositives into discrete study cards.
+
+#### Tier 8: Local SmolLM2 In-Browser Fallback Engine (`parseWithSmolLM2`)
+* **Purpose:** Provides high-accuracy AI fallback for unstructured, complex, or conversational sentences where strict regex patterns fail.
+* **Technology:** Runs `HuggingFaceTB/SmolLM2-360M-Instruct` 4-bit quantized locally in the user's browser via WebGPU/WASM using `@huggingface/transformers`.
+* **Execution:** Asynchronously triggered when the user pastes substantive raw text ($\ge 15$ chars) that heuristic tiers cannot separate.
+* **Output:** Extracts `{ term, question }` JSON, ensuring the definition is reformatted as a clean identification prompt without removing exact factual content.
   > *"the marketplace, the physical world for people and things, and the marketspace, a virtual world of information."*
 * Pairs alternating noun phrases and descriptive clauses with strict length and verb validation.
 

@@ -131,7 +131,7 @@ export class QuizTransformService {
 
     const escapedTerm = cleanTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const leadingTermPattern = new RegExp(
-      `^The\\s+${escapedTerm}(?:\\s+(\\([^)]*\\)))?\\s+([a-z][\\w-]*)`,
+      `^(?:The\\s+)?${escapedTerm}(?:\\s+(\\([^)]*\\)))?\\s+([a-z][\\w-]*)`,
       'i'
     );
     const leadingTerm = cleanDefinition.match(leadingTermPattern);
@@ -140,7 +140,7 @@ export class QuizTransformService {
       const descriptor = leadingTerm[1] ? ` ${leadingTerm[1].trim()}` : '';
       const remainder = cleanDefinition.slice(leadingTerm[0].length);
       const nounOrVerb = leadingTerm[2];
-      const verbLed = /^(?:is|are|was|were|has|have|had|does|do|did|can|could|will|would|may|might|must|refers|means|includes|consists|focuses|allows|provides|uses|applies|supports|describes|involves)$/i.test(nounOrVerb);
+      const verbLed = /^(?:is|are|was|were|has|have|had|does|do|did|can|could|will|would|may|might|must|refers|means|includes|consists|focuses|allows|provides|uses|applies|supports|describes|involves|deals)$/i.test(nounOrVerb);
 
       cleanDefinition = verbLed
         ? `This${descriptor} ${nounOrVerb}${remainder}`
@@ -160,7 +160,18 @@ export class QuizTransformService {
       `(^|[^A-Za-z0-9])${escapedTerm}(?![A-Za-z0-9])`,
       'gi'
     );
-    return cleanDefinition.replace(termPattern, '$1this concept').replace(/\s+/g, ' ').trim();
+    let result = cleanDefinition.replace(termPattern, '$1this concept').replace(/\s+/g, ' ').trim();
+
+    // If definition starts with a subject + passive verb (e.g. "Pixel data is stored in a region of memory")
+    // and does not contain the term, rephrase to "This is stored in a region of memory"
+    const passiveMatch = result.match(/^([A-Za-z0-9\s]{2,40}?)\s+(is|are|was|were)\s+([a-z]+ed\b[\s\S]*)$/i);
+    if (passiveMatch && !new RegExp(`\\b${escapedTerm}\\b`, 'i').test(passiveMatch[1])) {
+      const verb = passiveMatch[2];
+      const remainder = passiveMatch[3];
+      result = `This ${verb} ${remainder}`.replace(/\s+/g, ' ').trim();
+    }
+
+    return result;
   }
 
   /**

@@ -673,7 +673,7 @@ export default function ManualQuizCreator({
     >
       {/* Smart Clipboard Import Preview Modal / Banner */}
       {pendingImport && (
-        <div className="sticky top-4 z-40 rounded-3xl border border-primary/30 bg-card/95 backdrop-blur-md p-5 shadow-2xl ring-1 ring-primary/20 space-y-3 animate-in fade-in slide-in-from-top-3 duration-200">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-4xl z-50 rounded-3xl border border-primary/40 bg-card/95 backdrop-blur-xl p-5 shadow-2xl ring-2 ring-primary/25 space-y-3 animate-in fade-in slide-in-from-top-4 duration-200">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">

@@ -9,16 +9,24 @@ interface FloatingBottomNavProps {
   onOpenAiModal?: () => void;
   onOpenSubjectModal?: () => void;
   onLibrarySectionSelect?: (section: 'subjects' | 'reviewers') => void;
+  activeSection?: 'subjects' | 'reviewers';
 }
 
 export default function FloatingBottomNav({
   onOpenAiModal,
   onOpenSubjectModal,
   onLibrarySectionSelect,
+  activeSection,
 }: FloatingBottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'subjects' | 'reviewers'>('subjects');
+
+  useEffect(() => {
+    if (activeSection) {
+      setActiveTab(activeSection);
+    }
+  }, [activeSection]);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -222,6 +230,10 @@ export default function FloatingBottomNav({
 
     if (!isLibraryRoute) {
       router.push(`/library#${id}`);
+      return;
+    }
+
+    if (onLibrarySectionSelect) {
       return;
     }
 

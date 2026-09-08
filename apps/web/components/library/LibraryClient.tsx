@@ -116,9 +116,6 @@ export default function LibraryClient({
 
   const selectView = (view: LibraryView) => {
     setActiveView(view);
-    if (view !== 'overview') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
   };
 
   const handleSubjectDeleted = (subjectId: string) => {
@@ -456,6 +453,7 @@ export default function LibraryClient({
         onOpenAiModal={() => setShowAiModal(true)}
         onOpenSubjectModal={() => setShowSubjectModal(true)}
         onLibrarySectionSelect={(section) => setActiveView(section)}
+        activeSection={activeView === 'reviewers' ? 'reviewers' : activeView === 'subjects' ? 'subjects' : undefined}
       />
     </div>
   );

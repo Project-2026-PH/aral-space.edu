@@ -35,7 +35,7 @@ function parseSessionType(value: unknown): SessionType {
 function parseSummary(value: unknown): SessionMasterySummary | undefined {
   if (value === undefined || value === null) return undefined;
   const summary = assertPlainObject(value, 'summary');
-  const deckMedianLatencyMs = boundedInteger(summary.deckMedianLatencyMs, 'summary.deckMedianLatencyMs', 0, 300_000, true)!;
+  const deckMedianLatencyMs = boundedInteger(summary.deckMedianLatencyMs, 'summary.deckMedianLatencyMs', 0, 86_400_000, true)!;
   const bucketsValue = assertPlainObject(summary.buckets, 'summary.buckets');
   const parseQuestionIds = (field: string): string[] => {
     const ids = boundedArray<unknown>(bucketsValue[field], `summary.buckets.${field}`, 100,)!;
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
           }
         : undefined;
       const sessionType = parseSessionType(body.sessionType);
-      const latencyMs = boundedInteger(body.latencyMs, 'latencyMs', 0, 300_000);
+      const latencyMs = boundedInteger(body.latencyMs, 'latencyMs', 0, 86_400_000);
       const progress = await controller.recordAnswer(
         sessionId,
         parsedAnswer.questionId,

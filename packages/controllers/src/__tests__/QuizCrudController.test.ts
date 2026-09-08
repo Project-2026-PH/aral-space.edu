@@ -65,6 +65,18 @@ describe('QuizCrudController & MasterySessionController', () => {
     expect(resumedResult.session.id).toBe(sampleResult.session.id);
     expect(resumedResult.progress.find((progress) => progress.question_id === sampleResult.questions[0].id)?.streak_count).toBe(1);
 
+    const surrenderProgress = await controllerB.recordAnswer(
+      sampleResult.session.id,
+      sampleResult.questions[1].id,
+      false,
+      'initial',
+      userId,
+      1000,
+      { selectedOptionId: -1 }
+    );
+    expect(surrenderProgress.streak_count).toBe(0);
+    expect(surrenderProgress.has_missed).toBe(true);
+
     await expect(
       controllerB.recordAnswer(sampleResult.session.id, sampleResult.questions[0].id, true, 'initial', 'different-user')
     ).rejects.toThrow('Session not found or access is restricted');

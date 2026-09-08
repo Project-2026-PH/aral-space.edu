@@ -28,9 +28,9 @@ export class QuizSessionSync {
       });
 
       if (!response.ok) {
-        if (response.status === 404 || response.status === 403) {
-          console.warn('[QuizRunner] Session expired or inaccessible, discarding stale answer event:', event.sessionId);
-          return true; // Discard stale event from pending queue
+        if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+          console.warn('[QuizRunner] Session event stale or unprocessable, discarding answer event:', event.id, 'status:', response.status);
+          return true; // Discard stale or unprocessable event from pending queue
         }
         throw new Error(`Answer sync failed with status ${response.status}`);
       }

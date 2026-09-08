@@ -46,6 +46,22 @@ describe('request validation boundaries', () => {
     });
   });
 
+  it('allows -1 selectedOptionId for surrendered answers', () => {
+    expect(parseSessionAnswer({
+      questionId: 'question-1',
+      selectedOptionId: -1
+    })).toMatchObject({
+      questionId: 'question-1',
+      selectedOptionId: -1,
+      isCorrect: false
+    });
+  });
+
+  it('rejects selectedOptionId below -1 or above 100', () => {
+    expect(() => parseSessionAnswer({ questionId: 'question-1', selectedOptionId: -2 })).toThrow();
+    expect(() => parseSessionAnswer({ questionId: 'question-1', selectedOptionId: 101 })).toThrow();
+  });
+
   it('requires either a submitted answer or the legacy correctness value', () => {
     expect(() => parseSessionAnswer({ questionId: 'question-1' })).toThrow(
       'Either an answer or isCorrect is required'

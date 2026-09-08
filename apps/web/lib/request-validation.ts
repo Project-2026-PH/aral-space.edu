@@ -153,7 +153,7 @@ export function parseSessionAnswer(value: Record<string, unknown>): {
 } {
   const questionId = boundedString(value.questionId, 'questionId', 128, true)!;
   const legacyIsCorrect = boundedBoolean(value.isCorrect, 'isCorrect');
-  const selectedOptionId = boundedInteger(value.selectedOptionId, 'selectedOptionId', 0, 100);
+  const selectedOptionId = boundedInteger(value.selectedOptionId, 'selectedOptionId', -1, 100);
   const answerText = boundedString(value.answerText, 'answerText', 2_000);
   const answerModeValue = boundedString(value.answerMode, 'answerMode', 32);
   if (answerModeValue !== undefined && answerModeValue !== 'learn' && answerModeValue !== 'identification') {

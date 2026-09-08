@@ -528,17 +528,17 @@ export function useQuizSession({
       recapQuestionIds: transition.recapQuestionIds
     });
 
-    const isTypedAnswer = activeQuestion.question_type === 'typed_answer' || activeQuestion.options.length === 0;
+    const isTypedAnswer = Boolean(typedAnswerMode) || activeQuestion.question_type === 'typed_answer' || activeQuestion.options.length === 0;
     const event: PersistedAnswerEvent = {
       id: createAnswerEventId(),
       sessionId: session.id,
       questionId: getProgressSourceId(questionId),
       isCorrect: option.isCorrect,
-      selectedOptionId: isTypedAnswer ? undefined : option.optionId,
+      selectedOptionId: isTypedAnswer || option.optionId < 0 ? undefined : option.optionId,
       answerText: isTypedAnswer ? option.text : undefined,
       answerMode: isTypedAnswer ? typedAnswerMode : undefined,
       sessionType: session.session_type,
-      latencyMs,
+      latencyMs: Math.min(300_000, Math.max(1, latencyMs)),
       createdAt: new Date().toISOString()
     };
     setPendingAnswerEvents((current) => [...current, event]);
@@ -656,8 +656,9 @@ export function useQuizSession({
     }
 
     const synced = await syncClientRef.current.completeSession(session, quiz.id, summary);
-    if (synced && pendingAnswerEvents.length === 0) {
+    if (synced) {
       removeQuizProgressSnapshot(quiz.id, session.id);
+      setPendingAnswerEvents([]);
     }
   }
 

@@ -13,7 +13,7 @@ export interface SubmittedAnswer {
 }
 
 function resolveSubmittedAnswer(question: QuizQuestion, submittedAnswer: SubmittedAnswer): boolean {
-  const isTypedAnswer = question.question_type === 'typed_answer' || !Array.isArray(question.options) || question.options.length === 0;
+  const isTypedAnswer = submittedAnswer.answerText !== undefined || question.question_type === 'typed_answer' || !Array.isArray(question.options) || question.options.length === 0;
   if (isTypedAnswer) {
     if (typeof submittedAnswer.answerText !== 'string') {
       throw new Error('A typed answer is required');
@@ -24,6 +24,9 @@ function resolveSubmittedAnswer(question: QuizQuestion, submittedAnswer: Submitt
 
   if (!Number.isInteger(submittedAnswer.selectedOptionId)) {
     throw new Error('A selected answer option is required');
+  }
+  if (submittedAnswer.selectedOptionId === -1) {
+    return false;
   }
   return submittedAnswer.selectedOptionId === question.correct_answer;
 }

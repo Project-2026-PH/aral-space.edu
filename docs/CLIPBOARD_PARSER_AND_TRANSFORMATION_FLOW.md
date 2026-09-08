@@ -65,41 +65,67 @@ Located in: [`apps/web/lib/clipboardParser.ts`](file:///c:/Users/User/IntelliJ/q
 Enables zero-friction authoring by allowing students and instructors to copy notes, slides, PDFs, TSV spreadsheets, and textbook definitions directly into the quiz editor without manual copy-pasting across separate form fields.
 
 ### 2.2 Extraction Hierarchy
-The parser evaluates input text through a prioritized 4-tier pipeline:
+The parser evaluates input text (plain text and rich `text/html` from browser/word processors) through a prioritized pipeline:
 
 ```
-Raw Text
+Raw Text / HTML Clipboard
    │
-   ├── [1. Bulk Bulleted Terms] ── (• Term: Definition / Title Case Fallback)
+   ├── [1. Numbered Q&A / Terms] ── (Numbered lines with Answer or continuation definitions)
    │
-   ├── [2. Category Enumeration] ─ (Header + >= 2 bullets)
+   ├── [2. Bold-Based Terms] ────── (**Term** Definition / <b>Term</b> Definition)
+   │     ├── Rich HTML Normalization (glues fragmented spans, converts blocks to newlines)
+   │     └── Heuristic Mitigations (inline emphasis, meta labels, whole-sentence guards)
    │
-   ├── [3. Single Pair] ────────── (TSV, Key-Value Delimiter, 2-line break)
+   ├── [3. Bulk Bulleted Terms] ─── (• Term: Definition / Title Case Fallback)
    │
-   └── [4. Inline Appositives] ─── ("Term, definition, and term, definition...")
+   ├── [4. Category Enumeration] ── (Header + >= 2 bullets)
+   │
+   ├── [5. Single Pair] ─────────── (TSV, Key-Value Delimiter, 2-line break)
+   │
+   └── [6. Inline Appositives] ──── ("Term, definition, and term, definition...")
 ```
 
-#### Tier 1: Bulk Bulleted Terms (`extractBulkTerms`)
+#### Tier 1: Numbered Question/Answers & Numbered Definitions
+* Extracts `1. Question? Answer: ...` or numbered terms with following definition lines.
+
+#### Tier 2: Bold-Based Term Separation (`extractBoldTerms` & `normalizeHtmlClipboard`)
+* **Purpose:** Seamlessly captures glossary terms from slides, web lecture notes, PDFs, Google Docs, and Word where the author bolds key concepts instead of typing colons or dashes.
+* **HTML Normalizer (`normalizeHtmlClipboard`):**
+  * Extracts styling from `<b\b>`, `<strong\b>`, and `<span style="font-weight: bold|700">`.
+  * **Fragmented Span Merging:** Google Docs and Microsoft Word frequently split bold words across adjacent spans (e.g. `<span style="font-weight:700">Mod</span><span style="font-weight:bold">eling</span>`). The normalizer automatically glues contiguous bold markers into `**Modeling**`.
+  * Preserves list structure by converting `<li>` elements to bullet lines and `<p>`/`<div>`/`<br>` to newlines.
+* **Zero-Infrastructure Deterministic Mitigations:**
+  1. **Inline Emphasis Rejection:** Anchors pattern matching to the start of a line or bullet marker (`BOLD_LEAD_PATTERN = /^(?:(?:[•▪‣◦●○*]|[-–—]|\(?\d+[.)]|[a-zA-Z][.)])\s+)?\*\*([^*]+)\*\*(.*)$/`). Mid-sentence bold words (e.g., `"The process is **strictly** sequential"`) are discarded as emphasis.
+  2. **Editorial Meta-Label Blacklist:** Blocks common advisory and structural headings (`Note:`, `Warning:`, `Tip:`, `Caution:`, `Chapter \d+`, `Figure \d+`).
+  3. **Whole-Sentence Bold Mitigation:** Rejects bold segments if they end with terminal punctuation (`/[.!?]$/`), contain finite predicate verbs (`FINITE_VERB`), exceed 8 words, or consume $> 45\%$ of the total text block length.
+* **Delimiter Agnostic:** Works both with delimiters (`**Modeling** – deals with...`) and without delimiters (`**Polymorphism** allows objects to...`).
+
+#### Tier 3: Bulk Bulleted Terms (`extractBulkTerms`)
 * **Regex Pattern:** `BULLET_PREFIX = /^(?:[•▪‣◦●○*]|[-–—]|\(?\d+[.)]|[oO][.)]?(?=\s)|[a-zA-Z][.)])\s+/`
 * **Delimiter Pattern:** `TERM_DELIMITER = /^(.{2,80}?)(?:\s*:(?:\s+|$)|\s+[–—](?:\s+|$)|\s+-(?:\s+|$))([\s\S]*)$/`
 * **Multiline Continuity:** Lines following a term line without a new bullet marker are treated as continuation of the preceding definition.
 * **Title Case Fallback:** If a list uses bullets without delimiters (e.g. `• Business Relationship Management focuses on...`), once a delimited sibling confirms a list context, leading Title Case runs are extracted as terms.
 
-#### Tier 2: Category Heading + Enumeration Blocks
+#### Tier 4: Category Heading + Enumeration Blocks
 * Detects category headers followed by two or more bulleted items.
 * Emits `{ type: 'enumeration_blocks', blocks: [{ header, items: [...] }] }`.
 
-#### Tier 3: Single Pair Extraction
+#### Tier 5: Single Pair Extraction
 * **TSV Support:** Splits tab characters `\t` (e.g., copied from Google Sheets / Excel).
 * **Key-Value Delimiters:** Matches `:`, ` - `, ` – `, ` — `, or `=`.
 * **Two-Line Heuristic:** If text is exactly two lines, line 1 is verified with `isLabelLike(line1)` (length $\le 80$, word count $\le 10$, no terminating periods or conjunctions) to prevent wrapped prose sentences from being mistaken for cards.
 
-#### Tier 4: Inline Appositive Compound Definitions
+#### Tier 6: Inline Appositive Compound Definitions
 * Detects complex grammatical structures like:
   > *"the marketplace, the physical world for people and things, and the marketspace, a virtual world of information."*
 * Pairs alternating noun phrases and descriptive clauses with strict length and verb validation.
 
-### 2.3 Notes Workspace Reviewer Builder
+### 2.3 Editor Synchronization & Prompt Paste Interception
+When pasting into the question prompt editor ([`RichTextEditor.tsx`](file:///c:/Users/User/IntelliJ/quiz-creator/apps/web/components/editor/RichTextEditor.tsx)):
+* Programmatic paste interception in [`ManualQuizCreator.tsx`](file:///c:/Users/User/IntelliJ/quiz-creator/apps/web/components/quiz/ManualQuizCreator.tsx) extracts term/definition pairs and sets `options: [term]` and `question_text: definition`.
+* To prevent contentEditable focus desynchronization (where native paste is prevented and focus guards prevent external props from syncing to innerHTML), the editor compares sanitized text representations. If an external programmatic change occurs while focused, the editor automatically writes the normalized content into the DOM and places the selection at the end.
+
+### 2.4 Notes Workspace Reviewer Builder
 
 The Notes workspace has a separate deterministic path from clipboard paste. When the user selects **Save as reviewer**, `apps/web/components/notes/NotesClient.tsx` converts the note's rich text to plain text and passes it to [`NotesReviewerBuilder`](../packages/core/src/services/NotesReviewerBuilder.ts).
 

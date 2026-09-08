@@ -27,10 +27,27 @@ interface ManualQuizDraft {
   updatedAt: string;
   title: string;
   description: string;
+  term?: string;
   subjectId: string;
   questions: QuestionDraft[];
 }
 
+const DEFAULT_TERMS = [
+  'Prelim',
+  'Midterm',
+  'Pre-Final',
+  'Finals',
+  '1st Grading',
+  '2nd Grading',
+  '3rd Grading',
+  '4th Grading',
+  'Quarter 1',
+  'Quarter 2',
+  'Quarter 3',
+  'Quarter 4'
+];
+
+const CUSTOM_TERMS_STORAGE_KEY = 'quiz-creator:custom-terms:v1';
 const MANUAL_DRAFT_STORAGE_KEY = 'quiz-creator:manual-draft:v1';
 const MANUAL_DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -57,6 +74,7 @@ function parseManualQuizDraft(raw: string | null): ManualQuizDraft | null {
       updatedAt: parsed.updatedAt as string,
       title: parsed.title,
       description: parsed.description,
+      term: typeof parsed.term === 'string' ? parsed.term : undefined,
       subjectId: parsed.subjectId,
       questions: parsed.questions as QuestionDraft[]
     };
@@ -79,6 +97,10 @@ export default function ManualQuizCreator({
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [term, setTerm] = useState('');
+  const [customTermInput, setCustomTermInput] = useState('');
+  const [showCustomTermInput, setShowCustomTermInput] = useState(false);
+  const [customTerms, setCustomTerms] = useState<string[]>([]);
   const [subjectList, setSubjectList] = useState<Array<{ id: string; name: string; color?: string }>>(subjects || []);
   const [subjectId, setSubjectId] = useState(subjects?.[0]?.id || '');
   const [subjectsLoading, setSubjectsLoading] = useState(!subjects || subjects.length === 0);
@@ -139,6 +161,36 @@ export default function ManualQuizCreator({
   }, [subjects]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(CUSTOM_TERMS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setCustomTerms(parsed.filter((t): t is string => typeof t === 'string' && t.trim().length > 0));
+        }
+      }
+    } catch { }
+  }, []);
+
+  function handleAddCustomTerm() {
+    const trimmed = customTermInput.trim();
+    if (!trimmed) return;
+    if (!customTerms.includes(trimmed) && !DEFAULT_TERMS.includes(trimmed)) {
+      const updated = [...customTerms, trimmed];
+      setCustomTerms(updated);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(CUSTOM_TERMS_STORAGE_KEY, JSON.stringify(updated));
+      }
+    }
+    setTerm(trimmed);
+    setCustomTermInput('');
+    setShowCustomTermInput(false);
+  }
+
+  const allAvailableTerms = Array.from(new Set([...DEFAULT_TERMS, ...customTerms, ...(term ? [term] : [])]));
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       setDraftHydrated(true);
       return;
@@ -170,6 +222,7 @@ export default function ManualQuizCreator({
           updatedAt: new Date().toISOString(),
           title,
           description,
+          term,
           subjectId,
           questions
         };
@@ -181,12 +234,13 @@ export default function ManualQuizCreator({
     }, 500);
 
     return () => window.clearTimeout(timeout);
-  }, [draftHydrated, title, description, subjectId, questions]);
+  }, [draftHydrated, title, description, term, subjectId, questions]);
 
   function restoreDraft() {
     if (!draftRecovery) return;
     setTitle(draftRecovery.title);
     setDescription(draftRecovery.description);
+    if (draftRecovery.term) setTerm(draftRecovery.term);
     setSubjectId(draftRecovery.subjectId);
     setQuestions(draftRecovery.questions);
     setDraftRecovery(null);
@@ -322,9 +376,10 @@ export default function ManualQuizCreator({
 
   function handlePromptPaste(qIdx: number, e: React.ClipboardEvent<HTMLElement>) {
     const text = e.clipboardData.getData('text');
-    if (!text) return;
+    const html = e.clipboardData.getData('text/html');
+    if (!text && !html) return;
 
-    const parsed = parseSmartClipboard(text);
+    const parsed = parseSmartClipboard(text, html);
     if (parsed && parsed.type === 'question_answer') {
       e.preventDefault();
       applyQuestionAnswer(qIdx, parsed.question, parsed.answer);
@@ -353,9 +408,10 @@ export default function ManualQuizCreator({
 
   function handleTargetAnswerPaste(qIdx: number, e: React.ClipboardEvent<HTMLInputElement>) {
     const text = e.clipboardData.getData('text');
-    if (!text) return;
+    const html = e.clipboardData.getData('text/html');
+    if (!text && !html) return;
 
-    const parsed = parseSmartClipboard(text);
+    const parsed = parseSmartClipboard(text, html);
     if (parsed && parsed.type === 'question_answer') {
       e.preventDefault();
       applyQuestionAnswer(qIdx, parsed.question, parsed.answer);
@@ -388,9 +444,10 @@ export default function ManualQuizCreator({
     if (target.closest('[data-skip-clipboard-intercept="true"]')) return;
 
     const text = e.clipboardData.getData('text');
-    if (!text) return;
+    const html = e.clipboardData.getData('text/html');
+    if (!text && !html) return;
 
-    const parsed = parseSmartClipboard(text);
+    const parsed = parseSmartClipboard(text, html);
     if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
       setPendingImport(parsed);
@@ -523,6 +580,7 @@ export default function ManualQuizCreator({
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || null,
+          term: term.trim() || null,
           subject_id: subjectId || null,
           source_model: 'manual',
           questions: payloadQuestions
@@ -574,20 +632,20 @@ export default function ManualQuizCreator({
                     {pendingImport.type === 'bulk_terms'
                       ? 'Term/Definition List'
                       : pendingImport.type === 'question_answers'
-                      ? 'Question/Answer List'
-                      : 'Slide Enumeration'}
+                        ? 'Question/Answer List'
+                        : 'Slide Enumeration'}
                   </span>
                 </h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {pendingImport.type === 'bulk_terms'
                     ? `✨ Detected ${pendingImport.items.length} Term/Definition pairs ready to convert into identification cards.`
                     : pendingImport.type === 'question_answers'
-                    ? `✨ Detected ${pendingImport.items.length} numbered question/answer pairs ready to import.`
-                    : pendingImport.type === 'enumeration_blocks'
-                    ? `✨ Detected ${pendingImport.blocks.length} Enumeration group(s) (${pendingImport.blocks.map((b) => b.header).slice(0, 2).join(', ')}${pendingImport.blocks.length > 2 ? '...' : ''}) ready to convert.`
-                    : '✨ Detected structured text ready to convert.'}
+                      ? `✨ Detected ${pendingImport.items.length} numbered question/answer pairs ready to import.`
+                      : pendingImport.type === 'enumeration_blocks'
+                        ? `✨ Detected ${pendingImport.blocks.length} Enumeration group(s) (${pendingImport.blocks.map((b) => b.header).slice(0, 2).join(', ')}${pendingImport.blocks.length > 2 ? '...' : ''}) ready to convert.`
+                        : '✨ Detected structured text ready to convert.'}
                 </p>
-              </div>  
+              </div>
             </div>
 
             <button
@@ -618,10 +676,10 @@ export default function ManualQuizCreator({
                 {pendingImport.type === 'bulk_terms'
                   ? `Import ${pendingImport.items.length} Question Cards`
                   : pendingImport.type === 'question_answers'
-                  ? `Import ${pendingImport.items.length} Question Cards`
-                  : pendingImport.type === 'enumeration_blocks'
-                  ? `Import ${pendingImport.blocks.length} Enumeration Cards`
-                  : 'Import Cards'}
+                    ? `Import ${pendingImport.items.length} Question Cards`
+                    : pendingImport.type === 'enumeration_blocks'
+                      ? `Import ${pendingImport.blocks.length} Enumeration Cards`
+                      : 'Import Cards'}
               </span>
             </button>
           </div>
@@ -720,7 +778,7 @@ export default function ManualQuizCreator({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Subject Category
+                Subject
               </label>
               <button
                 type="button"
@@ -776,6 +834,106 @@ export default function ManualQuizCreator({
                 })()}
               </div>
             )}
+
+            {/* Term / Grading Period Selection & Creation */}
+            <div className="mt-4 pt-4 border-t border-border/60">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Term / Grading Period
+                </label>
+                {!showCustomTermInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomTermInput(true)}
+                    className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 transition-all cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Custom Term</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomTermInput(false)}
+                    className="text-[11px] font-bold text-muted-foreground hover:underline transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+
+              {showCustomTermInput ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="e.g. Prelim, 1st Grading..."
+                      value={customTermInput}
+                      onChange={(e) => setCustomTermInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomTerm();
+                        } else if (e.key === 'Escape') {
+                          setShowCustomTermInput(false);
+                        }
+                      }}
+                      className="w-full rounded-2xl border border-primary bg-background px-3.5 py-2 text-xs font-medium text-foreground focus:outline-none"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomTerm}
+                      disabled={!customTermInput.trim()}
+                      className="rounded-2xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-50 shrink-0 transition-all active:scale-95 cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Type custom term and press Enter or Add.
+                  </p>
+                </div>
+              ) : (
+                <div className="relative flex items-center">
+                  <select
+                    value={term}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setShowCustomTermInput(true);
+                      } else {
+                        setTerm(e.target.value);
+                      }
+                    }}
+                    className="w-full rounded-2xl border border-border bg-background pl-4 pr-8 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none cursor-pointer"
+                  >
+                    <option value="">No Term (General)</option>
+                    {allAvailableTerms.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                    <option value="__custom__">+ Add new term...</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Active term badge */}
+              {term && (
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-primary/10 text-primary border border-primary/20">
+                    <span>Term:</span>
+                    <span className="font-black">{term}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setTerm('')}
+                    className="text-[10px] font-bold text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                  >
+                    Clear term
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -830,13 +988,12 @@ export default function ManualQuizCreator({
                 setDraggedIdx(null);
                 setDragOverIdx(null);
               }}
-              className={`rounded-3xl border bg-card p-6 shadow-sm space-y-4 transition-all cursor-default ${
-                isDragging
-                  ? 'opacity-30 border-dashed border-primary scale-[0.98] shadow-none'
-                  : isOver
+              className={`rounded-3xl border bg-card p-6 shadow-sm space-y-4 transition-all cursor-default ${isDragging
+                ? 'opacity-30 border-dashed border-primary scale-[0.98] shadow-none'
+                : isOver
                   ? 'border-primary ring-2 ring-primary/30 bg-primary/[0.03] translate-y-1 shadow-md'
                   : 'border-border/80 hover:border-border'
-              }`}
+                }`}
             >
               {/* Header: Drag handle, Number, Category Badges & Delete */}
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -871,11 +1028,10 @@ export default function ManualQuizCreator({
                         key={t.id}
                         type="button"
                         onClick={() => setQuestionType(qIdx, t.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                          isActive
-                            ? 'bg-primary text-white shadow-sm shadow-primary/30 ring-2 ring-primary/20 scale-100'
-                            : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40'
-                        }`}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${isActive
+                          ? 'bg-primary text-white shadow-sm shadow-primary/30 ring-2 ring-primary/20 scale-100'
+                          : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40'
+                          }`}
                       >
                         <Icon className="h-3.5 w-3.5" />
                         <span>{t.label}</span>
@@ -930,16 +1086,14 @@ export default function ManualQuizCreator({
                           tabIndex={0}
                           role="radio"
                           aria-checked={isSelected}
-                          className={`flex items-center gap-3 rounded-2xl border p-3 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                            isSelected
-                              ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                              : 'border-border bg-background/50 hover:bg-muted/40'
-                          }`}
+                          className={`flex items-center gap-3 rounded-2xl border p-3 cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isSelected
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                            : 'border-border bg-background/50 hover:bg-muted/40'
+                            }`}
                         >
                           <div
-                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                              isSelected ? 'border-primary bg-primary text-white' : 'border-muted-foreground'
-                            }`}
+                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? 'border-primary bg-primary text-white' : 'border-muted-foreground'
+                              }`}
                           >
                             {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                           </div>
@@ -984,16 +1138,14 @@ export default function ManualQuizCreator({
                           tabIndex={0}
                           role="radio"
                           aria-checked={isSelected}
-                          className={`flex items-center justify-center gap-2.5 rounded-2xl border py-4 px-4 cursor-pointer font-bold text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                            isSelected
-                              ? tf.activeBg
-                              : 'border-border bg-background/50 hover:bg-muted/40 text-muted-foreground'
-                          }`}
+                          className={`flex items-center justify-center gap-2.5 rounded-2xl border py-4 px-4 cursor-pointer font-bold text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isSelected
+                            ? tf.activeBg
+                            : 'border-border bg-background/50 hover:bg-muted/40 text-muted-foreground'
+                            }`}
                         >
                           <div
-                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                              isSelected ? 'border-current bg-current text-card' : 'border-muted-foreground'
-                            }`}
+                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? 'border-current bg-current text-card' : 'border-muted-foreground'
+                              }`}
                           >
                             {isSelected && <Check className="w-3 h-3 text-white" />}
                           </div>

@@ -155,12 +155,27 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
       lastValue.current = value;
       return;
     }
-    if (typeof document !== 'undefined' && (document.activeElement === editorRef.current || editorRef.current.contains(document.activeElement))) {
-      lastValue.current = value;
-      return;
+    const isFocused = typeof document !== 'undefined' && (document.activeElement === editorRef.current || editorRef.current.contains(document.activeElement));
+    if (isFocused) {
+      const currentSanitized = sanitizeRichTextHtml(editorRef.current.innerHTML);
+      const incomingSanitized = sanitizeRichTextHtml(value);
+      if (currentSanitized === incomingSanitized) {
+        lastValue.current = value;
+        return;
+      }
     }
     editorRef.current.innerHTML = normalized;
     lastValue.current = value;
+    if (isFocused) {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        const range = document.createRange();
+        range.selectNodeContents(editorRef.current);
+        range.collapse(false);
+        selection.addRange(range);
+      }
+    }
   }, [value]);
 
   function handleInput() {

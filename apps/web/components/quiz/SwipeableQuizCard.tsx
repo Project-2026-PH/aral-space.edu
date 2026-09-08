@@ -248,26 +248,33 @@ export default function SwipeableQuizCard({
           className="block space-y-2 rounded-xl focus:outline-none"
         >
           <div className="flex items-center justify-between gap-2 text-xs">
-            {quiz.id === 'b0000000-0000-4000-8000-000000000001' || quiz.share_token === 'kasaysayan-pilipinas-reviewer' ? (
-              <span className="rounded-md border-2 border-slate-900 bg-[#bfdbfe] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
-                Sample Reviewer
-              </span>
-            ) : subjectName ? (
-              <span
-                style={{
-                  backgroundColor: `${subject?.color || '#3b82f6'}26`,
-                  borderColor: '#0f172a',
-                  color: subject?.color || '#3b82f6'
-                }}
-                className="max-w-[12rem] truncate rounded-md border-2 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm"
-              >
-                {subjectName}
-              </span>
-            ) : (
-              <span className="rounded-md border-2 border-slate-900 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm">
-                Reviewer
-              </span>
-            )}
+            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+              {quiz.id === 'b0000000-0000-4000-8000-000000000001' || quiz.share_token === 'kasaysayan-pilipinas-reviewer' ? (
+                <span className="rounded-md border-2 border-slate-900 bg-[#bfdbfe] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
+                  Sample Reviewer
+                </span>
+              ) : subjectName ? (
+                <span
+                  style={{
+                    backgroundColor: `${subject?.color || '#3b82f6'}26`,
+                    borderColor: '#0f172a',
+                    color: subject?.color || '#3b82f6'
+                  }}
+                  className="max-w-[10rem] truncate rounded-md border-2 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm"
+                >
+                  {subjectName}
+                </span>
+              ) : (
+                <span className="rounded-md border-2 border-slate-900 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm">
+                  Reviewer
+                </span>
+              )}
+              {quiz.term && (
+                <span className="rounded-md border-2 border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-black text-primary shadow-brutal-sm truncate max-w-[8rem]">
+                  {quiz.term}
+                </span>
+              )}
+            </div>
             <span className="shrink-0 rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black text-slate-900 dark:text-white shadow-brutal-sm">
               {quiz.question_count} Qs
             </span>
@@ -319,6 +326,17 @@ export default function SwipeableQuizCard({
                 className="hidden sm:inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Edit ${quiz.title}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="hidden sm:inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-blue-600/10 hover:text-blue-600 transition-colors cursor-pointer"
+              >
+                <Pencil className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : (

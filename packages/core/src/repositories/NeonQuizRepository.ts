@@ -473,6 +473,7 @@ export class NeonQuizRepository implements IQuizRepository {
         INSERT INTO quizzes (
           title,
           description,
+          term,
           question_count,
           handout_name,
           source_model,
@@ -485,6 +486,7 @@ export class NeonQuizRepository implements IQuizRepository {
         VALUES (
           ${dto.title},
           ${dto.description || null},
+          ${dto.term || null},
           ${dto.questions.length},
           ${dto.handout_name || null},
           ${dto.source_model || 'manual'},
@@ -563,6 +565,7 @@ export class NeonQuizRepository implements IQuizRepository {
           UPDATE quizzes
           SET title = ${dto.title !== undefined ? dto.title : existing.title},
               description = ${dto.description !== undefined ? dto.description : existing.description || null},
+              term = ${dto.term !== undefined ? dto.term : existing.term || null},
               subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null}
           WHERE id = ${id}
           RETURNING *
@@ -571,6 +574,7 @@ export class NeonQuizRepository implements IQuizRepository {
           UPDATE quizzes
           SET title = ${dto.title !== undefined ? dto.title : existing.title},
               description = ${dto.description !== undefined ? dto.description : existing.description || null},
+              term = ${dto.term !== undefined ? dto.term : existing.term || null},
               subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null}
           WHERE id = ${id}
           RETURNING *
@@ -815,6 +819,7 @@ export class NeonQuizRepository implements IQuizRepository {
     return this.createQuiz({
       title: `${source.title} (Copy)`,
       description: source.description || null,
+      term: source.term || null,
       subject_id: null,
       source_model: 'cloned',
       questions: questions.map((question) => ({

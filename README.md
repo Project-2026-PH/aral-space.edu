@@ -45,8 +45,15 @@ quiz-creator/
   - 4 study modes: Multiple Choice, Flashcards, Direct Identification, and Reverse Questioning.
   - Continuous 7-item sliding-window mastery queue with streak-based progress locking and targeted struggle-pile review.
   - Ebbinghaus forgetting curve scheduling: Initial -> 24h -> 3d -> 7d -> 14d reviews.
+- **Academic Term Categorization**:
+  - **Grading Period Tagging**: Tag and organize quizzes by academic terms (e.g., *Prelim*, *Midterm*, *Finals*, *1st Grading*) directly below the subject in manual creation and via header badges in the quiz overview.
+  - **Custom Term Creation**: Type any custom grading period on-the-fly; automatically added to user selection options.
+  - **Multi-Level Library Filtering**: Filter library decks simultaneously by subject and academic term using interactive pill bars with deck count badges.
+  - **Synchronized Cache Invalidation**: Tag-based Next.js cache revalidation and multi-backend invalidation (`quizzes:`, `library:`) ensure instant UI consistency across all CRUD updates.
 - **Smart Note Import & Question Shaping**:
-  - **Copy-Paste Import**: Paste notes directly from PDFs, slides, websites, or spreadsheets. The app automatically separates terms and definitions, even from messy bulleted lists.
+  - **Copy-Paste Import**: Paste notes directly from PDFs, slides, websites, or spreadsheets. Automatically separates terms and definitions from bulleted lists, TSV spreadsheets, and key-value pairs.
+  - **Bold-Based Term Extraction**: Captures terms formatted in Markdown bold (`**Term**`) or rich HTML (`<b>`, `<strong>`, `font-weight: 700`) without requiring colons or dashes.
+  - **Zero-Infra Mitigations**: Built-in deterministic heuristics filter out inline emphasis, editorial meta-labels (`Note:`, `Warning:`), whole-sentence bolding, and glue fragmented adjacent spans from Google Docs/Microsoft Word.
   - **Instant Study Modes**: Turns single definition-answer pairs into flashcards, 4-option multiple-choice quizzes, or reverse-prompt questions without extra typing.
   - **Natural True or False Cards**: Rewrites definitions into natural statements, swapping in concepts from other cards to generate realistic False questions (see [CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md](docs/CLIPBOARD_PARSER_AND_TRANSFORMATION_FLOW.md)).
 - **Deterministic Notes Reviewers**:

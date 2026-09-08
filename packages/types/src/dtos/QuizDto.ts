@@ -17,6 +17,7 @@ export interface QuizQuestionInput {
 export interface CreateQuizDto {
   title: string;
   description?: string | null;
+  term?: string | null;
   subject_id?: string | null;
   handout_name?: string | null;
   source_model?: string;
@@ -26,6 +27,7 @@ export interface CreateQuizDto {
 export interface UpdateQuizDto {
   title?: string;
   description?: string | null;
+  term?: string | null;
   subject_id?: string | null;
 }
 

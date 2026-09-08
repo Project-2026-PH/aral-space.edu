@@ -243,25 +243,213 @@ function extractBulkTerms(
   return items;
 }
 
-export function parseSmartClipboard(raw: string): ParsedClipboard | null {
-  const trimmed = raw.trim();
+const META_BOLD_LABEL =
+  /^(?:note|warning|tip|important|caution|notice|example|remember|remark|key|info|step\s*\d+|figure\s*\d+|table\s*\d+|chapter\s*\d+|section\s*\d+):?$/i;
+
+const BOLD_LEAD_PATTERN =
+  /^(?:(?:[•▪‣◦●○*]|[-–—]|\(?\d+[.)]|[a-zA-Z][.)])\s+)?\*\*([^*]+)\*\*(.*)$/;
+
+function isDisallowedTermWord(term: string): boolean {
+  return /^(?:and|or|the|a|an|is|are|was|were|that|which|not|never|always|only|must|should|can|could|would|will)$/i.test(
+    term
+  );
+}
+
+/**
+ * Normalizes rich clipboard HTML into text with markdown `**` bold markers.
+ * Glues fragmented adjacent bold spans (Word/Docs) and converts lists/paragraphs into newlines.
+ */
+export function normalizeHtmlClipboard(html: string): string {
+  if (!html || !html.trim()) return '';
+
+  if (typeof DOMParser === 'undefined') {
+    return html
+      .replace(/<(?:strong|b)\b[^>]*>([\s\S]*?)<\/(?:strong|b)>/gi, ' **$1** ')
+      .replace(
+        /<span\b[^>]*style="[^"]*font-weight:\s*(?:bold|bolder|[6-9]00)[^"]*"[^>]*>([\s\S]*?)<\/span>/gi,
+        ' **$1** '
+      )
+      .replace(/<li\b[^>]*>/gi, '\n• ')
+      .replace(/<(?:p|div|tr|h[1-6])\b[^>]*>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/&quot;/gi, '"')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\*\*\s*\*\*/g, '')
+      .replace(/\n\s+/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    doc.body.normalize();
+
+    const isBoldElement = (el: HTMLElement): boolean => {
+      const tag = el.tagName.toUpperCase();
+      const style = el.getAttribute('style') || '';
+      if (/font-weight:\s*(?:normal|400)/i.test(style)) return false;
+      if (tag === 'B' || tag === 'STRONG') return true;
+      return /font-weight:\s*(?:bold|bolder|[6-9]00)/i.test(style);
+    };
+
+    const boldNodes: HTMLElement[] = [];
+    const walk = (node: Node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (isBoldElement(el)) {
+          boldNodes.push(el);
+          return;
+        }
+        for (let i = 0; i < el.childNodes.length; i++) {
+          walk(el.childNodes[i]);
+        }
+      }
+    };
+    walk(doc.body);
+
+    for (const el of boldNodes) {
+      const content = (el.textContent || '').trim();
+      if (content) {
+        const marker = doc.createTextNode(` **${content}** `);
+        el.parentNode?.replaceChild(marker, el);
+      }
+    }
+
+    const blocks = doc.body.querySelectorAll('p, div, li, tr, br, h1, h2, h3, h4, h5, h6');
+    blocks.forEach((b) => {
+      if (b.tagName.toUpperCase() === 'LI') {
+        b.prepend(doc.createTextNode('\n• '));
+      } else {
+        b.append(doc.createTextNode('\n'));
+      }
+    });
+
+    const rawResult = doc.body.textContent || '';
+    return rawResult
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\*\*\s*\*\*/g, '')
+      .replace(/\n\s+/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Extracts term/definition pairs demarcated by bold styling (`**Term**`).
+ * Mitigates:
+ * 1. Inline emphasis: anchors to start of line/bullet.
+ * 2. Meta/editorial labels: skips Note:, Warning:, Chapter \d+, etc.
+ * 3. Whole-sentence bold: checks terminal punctuation, finite verbs, word count, and length ratio.
+ */
+export function extractBoldTerms(text: string): Array<{ term: string; definition: string }> {
+  const normalized = text.replace(/([^\n\s])[ \t]*([•▪‣◦●○])[ \t]*/g, '$1\n$2 ');
+  const lines = normalized.split(/\r?\n/);
+
+  const items: Array<{ term: string; definition: string }> = [];
+  let current: { term: string; parts: string[] } | null = null;
+
+  const flush = () => {
+    if (!current) return;
+    const definition = current.parts.join(' ').replace(/\s+/g, ' ').trim();
+    if (definition.length >= 8 && (definition.length > current.term.length || definition.split(/\s+/).length >= 3)) {
+      const totalLen = current.term.length + definition.length;
+      if (current.term.length / totalLen <= 0.45) {
+        items.push({ term: current.term, definition });
+      }
+    }
+    current = null;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const boldMatch = line.match(BOLD_LEAD_PATTERN);
+    if (boldMatch) {
+      const candidateTerm = boldMatch[1].replace(/\*\*/g, '').trim();
+      let remainder = boldMatch[2].trim();
+
+      // Strip delimiter between bold term and remainder (e.g. " : ", " - ", " – ", " — ", " :", ",")
+      remainder = remainder.replace(/^(?:\s*[:=]\s*|\s*[-–—]\s*|,\s+)/, '').trim();
+
+      const isValidCandidate =
+        candidateTerm.length >= 2 &&
+        candidateTerm.length <= 80 &&
+        candidateTerm.split(/\s+/).length <= 8 &&
+        !/[.!?]$/.test(candidateTerm) &&
+        !META_BOLD_LABEL.test(candidateTerm) &&
+        !isDisallowedTermWord(candidateTerm) &&
+        !FINITE_VERB.test(candidateTerm);
+
+      if (isValidCandidate) {
+        flush();
+        current = { term: candidateTerm, parts: [] };
+        if (remainder) {
+          current.parts.push(remainder);
+        }
+        continue;
+      }
+    }
+
+    if (current) {
+      current.parts.push(line);
+    }
+  }
+
+  flush();
+  return items;
+}
+
+export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard | null {
+  const trimmed = (raw || '').trim();
+  const trimmedHtml = (html || '').trim();
+  if (!trimmed && !trimmedHtml) return null;
+
+  if (trimmed) {
+    const numberedQuestionAnswers = extractNumberedQuestionAnswers(trimmed);
+    if (numberedQuestionAnswers.length > 0) {
+      if (numberedQuestionAnswers.length === 1) {
+        return { type: 'question_answer', ...numberedQuestionAnswers[0] };
+      }
+      return { type: 'question_answers', items: numberedQuestionAnswers };
+    }
+
+    const numberedTermDefinitions = extractNumberedTermDefinitions(trimmed);
+    if (numberedTermDefinitions.length > 0) {
+      if (numberedTermDefinitions.length === 1) {
+        return { type: 'single_pair', ...numberedTermDefinitions[0] };
+      }
+      return { type: 'bulk_terms', items: numberedTermDefinitions };
+    }
+  }
+
+  // Check for Bold-based Term/Definition Extraction
+  let boldCandidates: Array<{ term: string; definition: string }> = [];
+  if (trimmedHtml && (/<(?:strong|b)\b/i.test(trimmedHtml) || /font-weight:\s*(?:bold|bolder|[6-9]00)/i.test(trimmedHtml))) {
+    const normalizedHtml = normalizeHtmlClipboard(trimmedHtml);
+    boldCandidates = extractBoldTerms(normalizedHtml);
+  } else if (trimmed.includes('**')) {
+    boldCandidates = extractBoldTerms(trimmed);
+  }
+
+  if (boldCandidates.length >= 2) {
+    return { type: 'bulk_terms', items: boldCandidates };
+  }
+  if (boldCandidates.length === 1) {
+    return { type: 'single_pair', ...boldCandidates[0] };
+  }
+
   if (!trimmed) return null;
-
-  const numberedQuestionAnswers = extractNumberedQuestionAnswers(trimmed);
-  if (numberedQuestionAnswers.length > 0) {
-    if (numberedQuestionAnswers.length === 1) {
-      return { type: 'question_answer', ...numberedQuestionAnswers[0] };
-    }
-    return { type: 'question_answers', items: numberedQuestionAnswers };
-  }
-
-  const numberedTermDefinitions = extractNumberedTermDefinitions(trimmed);
-  if (numberedTermDefinitions.length > 0) {
-    if (numberedTermDefinitions.length === 1) {
-      return { type: 'single_pair', ...numberedTermDefinitions[0] };
-    }
-    return { type: 'bulk_terms', items: numberedTermDefinitions };
-  }
 
   // 1. Check for Bulk Bulleted Term/Definition List first
   // Supports `:`, ` - `, ` – `, ` — ` delimiters and multi-line wrapped definitions.

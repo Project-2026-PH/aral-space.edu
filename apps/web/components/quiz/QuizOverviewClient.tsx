@@ -14,6 +14,23 @@ import { Play, Plus, Edit, Trash2, ArrowLeft, Share2, Save, Check } from 'lucide
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+const DEFAULT_TERMS = [
+  'Prelim',
+  'Midterm',
+  'Semi-Final',
+  'Finals',
+  '1st Grading',
+  '2nd Grading',
+  '3rd Grading',
+  '4th Grading',
+  'Quarter 1',
+  'Quarter 2',
+  'Quarter 3',
+  'Quarter 4'
+];
+
+const CUSTOM_TERMS_STORAGE_KEY = 'quiz-creator:custom-terms:v1';
+
 interface QuizOverviewClientProps {
   quiz: Quiz;
   questions: QuizQuestion[];
@@ -40,6 +57,11 @@ export default function QuizOverviewClient({
   const [isEditingDesc, setIsEditingDesc] = useState(false);
   const [descInput, setDescInput] = useState(quiz.description || '');
   const [savingDesc, setSavingDesc] = useState(false);
+  const [isEditingTerm, setIsEditingTerm] = useState(false);
+  const [termInput, setTermInput] = useState(quiz.term || '');
+  const [customTermVal, setCustomTermVal] = useState('');
+  const [isCustomTerm, setIsCustomTerm] = useState(false);
+  const [savingTerm, setSavingTerm] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
   const [showStartModal, setShowStartModal] = useState(false);
@@ -51,6 +73,7 @@ export default function QuizOverviewClient({
     setQuestions(initialQuestions);
     setTitleInput(initialQuiz.title);
     setDescInput(initialQuiz.description || '');
+    setTermInput(initialQuiz.term || '');
   }, [initialQuiz, initialQuestions]);
 
   async function refreshQuestions() {
@@ -129,6 +152,39 @@ export default function QuizOverviewClient({
       console.error('Description save error:', err);
     } finally {
       setSavingDesc(false);
+    }
+  }
+
+  async function handleSaveTerm(termToSave: string | null) {
+    setSavingTerm(true);
+    try {
+      const res = await fetch(`/api/quizzes/${quiz.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ term: termToSave })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setQuiz(updated);
+        setTermInput(updated.term || '');
+        setIsEditingTerm(false);
+        setIsCustomTerm(false);
+        setCustomTermVal('');
+        if (termToSave && typeof window !== 'undefined') {
+          try {
+            const raw = window.localStorage.getItem(CUSTOM_TERMS_STORAGE_KEY);
+            const list = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(list) && !list.includes(termToSave) && !DEFAULT_TERMS.includes(termToSave)) {
+              list.push(termToSave);
+              window.localStorage.setItem(CUSTOM_TERMS_STORAGE_KEY, JSON.stringify(list));
+            }
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.error('Term save error:', err);
+    } finally {
+      setSavingTerm(false);
     }
   }
 
@@ -248,7 +304,7 @@ export default function QuizOverviewClient({
                 )}
               </div>
             )}
-            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1.5">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-muted-foreground mt-1.5">
               <span>{questions.length} Questions</span>
               {quiz.subject && (
                 <span className="flex items-center gap-1.5 font-semibold text-foreground">
@@ -258,6 +314,101 @@ export default function QuizOverviewClient({
                   />
                   {quiz.subject.name}
                 </span>
+              )}
+              {/* Term badge & editor */}
+              {isEditingTerm ? (
+                <div className="flex items-center gap-1.5">
+                  {!isCustomTerm ? (
+                    <select
+                      value={termInput}
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          setIsCustomTerm(true);
+                        } else {
+                          setTermInput(e.target.value);
+                        }
+                      }}
+                      className="rounded-xl border border-primary bg-background px-2 py-0.5 text-xs font-bold text-foreground focus:outline-none cursor-pointer"
+                    >
+                      <option value="">No Term</option>
+                      {Array.from(new Set([...DEFAULT_TERMS, ...(quiz.term ? [quiz.term] : [])])).map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                      <option value="__custom__">+ Custom term...</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="e.g. Prelim..."
+                      value={customTermVal}
+                      onChange={(e) => setCustomTermVal(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customTermVal.trim()) {
+                          handleSaveTerm(customTermVal.trim());
+                        } else if (e.key === 'Escape') {
+                          setIsEditingTerm(false);
+                          setIsCustomTerm(false);
+                        }
+                      }}
+                      className="rounded-xl border border-primary bg-background px-2.5 py-0.5 text-xs font-bold text-foreground focus:outline-none w-28"
+                      autoFocus
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleSaveTerm(isCustomTerm ? (customTermVal.trim() || null) : (termInput.trim() || null))}
+                    disabled={savingTerm}
+                    className="inline-flex items-center gap-1 rounded-xl bg-primary px-2 py-0.5 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+                  >
+                    <Check className="h-3 w-3" />
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingTerm(false);
+                      setIsCustomTerm(false);
+                      setTermInput(quiz.term || '');
+                    }}
+                    className="rounded-xl px-2 py-0.5 text-xs font-semibold text-muted-foreground hover:bg-muted cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                quiz.term ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-extrabold text-primary shadow-2xs">
+                    <span>{quiz.term}</span>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTermInput(quiz.term || '');
+                          setIsEditingTerm(true);
+                        }}
+                        title="Edit term"
+                        aria-label="Edit term"
+                        className="text-primary/70 hover:text-primary transition-colors cursor-pointer"
+                      >
+                        <Edit className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </span>
+                ) : (
+                  !readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTermInput('');
+                        setIsEditingTerm(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                    >
+                      <Plus className="h-3 w-3" />
+                      <span>Add Term</span>
+                    </button>
+                  )
+                )
               )}
               {quiz.handout_name && (
                 <span>Source: {quiz.handout_name}</span>

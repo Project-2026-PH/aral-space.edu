@@ -5,6 +5,7 @@ export interface Quiz {
   id: string;
   title: string;
   description?: string | null;
+  term?: string | null;
   question_count: number;
   generated_at: string;
   handout_name?: string | null;
@@ -27,6 +28,7 @@ export interface QuizMetadata {
   id: string;
   title: string;
   description?: string | null;
+  term?: string | null;
   question_count: number;
   generated_at: string;
   handout_name?: string | null;

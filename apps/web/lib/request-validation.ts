@@ -178,6 +178,7 @@ export function parseCreateQuiz(value: unknown): CreateQuizDto {
   const object = assertPlainObject(value);
   const title = boundedString(object.title, 'title', 200, true)!;
   const description = optionalText(object.description, 'description', 10_000);
+  const term = optionalText(object.term, 'term', 100);
   const subjectId = optionalText(object.subject_id, 'subject_id', 128);
   const handoutName = optionalText(object.handout_name, 'handout_name', 500);
   const sourceModel = boundedString(object.source_model, 'source_model', 100);
@@ -186,6 +187,7 @@ export function parseCreateQuiz(value: unknown): CreateQuizDto {
   return {
     title,
     description,
+    term,
     subject_id: subjectId,
     handout_name: handoutName,
     source_model: sourceModel,
@@ -200,6 +202,8 @@ export function parseUpdateQuiz(value: unknown): UpdateQuizDto {
   if (title !== undefined) result.title = title;
   const description = optionalText(object.description, 'description', 10_000);
   if (description !== undefined) result.description = description;
+  const term = optionalText(object.term, 'term', 100);
+  if (term !== undefined) result.term = term;
   const subjectId = optionalText(object.subject_id, 'subject_id', 128);
   if (subjectId !== undefined) result.subject_id = subjectId;
   if (!Object.keys(result).length) throw new RequestSecurityError(400, 'At least one quiz field is required');

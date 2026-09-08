@@ -296,4 +296,139 @@ and the marketspace, a virtual world of information`;
       expect(parseSmartClipboard('Just a random paragraph with no structure and no delimiter.')).toBeNull();
     });
   });
+
+  describe('Bold Text Term Separation & Heuristic Mitigations', () => {
+    it('parses markdown bold single pair with delimiter and soft line break', () => {
+      const raw =
+        '**Modeling** – deals with the mathematical specification of shape and\nappearance properties in a way that can be stored on the computer';
+      const res = parseSmartClipboard(raw);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'Modeling',
+        definition:
+          'deals with the mathematical specification of shape and appearance properties in a way that can be stored on the computer'
+      });
+    });
+
+    it('parses markdown bold single pair WITHOUT delimiter', () => {
+      const raw =
+        '**Polymorphism** allows objects of different types to be treated through a unified interface.';
+      const res = parseSmartClipboard(raw);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'Polymorphism',
+        definition:
+          'allows objects of different types to be treated through a unified interface.'
+      });
+    });
+
+    it('parses multiple markdown bold terms into bulk_terms', () => {
+      const raw = `
+        • **Modeling** deals with 3D object geometry and representation
+        • **Rendering** generates 2D images from 3D scene descriptions
+        • **Animation** handles movement and time-dependent changes
+      `;
+      const res = parseSmartClipboard(raw);
+      expect(res).toEqual({
+        type: 'bulk_terms',
+        items: [
+          {
+            term: 'Modeling',
+            definition: 'deals with 3D object geometry and representation'
+          },
+          {
+            term: 'Rendering',
+            definition: 'generates 2D images from 3D scene descriptions'
+          },
+          {
+            term: 'Animation',
+            definition: 'handles movement and time-dependent changes'
+          }
+        ]
+      });
+    });
+
+    it('parses HTML bold single pair without explicit delimiter', () => {
+      const html =
+        '<p><strong>Modeling</strong> deals with the mathematical specification of shape and appearance properties in a way that can be stored on the computer</p>';
+      const raw =
+        'Modeling deals with the mathematical specification of shape and appearance properties in a way that can be stored on the computer';
+      const res = parseSmartClipboard(raw, html);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'Modeling',
+        definition:
+          'deals with the mathematical specification of shape and appearance properties in a way that can be stored on the computer'
+      });
+    });
+
+    it('parses HTML bold bullet list from web or LMS paste', () => {
+      const html = `
+        <ul>
+          <li><b>RAM</b> Random Access Memory used for short-term data</li>
+          <li><b>ROM</b> Read Only Memory containing permanent boot instructions</li>
+        </ul>
+      `;
+      const res = parseSmartClipboard('', html);
+      expect(res).toEqual({
+        type: 'bulk_terms',
+        items: [
+          {
+            term: 'RAM',
+            definition: 'Random Access Memory used for short-term data'
+          },
+          {
+            term: 'ROM',
+            definition: 'Read Only Memory containing permanent boot instructions'
+          }
+        ]
+      });
+    });
+
+    it('glues fragmented adjacent bold spans (Word/Docs clipboard format)', () => {
+      const html =
+        '<p><span style="font-weight:700">Mod</span><span style="font-weight:bold">eling</span> – deals with the mathematical specification of shape and appearance properties</p>';
+      const res = parseSmartClipboard('', html);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'Modeling',
+        definition:
+          'deals with the mathematical specification of shape and appearance properties'
+      });
+    });
+
+    it('mitigation: rejects inline emphasis mid-sentence as terms', () => {
+      const raw = 'The convergence guarantee is **strictly** dependent on the learning rate parameter.';
+      expect(parseSmartClipboard(raw)).toBeNull();
+    });
+
+    it('mitigation: rejects editorial meta labels (Note:, Warning:, Chapter 1)', () => {
+      const note = '**Note:** Please do not forget to bring a calculator to the exam room.';
+      expect(parseSmartClipboard(note)).toBeNull();
+
+      const warning = '**Warning:** High voltage equipment inside the server rack.';
+      expect(parseSmartClipboard(warning)).toBeNull();
+
+      const chapter = '**Chapter 1:** Introduction to Linear Transformations and Vectors.';
+      expect(parseSmartClipboard(chapter)).toBeNull();
+    });
+
+    it('mitigation: rejects whole-sentence bold headings and announcements', () => {
+      const sentence =
+        '**All students must submit their laboratory reports through the portal before midnight.**';
+      expect(parseSmartClipboard(sentence)).toBeNull();
+    });
+
+    it('parses user specific paste format with delimiter correctly', () => {
+      const raw =
+        'Modeling – deals with the mathematical specification of shape and\nappearance properties in a way that can be stored on the computer';
+      const res = parseSmartClipboard(raw);
+      expect(res).toEqual({
+        type: 'single_pair',
+        term: 'Modeling',
+        definition:
+          'deals with the mathematical specification of shape and appearance properties in a way that can be stored on the computer'
+      });
+    });
+  });
 });

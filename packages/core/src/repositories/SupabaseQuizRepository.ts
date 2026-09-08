@@ -403,6 +403,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
         .insert({
           title: dto.title,
           description: dto.description || null,
+          term: dto.term || null,
           question_count: dto.questions.length,
           handout_name: dto.handout_name,
           source_model: dto.source_model || 'manual',
@@ -717,6 +718,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
         return this.createQuiz({
           title: `${source.title} (Copy)`,
           description: source.description || null,
+          term: source.term || null,
           subject_id: null,
           source_model: 'cloned',
           questions: ((questions || []) as QuizQuestion[]).map((question) => ({

@@ -44,17 +44,15 @@ export default function LegalModal() {
       {activeTab && (
         <div
           onClick={handleClose}
-          className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/65 backdrop-blur-xs overflow-y-auto ${
-            isClosing ? 'animate-modal-backdrop-out' : 'animate-modal-backdrop'
-          }`}
+          className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/65 backdrop-blur-xs overflow-y-auto ${isClosing ? 'animate-modal-backdrop-out' : 'animate-modal-backdrop'
+            }`}
         >
           <div
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-4xl max-h-[88vh] rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] shadow-brutal flex flex-col overflow-hidden text-slate-900 dark:text-white my-auto ${
-              isClosing ? 'animate-modal-pop-out' : 'animate-modal-pop'
-            } will-change-transform`}
+            className={`relative w-full max-w-4xl max-h-[88vh] rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-[#0c0f1d] shadow-brutal flex flex-col overflow-hidden text-slate-900 dark:text-white my-auto ${isClosing ? 'animate-modal-pop-out' : 'animate-modal-pop'
+              } will-change-transform`}
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b-2 border-slate-900/15 dark:border-white/15 px-6 py-4 bg-slate-50 dark:bg-slate-900/50 shrink-0">
@@ -62,11 +60,10 @@ export default function LegalModal() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('terms')}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 transition-all cursor-pointer ${
-                    activeTab === 'terms'
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 transition-all cursor-pointer ${activeTab === 'terms'
                       ? 'bg-blue-600 text-white border-slate-900 shadow-brutal-xs'
                       : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent hover:border-slate-300'
-                  }`}
+                    }`}
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
                   Terms of Service
@@ -75,11 +72,10 @@ export default function LegalModal() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('privacy')}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 transition-all cursor-pointer ${
-                    activeTab === 'privacy'
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 transition-all cursor-pointer ${activeTab === 'privacy'
                       ? 'bg-blue-600 text-white border-slate-900 shadow-brutal-xs'
                       : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-transparent hover:border-slate-300'
-                  }`}
+                    }`}
                 >
                   <Lock className="w-3.5 h-3.5" />
                   Privacy Policy
@@ -115,7 +111,7 @@ export default function LegalModal() {
                   {/* Section 1 */}
                   <section className="space-y-2">
                     <h3 className="text-base font-black text-slate-900 dark:text-white">1. Description of the Service</h3>
-                    <p>Quiz Creator is a standalone, local-first learning platform providing:</p>
+                    <p>Aral Space is a standalone, local-first learning platform providing:</p>
                     <ul className="list-disc pl-5 space-y-1 font-medium">
                       <li>Notes authoring and rich-text editing.</li>
                       <li>Deterministic and AI-assisted quiz, flashcard, and reviewer generation.</li>

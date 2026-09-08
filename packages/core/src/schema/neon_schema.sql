@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
     handout_path TEXT,
     source_model TEXT NOT NULL DEFAULT 'manual',
     description TEXT,
+    term TEXT,
     subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL,
     user_id TEXT,
     share_token TEXT UNIQUE,
@@ -40,6 +41,8 @@ CREATE TABLE IF NOT EXISTS quizzes (
     generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS term TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_quizzes_user_id ON quizzes (user_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_subject_id ON quizzes (subject_id);

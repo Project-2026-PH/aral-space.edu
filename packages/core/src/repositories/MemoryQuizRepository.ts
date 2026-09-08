@@ -202,6 +202,7 @@ export class MemoryQuizRepository implements IQuizRepository {
       id: quizId,
       title: dto.title,
       description: dto.description || null,
+      term: dto.term || null,
       question_count: dto.questions.length,
       generated_at: new Date().toISOString(),
       handout_name: dto.handout_name || null,
@@ -249,6 +250,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     }
     if (dto.title !== undefined) quiz.title = dto.title;
     if (dto.description !== undefined) quiz.description = dto.description;
+    if (dto.term !== undefined) quiz.term = dto.term;
     if (dto.subject_id !== undefined) quiz.subject_id = dto.subject_id;
     this.quizzes.set(id, quiz);
     return quiz;
@@ -583,6 +585,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     return this.createQuiz({
       title: `${matchedQuiz.title} (Copy)`,
       description: matchedQuiz.description || null,
+      term: matchedQuiz.term || null,
       subject_id: null,
       source_model: 'cloned',
       questions: questions.map((question) => ({

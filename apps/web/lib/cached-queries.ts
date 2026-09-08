@@ -116,7 +116,7 @@ export async function getCachedPublicSubject(
 /**
  * Revalidation helpers for mutations (POST/PATCH/DELETE)
  */
-export function revalidateQuizTag(quizId: string, userId?: string): void {
+export function revalidateQuizTag(quizId: string, userId?: string, subjectId?: string | null): void {
   try {
     revalidateTag(CacheTags.quiz(quizId));
     if (userId) {
@@ -124,6 +124,10 @@ export function revalidateQuizTag(quizId: string, userId?: string): void {
     }
     revalidatePath(`/quizzes/${quizId}`);
     revalidatePath(`/review/${quizId}`);
+    revalidatePath('/library');
+    if (subjectId) {
+      revalidatePath(`/subjects/${subjectId}`);
+    }
   } catch (err) {
     // Graceful fallback outside Next.js request context (e.g. CLI/tests)
   }
@@ -134,6 +138,7 @@ export function revalidateUserLists(userId?: string): void {
     const uid = userId || 'anon';
     revalidateTag(CacheTags.userQuizzes(uid));
     revalidateTag(CacheTags.userSubjects(uid));
+    revalidatePath('/library');
   } catch (err) {
     // Graceful fallback
   }

@@ -184,7 +184,8 @@ export class CachedQuizRepository implements IQuizRepository {
 
   async createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz> {
     const created = await this.underlying.createQuiz(dto, userId);
-    this.cache.delete(this.quizzesKey(userId));
+    this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
     this.cache.delete(this.quizKey(created.id, userId));
     this.cache.deleteByPrefix('public_subject:');
     return created;
@@ -192,7 +193,8 @@ export class CachedQuizRepository implements IQuizRepository {
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
     const updated = await this.underlying.updateQuiz(id, dto, userId);
-    this.cache.delete(this.quizzesKey(userId));
+    this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
     this.cache.delete(this.quizKey(id, userId));
     this.cache.deleteByPrefix('public_quiz:');
     this.cache.deleteByPrefix('public_subject:');
@@ -201,7 +203,8 @@ export class CachedQuizRepository implements IQuizRepository {
 
   async deleteQuiz(id: string, userId?: string): Promise<boolean> {
     const result = await this.underlying.deleteQuiz(id, userId);
-    this.cache.delete(this.quizzesKey(userId));
+    this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
     this.cache.delete(this.quizKey(id, userId));
     this.cache.deleteByPrefix(`questions:${id}:`);
     this.cache.deleteByPrefix('public_quiz:');

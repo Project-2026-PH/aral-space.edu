@@ -30,7 +30,7 @@ export const PATCH = createApiRoute<{ quizId: string }>(async ({ req, params, us
   const before = await controller.getShareConfig(params.quizId, userId).catch(() => null);
   const updated = await controller.updateQuiz(params.quizId, dto, userId);
   if (before?.share_token) revalidatePublicQuizTag(before.share_token);
-  revalidateQuizTag(params.quizId, userId);
+  revalidateQuizTag(params.quizId, userId, updated.subject_id || accessibleQuiz.subject_id);
   revalidatePublicSubjectCaches();
   revalidateUserLists(userId);
   return NextResponse.json(updated);
@@ -50,7 +50,7 @@ export const DELETE = createApiRoute<{ quizId: string }>(async ({ req, params, u
   const success = await controller.deleteQuiz(params.quizId, userId);
   if (!success) return NextResponse.json({ error: 'Quiz not found' }, { status: 404 });
   if (before?.share_token) revalidatePublicQuizTag(before.share_token);
-  revalidateQuizTag(params.quizId, userId);
+  revalidateQuizTag(params.quizId, userId, accessibleQuiz.subject_id);
   revalidatePublicSubjectCaches();
   revalidateUserLists(userId);
   return { success };

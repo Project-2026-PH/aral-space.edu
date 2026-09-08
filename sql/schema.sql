@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
   handout_path TEXT,
   source_model TEXT NOT NULL DEFAULT 'manual',
   description TEXT,
+  term TEXT,
   subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL,
   user_id UUID,
   share_token TEXT UNIQUE,
@@ -30,6 +31,8 @@ CREATE TABLE IF NOT EXISTS quizzes (
   share_revoked_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS term TEXT;
 
 CREATE TABLE IF NOT EXISTS quiz_questions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

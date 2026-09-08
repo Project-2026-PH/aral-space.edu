@@ -74,7 +74,22 @@ export default function QuizLibrary({
   }
 
   const headingId = readOnly ? 'shared-reviewer-library-heading' : 'quiz-library-heading';
-  const visibleQuizzes = maxItems ? quizzes.slice(0, maxItems) : quizzes;
+  const [selectedTerm, setSelectedTerm] = useState<string>('');
+
+  const termsInQuizzes = Array.from(
+    new Set(
+      quizzes
+        .map((q) => q.term?.trim())
+        .filter((t): t is string => Boolean(t))
+    )
+  );
+
+  const filteredQuizzes = quizzes.filter((quiz) => {
+    if (!selectedTerm) return true;
+    return quiz.term?.trim().toLowerCase() === selectedTerm.toLowerCase();
+  });
+
+  const visibleQuizzes = maxItems ? filteredQuizzes.slice(0, maxItems) : filteredQuizzes;
 
   return (
     <section className="space-y-4" aria-labelledby={headingId}>
@@ -107,9 +122,46 @@ export default function QuizLibrary({
           )}
         </div>
         <span className="rounded-lg border-2 border-slate-900 bg-[#fde047] text-slate-900 px-3 py-1 text-xs font-black shadow-brutal-sm">
-          {quizzes.length} {quizzes.length === 1 ? 'reviewer' : 'reviewers'}
+          {filteredQuizzes.length} {filteredQuizzes.length === 1 ? 'reviewer' : 'reviewers'}
         </span>
       </div>
+
+      {termsInQuizzes.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mr-1">
+            Term:
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedTerm('')}
+            className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-black shadow-brutal-sm transition-all cursor-pointer ${
+              selectedTerm === ''
+                ? 'bg-primary text-white'
+                : 'bg-white dark:bg-card text-foreground hover:bg-muted'
+            }`}
+          >
+            All ({quizzes.length})
+          </button>
+          {termsInQuizzes.map((t) => {
+            const count = quizzes.filter((q) => q.term?.trim().toLowerCase() === t.toLowerCase()).length;
+            const isSelected = selectedTerm.toLowerCase() === t.toLowerCase();
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setSelectedTerm(isSelected ? '' : t)}
+                className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-black shadow-brutal-sm transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-primary text-white'
+                    : 'bg-white dark:bg-card text-foreground hover:bg-muted'
+                }`}
+              >
+                {t} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {loading ? (
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -124,6 +176,18 @@ export default function QuizLibrary({
           <p className="mt-1 text-xs text-muted-foreground">
             Create your first reviewer deck or import from a handout.
           </p>
+        </div>
+      ) : filteredQuizzes.length === 0 ? (
+        <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-900/40 dark:border-white/30 p-8 text-center bg-white dark:bg-card">
+          <BookOpen className="h-8 w-8 text-muted-foreground" />
+          <p className="mt-2 text-sm font-black text-foreground">No reviewers found for "{selectedTerm}"</p>
+          <button
+            type="button"
+            onClick={() => setSelectedTerm('')}
+            className="mt-2 text-xs font-bold text-primary hover:underline cursor-pointer"
+          >
+            Show all reviewers
+          </button>
         </div>
       ) : (
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -155,13 +219,13 @@ export default function QuizLibrary({
         </div>
       )}
 
-      {maxItems && quizzes.length > visibleQuizzes.length && onViewAll && (
+      {maxItems && filteredQuizzes.length > visibleQuizzes.length && onViewAll && (
         <button
           type="button"
           onClick={onViewAll}
           className="inline-flex items-center gap-1.5 text-xs font-black text-primary underline-offset-2 hover:underline"
         >
-          View all {quizzes.length} reviewers
+          View all {filteredQuizzes.length} reviewers
           <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
         </button>
       )}

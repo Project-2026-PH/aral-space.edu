@@ -630,7 +630,7 @@ export default function AnonymousSessionBadge() {
                     />
                     <div className="text-xs">
                       <div className="font-bold text-foreground">Merge quizzes (Recommended)</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">Keep this device&apos;s guest ID and combine its quizzes with the primary device.</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">Use the primary device&apos;s guest ID and combine both devices&apos; quizzes. Previously connected devices keep using this session.</div>
                     </div>
                   </label>
 

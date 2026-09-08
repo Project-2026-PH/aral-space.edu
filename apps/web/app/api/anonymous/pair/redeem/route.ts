@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { RepositoryFactory } from '@quiz-creator/core/repositories';
 import {
   ANON_COOKIE_NAME,
   anonymousCookieOptions,
@@ -50,13 +51,13 @@ export async function POST(req: NextRequest) {
       currentAnonUserId: currentAnonId,
     });
 
-    // 2. IdentityMigrationService: merge source-owned data into this device's identity.
-    // Merge must preserve the redeeming device's guest ID; replace intentionally switches
-    // this device to the source identity below.
-    const resultingAnonUserId = mode === 'merge' ? currentAnonId : sourceAnonUserId;
+    // 2. IdentityMigrationService: converge this device into the ticket owner's session.
+    // The ticket owner remains canonical so previously connected devices keep seeing the
+    // same library when another device is connected later.
+    const resultingAnonUserId = sourceAnonUserId;
     if (mode === 'merge') {
       try {
-        await migrateAnonymousIdentity(sourceAnonUserId, currentAnonId);
+        await migrateAnonymousIdentity(currentAnonId, sourceAnonUserId);
       } catch (migrationErr) {
         // Roll back consumed ticket so user can safely retry without losing pairing state
         await rollbackPairingTicket(ticketId);
@@ -64,7 +65,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. CacheService: invalidate cached lists and public registries ONLY after DB transactions succeed
+    // 3. Invalidate both framework tags and the process-local repository snapshot after
+    // ownership changes, otherwise an old identity can continue serving stale library data.
+    RepositoryFactory.clearSharedQuizCache();
     revalidateUserLists(currentAnonId);
     revalidateUserLists(sourceAnonUserId);
     revalidatePublicSubjectCaches();
@@ -73,7 +76,7 @@ export async function POST(req: NextRequest) {
       success: true,
       label: anonymousLabel(resultingAnonUserId),
       message: mode === 'merge'
-        ? 'Quizzes merged; this guest session remains active'
+        ? 'Quizzes merged; connected devices now share this guest session'
         : 'Device successfully connected to the primary session',
     });
 

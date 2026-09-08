@@ -214,7 +214,7 @@ export default function AutoPairModal() {
                   </span>
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                  Keep this device&apos;s guest ID and combine its quizzes with the scanned device.
+                  Use the scanned device&apos;s guest ID and combine both devices&apos; quizzes. Previously connected devices keep using this session.
                 </div>
               </div>
             </label>

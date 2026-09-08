@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.17.1",
+    "@huggingface/transformers": "^4.2.0",
     "@neondatabase/serverless": "^0.10.4",
     "@quiz-creator/controllers": "workspace:*",
     "@quiz-creator/core": "workspace:*",

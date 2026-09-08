@@ -94,10 +94,25 @@ const CORRECT_FEEDBACK_MESSAGES = [
   'May bitaw ka ah',
   'Alam na alam mo ah',
   'YES NA YES FOR YOU!',
-  'Galingch namanch'
+  'Galingch namanch',
+  'TAMA NA NAMAN BUSSENG!!?',
+  'EYY! Corrected bai',
+  'Walang mintis bai!!'
 ];
 
 const INCORRECT_FEEDBACK_MESSAGES = [
+  'Eyyy, bawi next card!',
+  "Sheesh, kaya pa 'yan!",
+  'Mindset ba, mindset!',
+  'Goods lang, bawi agad!',
+  'Aray beh, pero laban!',
+  'Chill lang, bounce back tayo!',
+  'Dikit na, isa pa!',
+  'G lang, tuloy ang aral!',
+  "Huy teka, kaya mo 'to!",
+  'Padayon, babawi tayo!',
+  'Kering-keri, bawi ka!',
+  'Tuloy lang ang grind!',
   "No problem. You're still learning!",
   'Good effort—keep going!',
   'Not quite, but you are getting closer!',
@@ -107,7 +122,12 @@ const INCORRECT_FEEDBACK_MESSAGES = [
   'No worries, Learning is a process',
   'Okay lang magkamali, bawi ka',
   'Go Vabee, kaya mo yan',
-  'Nice try though'
+  'Nice try though',
+  'Aray mo pakak',
+  'BAWI TAYO BUSSENG!!',
+  'Eh babawi raw sha next',
+  'uhmm gewch bawi ka',
+  'Ba is wi'
 ];
 
 function getRandomFeedbackMessage(messages: readonly string[]): string {
@@ -223,10 +243,10 @@ export function useQuizSession({
         setEvaluatedCardIds(snapshot.evaluatedCardIds);
         setPendingAdvance(snapshot.pendingAdvance
           ? {
-              nextQueue: snapshot.pendingAdvance.nextQueue,
-              progressMap: new Map(snapshot.pendingAdvance.progressEntries),
-              recapQuestionIds: snapshot.pendingAdvance.recapQuestionIds
-            }
+            nextQueue: snapshot.pendingAdvance.nextQueue,
+            progressMap: new Map(snapshot.pendingAdvance.progressEntries),
+            recapQuestionIds: snapshot.pendingAdvance.recapQuestionIds
+          }
           : null);
         setIsRecapVisible(snapshot.isRecapVisible);
         setIsEvaluating(snapshot.isEvaluating);
@@ -308,10 +328,10 @@ export function useQuizSession({
       evaluatedCardIds,
       pendingAdvance: pendingAdvance
         ? {
-            nextQueue: pendingAdvance.nextQueue,
-            progressEntries: Array.from(pendingAdvance.progressMap.entries()),
-            recapQuestionIds: pendingAdvance.recapQuestionIds
-          }
+          nextQueue: pendingAdvance.nextQueue,
+          progressEntries: Array.from(pendingAdvance.progressMap.entries()),
+          recapQuestionIds: pendingAdvance.recapQuestionIds
+        }
         : null,
       isRecapVisible,
       isEvaluating,
@@ -394,10 +414,10 @@ export function useQuizSession({
     setCurrentOptions(shuffleOptions
       ? QuizShuffleService.shuffleOptions(activeQuestion.options, activeQuestion.correct_answer)
       : activeQuestion.options.map((text, index) => ({
-          optionId: index,
-          text,
-          isCorrect: index === activeQuestion.correct_answer
-        })));
+        optionId: index,
+        text,
+        isCorrect: index === activeQuestion.correct_answer
+      })));
 
     const restoredSnapshot = restoringSnapshotRef.current;
     if (restoredSnapshot?.queueState.activeQueue[0] === activeQuestion.id) {

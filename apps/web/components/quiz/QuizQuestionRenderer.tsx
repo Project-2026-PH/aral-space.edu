@@ -8,6 +8,8 @@ import {
   Lightbulb,
   Sparkles,
   Tag,
+  ThumbsDown,
+  ThumbsUp,
   Volume2,
   XCircle
 } from 'lucide-react';
@@ -60,10 +62,133 @@ interface SharedQuestionProps {
   onAdvance?: () => void;
   onDontKnow?: () => void;
   desktopViewport?: boolean;
+  aiExplanation?: string | null;
+  aiMotivationalStim?: string | null;
+  isAiExplaining?: boolean;
+  onRateAiExplanation?: (rating: 'up' | 'down') => void;
+  aiRating?: 'up' | 'down' | null;
 }
 
 export interface QuizQuestionRendererProps extends SharedQuestionProps {
   mode: QuizMode;
+}
+
+function highlightKeywords(
+  text: string,
+  correctAnswer?: string,
+  wrongAnswer?: string
+): React.ReactNode {
+  if (!correctAnswer && !wrongAnswer) return text;
+
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const terms: Array<{ term: string; isCorrect: boolean }> = [];
+
+  if (correctAnswer && correctAnswer.trim()) {
+    terms.push({ term: correctAnswer.trim(), isCorrect: true });
+  }
+  if (
+    wrongAnswer &&
+    wrongAnswer.trim() &&
+    wrongAnswer.trim().toLowerCase() !== correctAnswer?.trim().toLowerCase()
+  ) {
+    terms.push({ term: wrongAnswer.trim(), isCorrect: false });
+  }
+
+  if (terms.length === 0) return text;
+
+  terms.sort((a, b) => b.term.length - a.term.length);
+
+  const pattern = new RegExp(`(${terms.map((t) => escapeRegex(t.term)).join('|')})`, 'gi');
+  const parts = text.split(pattern);
+
+  return parts.map((part, index) => {
+    const matchedTerm = terms.find((t) => t.term.toLowerCase() === part.toLowerCase());
+    if (!matchedTerm) {
+      return part;
+    }
+    if (matchedTerm.isCorrect) {
+      return (
+        <span
+          key={`term-${index}`}
+          className="font-black text-emerald-600 dark:text-emerald-400"
+        >
+          {part}
+        </span>
+      );
+    }
+    return (
+      <span
+        key={`term-${index}`}
+        className="font-black text-orange-600 dark:text-orange-400"
+      >
+        {part}
+      </span>
+    );
+  });
+}
+
+function AiExplanationCard({
+  explanation,
+  motivationalStim,
+  correctAnswer,
+  wrongAnswer,
+  aiRating,
+  onRate,
+}: {
+  explanation: string;
+  motivationalStim?: string | null;
+  correctAnswer?: string;
+  wrongAnswer?: string;
+  aiRating?: 'up' | 'down' | null;
+  onRate?: (rating: 'up' | 'down') => void;
+}) {
+  return (
+    <div className="rounded-2xl border-2 border-primary/40 bg-primary/10 p-3.5 text-xs space-y-2 lg:p-3 animate-in fade-in duration-200">
+      <div className="flex items-center justify-between gap-2 font-bold text-foreground">
+        <div className="flex items-center gap-2 text-primary flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="h-4 w-4" />
+            <span>AI Simplified Explanation</span>
+          </div>
+          {motivationalStim && (
+            <span className="inline-flex items-center rounded-lg bg-primary/20 px-2 py-0.5 text-[11px] font-black text-primary">
+              {motivationalStim}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <span className="text-[10px] font-medium mr-0.5">Helpful?</span>
+          <button
+            type="button"
+            onClick={() => onRate?.('up')}
+            className={`p-1 rounded-md transition-colors ${
+              aiRating === 'up'
+                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                : 'hover:bg-muted hover:text-foreground'
+            }`}
+            aria-label="Thumbs up"
+          >
+            <ThumbsUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onRate?.('down')}
+            className={`p-1 rounded-md transition-colors ${
+              aiRating === 'down'
+                ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                : 'hover:bg-muted hover:text-foreground'
+            }`}
+            aria-label="Thumbs down"
+          >
+            <ThumbsDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <p className="text-foreground leading-relaxed font-semibold">
+        {highlightKeywords(explanation, correctAnswer, wrongAnswer)}
+      </p>
+    </div>
+  );
 }
 
 export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): React.ReactElement {
@@ -83,7 +208,11 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
     onShowHint,
     onAdvance,
     onDontKnow,
-    desktopViewport
+    desktopViewport,
+    aiExplanation,
+    aiMotivationalStim,
+    onRateAiExplanation,
+    aiRating
   } = props;
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -199,9 +328,21 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
               {typedAnswerCorrect ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-destructive" />}
               <span>{typedAnswerCorrect ? 'Correct answer' : 'Keep practicing'}</span>
             </div>
-            <p className="text-foreground">Correct answer: <span className="font-bold">{getQuestionAnswer(question)}</span></p>
-            {!typedAnswerCorrect && <p className="text-muted-foreground">Your answer: {identificationInput}</p>}
+            <p className="text-foreground">Correct answer: <span className="font-bold text-emerald-600 dark:text-emerald-400">{getQuestionAnswer(question)}</span></p>
+            {!typedAnswerCorrect && <p className="text-muted-foreground">Your answer: <span className="font-bold text-orange-600 dark:text-orange-400">{identificationInput}</span></p>}
             {question.explanation && <RichTextContent html={question.explanation} className="text-muted-foreground italic" />}
+            {aiExplanation && (
+              <div className="pt-2 text-left">
+                <AiExplanationCard
+                  explanation={aiExplanation}
+                  motivationalStim={aiMotivationalStim}
+                  correctAnswer={getQuestionAnswer(question)}
+                  wrongAnswer={identificationInput.trim()}
+                  aiRating={aiRating}
+                  onRate={onRateAiExplanation}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex justify-end pt-2">
@@ -340,6 +481,7 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
     question,
     identificationInput,
     identificationSubmitted,
+    typedAnswerCorrect,
     isEvaluating,
     isHintVisible,
     onInputChange,
@@ -347,7 +489,11 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
     onShowHint,
     onAdvance,
     onDontKnow,
-    desktopViewport
+    desktopViewport,
+    aiExplanation,
+    aiMotivationalStim,
+    onRateAiExplanation,
+    aiRating
   } = props;
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -448,8 +594,23 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
       <div className="min-h-[72px] flex flex-col justify-end">
         {identificationSubmitted ? (
           <div className="rounded-2xl border border-border/80 bg-muted/40 p-4 text-xs space-y-1 text-center animate-in fade-in duration-200">
-            <p className="font-bold text-foreground">Correct Answer: {getQuestionAnswer(question)}</p>
+            <p className="font-bold text-foreground">Correct Answer: <span className="font-bold text-emerald-600 dark:text-emerald-400">{getQuestionAnswer(question)}</span></p>
+            {!typedAnswerCorrect && identificationInput && (
+              <p className="text-muted-foreground text-xs">Your Answer: <span className="font-bold text-orange-600 dark:text-orange-400">{identificationInput}</span></p>
+            )}
             {question.explanation && <RichTextContent html={question.explanation} className="text-muted-foreground text-[11px] leading-relaxed" />}
+            {aiExplanation && (
+              <div className="pt-2 text-left">
+                <AiExplanationCard
+                  explanation={aiExplanation}
+                  motivationalStim={aiMotivationalStim}
+                  correctAnswer={getQuestionAnswer(question)}
+                  wrongAnswer={identificationInput.trim()}
+                  aiRating={aiRating}
+                  onRate={onRateAiExplanation}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex justify-end pt-2">
@@ -486,7 +647,11 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
     onAnswer,
     onShowHint,
     onDontKnow,
-    desktopViewport
+    desktopViewport,
+    aiExplanation,
+    aiMotivationalStim,
+    onRateAiExplanation,
+    aiRating
   } = props;
   const definitionContentRef = React.useRef<HTMLDivElement>(null);
 
@@ -639,6 +804,20 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
           </div>
         </div>
       </div>
+
+      {/* AI Explanation Card */}
+      {isEvaluating && aiExplanation && (
+        <div className="shrink-0 space-y-2 pr-1">
+          <AiExplanationCard
+            explanation={aiExplanation}
+            motivationalStim={aiMotivationalStim}
+            correctAnswer={currentOptions.find((opt) => opt.isCorrect)?.text || getQuestionAnswer(question)}
+            wrongAnswer={currentOptions.find((opt) => opt.optionId === selectedOptionId)?.text}
+            aiRating={aiRating}
+            onRate={onRateAiExplanation}
+          />
+        </div>
+      )}
 
       {/* Explanation */}
       {isEvaluating && isExplanationVisible && hasExplanationContent && (

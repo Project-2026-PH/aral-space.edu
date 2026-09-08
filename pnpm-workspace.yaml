@@ -5,7 +5,9 @@ packages:
 allowBuilds:
   '@google/genai': true
   esbuild: true
+  onnxruntime-node: false
   protobufjs: true
+  sharp: false
 
 overrides:
   '@xmldom/xmldom': ^0.9.12

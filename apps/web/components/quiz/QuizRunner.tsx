@@ -26,6 +26,9 @@ import ResumePracticeModal from '@/components/quiz/ResumePracticeModal';
 import { removeQuizProgressSnapshot } from '@/lib/quizProgressPersistence';
 import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import { generateLocalExplanation } from '@/lib/ai/localExplanationEngine';
+import { recordExplanationFeedback } from '@/lib/ai/explanationPreferences';
+import { getClientUserId } from '@/lib/authoringPreferences';
 
 interface QuizRunnerProps {
   quiz: Quiz;
@@ -36,6 +39,7 @@ interface QuizRunnerProps {
   shuffleQuestions?: boolean;
   shuffleOptions?: boolean;
   personalizedFeedback?: PersonalizedFeedbackConfig | null;
+  viewerId?: string;
 }
 
 export default function QuizRunner(props: QuizRunnerProps) {
@@ -46,6 +50,10 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const [shuffleToast, setShuffleToast] = useState(false);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const resumePromptShownRef = useRef(false);
+  const [aiExplanations, setAiExplanations] = useState<Record<string, string>>({});
+  const [aiMotivationalStims, setAiMotivationalStims] = useState<Record<string, string>>({});
+  const [isAiExplaining, setIsAiExplaining] = useState(false);
+  const [aiRatings, setAiRatings] = useState<Record<string, 'up' | 'down'>>({});
 
   const session = useQuizSession({ ...props, mode: currentMode });
   const {
@@ -98,6 +106,69 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const handleConfirmReset = () => {
     resetProgress();
     setShowSettingsModal(false);
+  };
+
+  const handleExplainWithAi = async () => {
+    if (!activeQuestion || isAiExplaining) return;
+
+    const questionId = activeQuestion.id;
+    let correctAnswerText = '';
+    let wrongAnswerText = '';
+
+    if (currentOptions && currentOptions.length > 0) {
+      const correctOpt = currentOptions.find((opt) => opt.isCorrect);
+      correctAnswerText = correctOpt?.text || String(activeQuestion.correct_answer);
+
+      const wrongOpt = currentOptions.find((opt) => opt.optionId === selectedOptionId);
+      wrongAnswerText = wrongOpt?.text || (selectedOptionId !== null ? String(selectedOptionId) : 'selected choice');
+    } else {
+      correctAnswerText = String(activeQuestion.correct_answer || activeQuestion.answer_text || '');
+      wrongAnswerText = identificationInput.trim() || 'submitted answer';
+    }
+
+    const guestId = props.viewerId || getClientUserId();
+
+    setIsAiExplaining(true);
+    try {
+      const result = await generateLocalExplanation({
+        questionId,
+        questionText: activeQuestion.question_text,
+        correctAnswer: correctAnswerText,
+        wrongAnswer: wrongAnswerText,
+        guestId,
+        correctExplanation: activeQuestion.correct_explanation || activeQuestion.explanation,
+        distractorExplanation:
+          selectedOptionId !== null
+            ? activeQuestion.distractor_explanations?.[selectedOptionId]
+            : null,
+      });
+
+      setAiExplanations((prev) => ({
+        ...prev,
+        [questionId]: result.explanation,
+      }));
+      if (result.motivationalStim) {
+        setAiMotivationalStims((prev) => ({
+          ...prev,
+          [questionId]: result.motivationalStim!,
+        }));
+      }
+    } catch (err) {
+      console.error('Error generating AI explanation:', err);
+    } finally {
+      setIsAiExplaining(false);
+    }
+  };
+
+  const handleRateAiExplanation = (rating: 'up' | 'down') => {
+    if (!activeQuestion) return;
+    const questionId = activeQuestion.id;
+    setAiRatings((prev) => ({ ...prev, [questionId]: rating }));
+    const guestId = props.viewerId || getClientUserId();
+    recordExplanationFeedback(guestId, {
+      questionId,
+      rating,
+    });
   };
 
   const isMultipleChoiceMode = currentMode === 'multiple_choice';
@@ -290,6 +361,11 @@ export default function QuizRunner(props: QuizRunnerProps) {
             onShowHint={() => setIsHintVisible(true)}
             onAdvance={advance}
             onDontKnow={() => giveUp(currentMode === 'learn' || currentMode === 'identification' ? currentMode : undefined)}
+            aiExplanation={activeQuestion ? aiExplanations[activeQuestion.id] : null}
+            aiMotivationalStim={activeQuestion ? aiMotivationalStims[activeQuestion.id] : null}
+            isAiExplaining={isAiExplaining}
+            onRateAiExplanation={handleRateAiExplanation}
+            aiRating={activeQuestion ? aiRatings[activeQuestion.id] : null}
           />
         </div>
       </div>
@@ -302,6 +378,10 @@ export default function QuizRunner(props: QuizRunnerProps) {
               ? 'Tap anywhere to open your seven-card recap'
               : 'Press anywhere to continue'
           }
+          showAiExplain={answerResult === false || (identificationSubmitted && typedAnswerCorrect === false)}
+          isAiExplaining={isAiExplaining}
+          hasAiExplanation={Boolean(activeQuestion && aiExplanations[activeQuestion.id])}
+          onExplainWithAi={handleExplainWithAi}
         />
       )}
 

@@ -8,6 +8,8 @@ import {
   isValidAnonymousUserId,
 } from '@/lib/anonymous';
 import { assertAllowedOrigin, enforceRateLimit } from '@/lib/request-security';
+import { RepositoryFactory } from '@quiz-creator/core/repositories';
+import { revalidateAllQuizDetails, revalidateUserLists } from '@/lib/cached-queries';
 
 /**
  * Disconnects only this device from its current anonymous session by rotating
@@ -32,6 +34,10 @@ export async function POST(req: NextRequest) {
     if (rateLimit) return rateLimit;
 
     const newAnonId = `anon_${crypto.randomUUID()}`;
+    RepositoryFactory.clearSharedQuizCache();
+    revalidateAllQuizDetails();
+    revalidateUserLists(currentAnonId);
+    revalidateUserLists(newAnonId);
     const response = NextResponse.json({
       success: true,
       label: anonymousLabel(newAnonId),

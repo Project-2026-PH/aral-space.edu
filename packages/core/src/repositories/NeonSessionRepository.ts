@@ -131,4 +131,11 @@ export class NeonSessionRepository implements ISessionRepository {
     }
     return rows as QuestionProgress[];
   }
+
+  async purgeUserData(userId: string): Promise<void> {
+    await this.sql`
+      DELETE FROM quiz_sessions
+      WHERE user_id = ${userId}
+    `;
+  }
 }

@@ -15,6 +15,7 @@ interface QuizLibraryProps {
   selectedSubjectId?: string;
   onSubjectChange?: (subjectId: string) => void;
   onQuizDeleted?: (quizId: string) => void;
+  onQuizArchived?: (quizId: string) => void;
   readOnly?: boolean;
   heading?: string;
   maxItems?: number;
@@ -29,6 +30,7 @@ export default function QuizLibrary({
   selectedSubjectId = '',
   onSubjectChange,
   onQuizDeleted,
+  onQuizArchived,
   readOnly = false,
   heading = 'Reviewers',
   maxItems,
@@ -39,6 +41,9 @@ export default function QuizLibrary({
   const [swipedQuizId, setSwipedQuizId] = useState<string | null>(null);
   const [deleteQuiz, setDeleteQuiz] = useState<Quiz | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [archivingQuizId, setArchivingQuizId] = useState<string | null>(null);
+  const [archivedQuizIds, setArchivedQuizIds] = useState<Set<string>>(() => new Set());
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   // Close open swipe card when tapping anywhere outside
   useEffect(() => {
@@ -54,6 +59,24 @@ export default function QuizLibrary({
     window.addEventListener('pointerdown', handlePointerDown);
     return () => window.removeEventListener('pointerdown', handlePointerDown);
   }, [swipedQuizId]);
+
+  async function handleArchiveQuiz(quiz: Quiz) {
+    if (archivingQuizId) return;
+    setArchivingQuizId(quiz.id);
+    setArchiveError(null);
+    try {
+      const res = await fetch(`/api/quizzes/${quiz.id}/archive`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to archive reviewer');
+      setArchivedQuizIds((current) => new Set(current).add(quiz.id));
+      onQuizArchived?.(quiz.id);
+    } catch (err) {
+      console.error('Failed to archive reviewer:', err);
+      setArchiveError(err instanceof Error ? err.message : 'Failed to archive reviewer');
+    } finally {
+      setArchivingQuizId(null);
+    }
+  }
 
   async function handleDeleteQuiz() {
     if (!deleteQuiz || isDeleting) return;
@@ -89,7 +112,7 @@ export default function QuizLibrary({
   const filteredQuizzes = quizzes.filter((quiz) => {
     if (!selectedTerm) return true;
     return quiz.term?.trim().toLowerCase() === selectedTerm.toLowerCase();
-  });
+  }).filter((quiz) => !archivedQuizIds.has(quiz.id));
 
   const visibleQuizzes = maxItems ? filteredQuizzes.slice(0, maxItems) : filteredQuizzes;
 
@@ -127,6 +150,12 @@ export default function QuizLibrary({
           {filteredQuizzes.length} {filteredQuizzes.length === 1 ? 'reviewer' : 'reviewers'}
         </span>
       </div>
+
+      {archiveError && (
+        <div className="rounded-xl border-2 border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive">
+          {archiveError}
+        </div>
+      )}
 
       {termsInQuizzes.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
@@ -215,6 +244,10 @@ export default function QuizLibrary({
                 onDelete={() => {
                   setSwipedQuizId(null);
                   setDeleteQuiz(quiz);
+                }}
+                onArchive={() => {
+                  setSwipedQuizId(null);
+                  void handleArchiveQuiz(quiz);
                 }}
               />
             );

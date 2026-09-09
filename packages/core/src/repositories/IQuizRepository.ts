@@ -7,6 +7,9 @@ export interface IQuizRepository {
   getSubjectViewerCount?(subjectId: string, ownerId: string): Promise<number>;
   updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string): Promise<Subject>;
   deleteSubject(subjectId: string, userId?: string): Promise<boolean>;
+  archiveSubject(subjectId: string, userId?: string): Promise<boolean>;
+  restoreSubject(subjectId: string, userId?: string): Promise<boolean>;
+  listArchivedSubjects(userId: string): Promise<Subject[]>;
   getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null>;
   listQuizzesBySubject(subjectId: string, userId?: string): Promise<Quiz[]>;
   createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string, maxUses?: number): Promise<SubjectCollaboratorLink>;
@@ -20,6 +23,10 @@ export interface IQuizRepository {
   createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz>;
   updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz>;
   deleteQuiz(id: string, userId?: string): Promise<boolean>;
+  archiveQuiz(id: string, userId?: string): Promise<boolean>;
+  restoreQuiz(id: string, userId?: string): Promise<boolean>;
+  listArchivedQuizzes(userId: string): Promise<Quiz[]>;
+  purgeUserData?(userId: string): Promise<void>;
 
   /** When userId is supplied, the repository must enforce quiz access. */
   getQuestionsByQuizId(quizId: string, userId?: string): Promise<QuizQuestion[]>;

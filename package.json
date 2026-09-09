@@ -20,7 +20,9 @@
     "test:infisical": "infisical run -- pnpm test",
     "typecheck": "turbo run typecheck",
     "migrate": "node scripts/migrate.mjs",
+    "migrate:archive": "node scripts/migrate-archive.mjs",
     "migrate:infisical": "infisical run -- node scripts/migrate.mjs",
+    "migrate:archive:infisical": "infisical run -- node scripts/migrate-archive.mjs",
     "seed": "node scripts/seed.mjs",
     "seed:infisical": "infisical run -- node scripts/seed.mjs"
   },

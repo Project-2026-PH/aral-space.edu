@@ -73,4 +73,16 @@ export class MemorySessionRepository implements ISessionRepository {
       return updated;
     });
   }
+
+  async purgeUserData(userId: string): Promise<void> {
+    const sessionIds = new Set(
+      Array.from(this.sessions.values())
+        .filter((session) => session.user_id === userId)
+        .map((session) => session.id)
+    );
+    for (const sessionId of sessionIds) this.sessions.delete(sessionId);
+    for (const [key, progress] of this.progress.entries()) {
+      if (sessionIds.has(progress.session_id)) this.progress.delete(key);
+    }
+  }
 }

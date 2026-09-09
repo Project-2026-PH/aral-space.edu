@@ -11,4 +11,4 @@ export const GET = createApiRoute<{ shareToken: string }>(async ({ req, params }
   const publicQuiz = await getCachedPublicQuiz(token);
   if (!publicQuiz) return NextResponse.json({ error: 'Study set not found or access is restricted' }, { status: 404 });
   return publicQuiz;
-}, { cache: 'public', skipAuth: true });
+}, { cache: 'noStore', skipAuth: true });

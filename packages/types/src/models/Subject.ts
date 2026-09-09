@@ -4,6 +4,7 @@ export interface Subject {
   color: string;
   user_id?: string;
   created_at?: string;
+  archived_at?: string | null;
   share_token?: string | null;
   is_public?: boolean;
   share_expires_at?: string | null;

@@ -160,7 +160,24 @@ export default function LibraryClient({
     )));
   };
 
+  const handleSubjectArchived = async (subjectId: string) => {
+    try {
+      const res = await fetch(`/api/subjects/${subjectId}/archive`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to archive subject');
+      setSubjects((current) => current.filter((subject) => subject.id !== subjectId));
+      setQuizzes((current) => current.filter((quiz) => quiz.subject_id !== subjectId));
+      setSelectedSubjectId((current) => current === subjectId ? '' : current);
+    } catch (err) {
+      console.error('Failed to archive subject:', err);
+    }
+  };
+
   const handleQuizDeleted = (quizId: string) => {
+    setQuizzes((current) => current.filter((quiz) => quiz.id !== quizId));
+  };
+
+  const handleQuizArchived = (quizId: string) => {
     setQuizzes((current) => current.filter((quiz) => quiz.id !== quizId));
   };
 
@@ -174,6 +191,7 @@ export default function LibraryClient({
       maxItems={preview ? PREVIEW_LIMIT : undefined}
       onViewAll={preview ? () => selectView('subjects') : undefined}
       onSubjectDeleted={handleSubjectDeleted}
+      onSubjectArchived={handleSubjectArchived}
       onSubjectUpdated={handleSubjectUpdated}
     />
   );
@@ -189,6 +207,7 @@ export default function LibraryClient({
       maxItems={preview ? PREVIEW_LIMIT : undefined}
       onViewAll={preview ? () => selectView('reviewers') : undefined}
       onQuizDeleted={handleQuizDeleted}
+      onQuizArchived={handleQuizArchived}
     />
   );
 

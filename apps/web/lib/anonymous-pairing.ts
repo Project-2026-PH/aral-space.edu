@@ -298,6 +298,13 @@ function getPairingTicketRepository(): PairingTicketRepository {
     : new MemoryPairingTicketRepository();
 }
 
+export async function clearPairingTicketsForUser(anonUserId: string): Promise<void> {
+  if (!isValidAnonymousUserId(anonUserId)) {
+    throw new Error('Valid authenticated anonymous session required');
+  }
+  await getPairingTicketRepository().clearPreviousTickets(anonUserId);
+}
+
 export interface CreatePairingResult {
   ticketId: string;
   passcode: string;

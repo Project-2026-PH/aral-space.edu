@@ -19,8 +19,12 @@ export const CacheTags = {
   quiz: (quizId: string) => `quiz-${quizId}`,
   userQuizzes: (userId: string) => `quizzes-user-${userId || 'anon'}`,
   userSubjects: (userId: string) => `subjects-user-${userId || 'anon'}`,
+  userQuizDetails: (userId: string) => `quiz-details-user-${userId || 'anon'}`,
+  allQuizDetails: 'quiz-details-all',
+  allLibraryLists: 'library-lists-all',
   publicQuiz: (shareToken: string) => `public-quiz-${shareToken}`,
   publicSubject: (shareToken: string) => `public-subject-${shareToken}`,
+  allPublicQuizzes: 'public-quizzes-all',
   allPublicSubjects: 'public-subjects-all',
 } as const;
 
@@ -40,7 +44,7 @@ export async function getCachedQuiz(
     ['quiz-detail', quizId, userId || 'anon'],
     {
       revalidate: CACHE_TTL.MEDIUM,
-      tags: [CacheTags.quiz(quizId)],
+      tags: [CacheTags.quiz(quizId), CacheTags.userQuizDetails(userId || 'anon'), CacheTags.allQuizDetails],
     }
   );
 
@@ -63,7 +67,7 @@ export async function getCachedQuizzesAndSubjects(
     ['user-quizzes-subjects', uid],
     {
       revalidate: CACHE_TTL.SHORT,
-      tags: [CacheTags.userQuizzes(uid), CacheTags.userSubjects(uid), CacheTags.allPublicSubjects],
+      tags: [CacheTags.userQuizzes(uid), CacheTags.userSubjects(uid), CacheTags.allLibraryLists, CacheTags.allPublicSubjects],
     }
   );
 
@@ -71,46 +75,25 @@ export async function getCachedQuizzesAndSubjects(
 }
 
 /**
- * Cached Public Quiz by Share Token
+ * Public share reads must validate revocation, archive state, and expiration on
+ * every request. A long-lived Next data cache could outlive share_expires_at.
  */
 export async function getCachedPublicQuiz(
   shareToken: string
 ): Promise<PublicQuizDto | null> {
-  const fetcher = unstable_cache(
-    async (token: string) => {
-      const repo = await getQuizRepository(true);
-      return repo.getQuizByShareToken(token);
-    },
-    ['public-quiz-token', shareToken],
-    {
-      revalidate: CACHE_TTL.LONG,
-      tags: [CacheTags.publicQuiz(shareToken)],
-    }
-  );
-
-  return fetcher(shareToken);
+  const repo = await getQuizRepository(false);
+  return repo.getQuizByShareToken(shareToken);
 }
 
 /**
- * Cached Public Subject by Share Token
+ * Public subject reads use the same uncached validity check as public quizzes.
  */
 export async function getCachedPublicSubject(
   shareToken: string
 ): Promise<PublicSubjectDto | null> {
-  const fetcher = unstable_cache(
-    async (token: string): Promise<PublicSubjectDto | null> => {
-      const repo = await getQuizRepository(true);
-      const res = await repo.getSubjectByShareToken(token);
-      return (res as PublicSubjectDto | null) ?? null;
-    },
-    ['public-subject-token', shareToken],
-    {
-      revalidate: CACHE_TTL.LONG,
-      tags: [CacheTags.publicSubject(shareToken), CacheTags.allPublicSubjects],
-    }
-  );
-
-  return fetcher(shareToken);
+  const repo = await getQuizRepository(false);
+  const res = await repo.getSubjectByShareToken(shareToken);
+  return (res as PublicSubjectDto | null) ?? null;
 }
 
 /**
@@ -119,8 +102,10 @@ export async function getCachedPublicSubject(
 export function revalidateQuizTag(quizId: string, userId?: string, subjectId?: string | null): void {
   try {
     revalidateTag(CacheTags.quiz(quizId));
+    revalidateTag(CacheTags.allLibraryLists);
     if (userId) {
       revalidateTag(CacheTags.userQuizzes(userId));
+      revalidateTag(CacheTags.userQuizDetails(userId));
     }
     revalidatePath(`/quizzes/${quizId}`);
     revalidatePath(`/review/${quizId}`);
@@ -133,14 +118,40 @@ export function revalidateQuizTag(quizId: string, userId?: string, subjectId?: s
   }
 }
 
+export function revalidateUserQuizDetails(userId?: string): void {
+  try {
+    revalidateTag(CacheTags.userQuizDetails(userId || 'anon'));
+  } catch (err) {
+    // Graceful fallback
+  }
+}
+
+export function revalidateAllQuizDetails(): void {
+  try {
+    revalidateTag(CacheTags.allQuizDetails);
+  } catch (err) {
+    // Graceful fallback outside Next.js request context.
+  }
+}
+
 export function revalidateUserLists(userId?: string): void {
   try {
     const uid = userId || 'anon';
     revalidateTag(CacheTags.userQuizzes(uid));
     revalidateTag(CacheTags.userSubjects(uid));
+    revalidateTag(CacheTags.allLibraryLists);
+    revalidateUserQuizDetails(uid);
     revalidatePath('/library');
   } catch (err) {
     // Graceful fallback
+  }
+}
+
+export function revalidatePublicQuizCaches(): void {
+  try {
+    revalidateTag(CacheTags.allPublicQuizzes);
+  } catch (err) {
+    // Graceful fallback outside Next.js request context.
   }
 }
 

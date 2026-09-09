@@ -6,6 +6,7 @@ import PwaRegister from '@/components/PwaRegister';
 import UpdateNotification from '@/components/UpdateNotification';
 import AnonymousSessionBadge from '@/components/AnonymousSessionBadge';
 import ThemeToggle from '@/components/ThemeToggle';
+import { Archive } from 'lucide-react';
 
 export const viewport: Viewport = {
   themeColor: '#4f46e5',
@@ -73,6 +74,15 @@ export default function RootLayout({
             </Link>
 
             <div className="flex items-center gap-2.5">
+              <Link
+                href="/settings/archived"
+                aria-label="Open archived items"
+                title="Archived items"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/80 px-2.5 py-1.5 text-xs font-semibold text-foreground backdrop-blur-md transition-all hover:border-primary/50 hover:bg-muted/50 shadow-2xs"
+              >
+                <Archive className="h-3.5 w-3.5 text-primary" />
+                <span className="hidden sm:inline">Archived</span>
+              </Link>
               <ThemeToggle />
               <AnonymousSessionBadge />
             </div>

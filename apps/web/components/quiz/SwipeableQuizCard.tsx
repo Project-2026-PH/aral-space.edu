@@ -2,11 +2,11 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Quiz, Subject } from '@quiz-creator/types';
-import { Layers, Pencil, Play, Trash2 } from 'lucide-react';
+import { Archive, Layers, Pencil, Play, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-const REVEAL_WIDTH = 144; // 72px per action button
+const REVEAL_WIDTH = 216; // 72px per action button
 const SWIPE_THRESHOLD = 50;
 
 interface SwipeableQuizCardProps {
@@ -18,6 +18,7 @@ interface SwipeableQuizCardProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onArchive: () => void;
   subjectId?: string;
 }
 
@@ -30,6 +31,7 @@ export default function SwipeableQuizCard({
   onClose,
   onEdit,
   onDelete,
+  onArchive,
   subjectId,
 }: SwipeableQuizCardProps) {
   const router = useRouter();
@@ -209,6 +211,22 @@ export default function SwipeableQuizCard({
             <span className="text-[11px] font-black uppercase tracking-wider">Edit</span>
           </button>
 
+          {/* Archive Action Button */}
+          <button
+            type="button"
+            aria-label={`Archive ${quiz.title}`}
+            tabIndex={isOpen ? 0 : -1}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+              onArchive();
+            }}
+            className="flex w-[72px] flex-col items-center justify-center gap-1 border-l-2 border-slate-900 bg-amber-500 active:bg-amber-600 text-slate-900 font-black transition-all cursor-pointer select-none"
+          >
+            <Archive className="h-5 w-5 stroke-[2.5]" />
+            <span className="text-[11px] font-black uppercase tracking-wider">Archive</span>
+          </button>
+
           {/* Delete Action Button */}
           <button
             type="button"
@@ -320,7 +338,18 @@ export default function SwipeableQuizCard({
               >
                 Manage
               </Link>
-              {/* Desktop delete shortcut button */}
+              {/* Desktop archive and delete shortcut buttons */}
+              <button
+                type="button"
+                aria-label={`Archive ${quiz.title}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onArchive();
+                }}
+                className="hidden sm:inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-400 transition-colors cursor-pointer"
+              >
+                <Archive className="h-3.5 w-3.5" />
+              </button>
               <button
                 type="button"
                 aria-label={`Delete ${quiz.title}`}

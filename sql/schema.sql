@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS subjects (
   is_public BOOLEAN NOT NULL DEFAULT TRUE,
   share_expires_at TIMESTAMPTZ,
   share_revoked_at TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -29,6 +30,8 @@ CREATE TABLE IF NOT EXISTS quizzes (
   allow_public_answer_key BOOLEAN NOT NULL DEFAULT FALSE,
   share_expires_at TIMESTAMPTZ,
   share_revoked_at TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  archived_by_subject BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -75,6 +78,8 @@ CREATE TABLE IF NOT EXISTS quiz_question_progress (
 CREATE INDEX IF NOT EXISTS idx_quizzes_subject_id ON quizzes(subject_id);
 CREATE INDEX IF NOT EXISTS idx_quizzes_user_id ON quizzes(user_id);
 CREATE INDEX IF NOT EXISTS idx_subjects_user_id ON subjects(user_id);
+CREATE INDEX IF NOT EXISTS idx_subjects_archived_at ON subjects(archived_at);
+CREATE INDEX IF NOT EXISTS idx_quizzes_archived_at ON quizzes(archived_at);
 CREATE INDEX IF NOT EXISTS idx_quiz_questions_quiz_id ON quiz_questions(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_questions_quiz_order ON quiz_questions(quiz_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_quiz_sessions_quiz_id ON quiz_sessions(quiz_id);
@@ -87,6 +92,7 @@ ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT
 ALTER TABLE subjects ALTER COLUMN is_public SET DEFAULT TRUE;
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_expires_at TIMESTAMPTZ;
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_revoked_at TIMESTAMPTZ;
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_token TEXT;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
@@ -95,6 +101,8 @@ ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS allow_cloning BOOLEAN NOT NULL DEFA
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS allow_public_answer_key BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_expires_at TIMESTAMPTZ;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_revoked_at TIMESTAMPTZ;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS archived_by_subject BOOLEAN NOT NULL DEFAULT FALSE;
 UPDATE subjects SET is_public = TRUE WHERE is_public IS NULL;
 UPDATE quizzes SET is_public = TRUE WHERE is_public IS NULL;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS answer_text TEXT;

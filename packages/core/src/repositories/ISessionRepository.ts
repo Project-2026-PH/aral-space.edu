@@ -12,4 +12,5 @@ export interface ISessionRepository {
   getProgressForSession(sessionId: string, userId?: string): Promise<QuestionProgress[]>;
   saveQuestionProgress(progress: QuestionProgress, userId?: string): Promise<QuestionProgress>;
   batchSaveQuestionProgress(progressList: QuestionProgress[], userId?: string): Promise<QuestionProgress[]>;
+  purgeUserData?(userId: string): Promise<void>;
 }

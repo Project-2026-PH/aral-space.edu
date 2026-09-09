@@ -22,6 +22,10 @@ export default function AnonymousSessionBadge() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [resetting, setResetting] = useState(false);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetConfirmation, setResetConfirmation] = useState('');
+  const [resetCountdown, setResetCountdown] = useState(5);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [disconnectError, setDisconnectError] = useState<string | null>(null);
@@ -91,6 +95,14 @@ export default function AnonymousSessionBadge() {
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!resetModalOpen) return;
+    const interval = window.setInterval(() => {
+      setResetCountdown((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [resetModalOpen]);
+
   // Lock background scroll when open
   useEffect(() => {
     if (isOpen) {
@@ -130,27 +142,49 @@ export default function AnonymousSessionBadge() {
     return () => clearInterval(interval);
   }, [codeExpiresAt]);
 
+  function openResetModal() {
+    setIsOpen(false);
+    setResetError(null);
+    setResetConfirmation('');
+    setResetCountdown(5);
+    setResetModalOpen(true);
+  }
+
   async function handleReset() {
-    if (!confirm('Start a new anonymous session? Your current guest quizzes will remain under previous session ID.')) {
+    const expectedLabel = session?.label;
+    if (
+      resetting
+      || !expectedLabel
+      || resetCountdown > 0
+      || resetConfirmation.trim() !== expectedLabel
+    ) {
       return;
     }
+
     setResetting(true);
+    setResetError(null);
     try {
       const res = await fetch('/api/anonymous', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset' })
+        body: JSON.stringify({
+          action: 'reset',
+          confirmation: resetConfirmation.trim(),
+        })
       });
-      if (res.ok) {
-        try {
-          window.localStorage.removeItem(PAIRING_CONNECTION_STORAGE_KEY);
-        } catch {
-          // Connection marker is optional browser state.
-        }
-        window.location.reload();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to create a new guest session');
       }
+      try {
+        window.localStorage.removeItem(PAIRING_CONNECTION_STORAGE_KEY);
+      } catch {
+        // Connection marker is optional browser state.
+      }
+      window.location.reload();
     } catch (err) {
       console.error('Reset failed:', err);
+      setResetError(err instanceof Error ? err.message : 'Unable to create a new guest session');
       setResetting(false);
     }
   }
@@ -398,35 +432,9 @@ export default function AnonymousSessionBadge() {
                   No password or email required. Your guest profile is stored safely in your browser. You can link quizzes across devices using a short-lived sync code.
                 </p>
 
-                {disconnectError && (
-                  <div className="flex items-center gap-2 p-3 rounded-2xl bg-destructive/10 text-destructive text-xs font-medium">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>{disconnectError}</span>
-                  </div>
-                )}
-
-                {isConnected && (
-                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 space-y-2.5">
-                    <div>
-                      <div className="text-xs font-bold text-foreground">Connected to a synced guest session</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">
-                        Disconnect to create a new guest ID on this device. Your quizzes stay with the connected session.
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleDisconnect}
-                      disabled={disconnecting}
-                      className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-destructive/30 bg-background px-3 py-2 text-xs font-bold text-destructive hover:bg-destructive/5 transition-all disabled:opacity-50"
-                    >
-                      <Unplug className="h-3.5 w-3.5" />
-                      <span>{disconnecting ? 'Disconnecting...' : 'Disconnect Session'}</span>
-                    </button>
-                  </div>
-                )}
-
                 <div className="pt-3 border-t border-border/50 flex items-center justify-between gap-2.5">
                   <button
-                    onClick={handleReset}
+                    onClick={openResetModal}
                     disabled={resetting}
                     className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-background px-3 py-2 text-xs font-bold text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-all disabled:opacity-50"
                   >
@@ -650,6 +658,32 @@ export default function AnonymousSessionBadge() {
                   </label>
                 </div>
 
+                {isConnected && (
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3.5 space-y-2.5">
+                    <div>
+                      <div className="text-xs font-bold text-foreground">Connected to a synced guest session</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        Disconnect this device to hide the synced subjects and reviewers here. The shared session stays available for reconnection.
+                      </div>
+                    </div>
+                    {disconnectError && (
+                      <div className="flex items-center gap-2 rounded-xl bg-destructive/10 p-2.5 text-xs font-medium text-destructive">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>{disconnectError}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleDisconnect}
+                      disabled={disconnecting || linking}
+                      className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-destructive/30 bg-background px-3 py-2 text-xs font-bold text-destructive hover:bg-destructive/5 transition-all disabled:opacity-50"
+                    >
+                      <Unplug className="h-3.5 w-3.5" />
+                      <span>{disconnecting ? 'Disconnecting...' : 'Disconnect Session'}</span>
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={linking || Boolean(linkSuccess) || inputTicketId.trim().length !== 4 || inputPasscode.trim().length !== 6}
@@ -673,6 +707,96 @@ export default function AnonymousSessionBadge() {
         </>
       )}
       </div>
+
+      {resetModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-background/80 dark:bg-black/75 backdrop-blur-md"
+            onClick={resetting ? undefined : () => setResetModalOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-session-title"
+            className="relative w-full max-w-md rounded-3xl border border-border/80 bg-card p-6 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 id="new-session-title" className="text-base font-extrabold tracking-tight text-foreground">
+                  Create a new session?
+                </h3>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Creating a new session will permanently delete your subjects and sets, including archived items, questions, and study progress. This cannot be undone.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetModalOpen(false)}
+                disabled={resetting}
+                className="rounded-xl p-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:opacity-40"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <label htmlFor="new-session-guest-id" className="text-[11px] font-bold text-muted-foreground">
+                Enter your Guest ID to confirm
+              </label>
+              <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-center font-mono text-sm font-black text-primary">
+                {session?.label || 'Loading Guest ID...'}
+              </div>
+              <input
+                id="new-session-guest-id"
+                type="text"
+                value={resetConfirmation}
+                onChange={(event) => setResetConfirmation(event.target.value)}
+                disabled={resetting}
+                autoComplete="off"
+                placeholder="Type the Guest ID exactly"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-center font-mono text-sm font-bold text-foreground outline-none transition-colors focus:border-primary disabled:opacity-60"
+              />
+            </div>
+
+            {resetError && (
+              <div role="alert" className="mt-3 flex items-center gap-2 rounded-xl bg-destructive/10 p-3 text-xs font-medium text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{resetError}</span>
+              </div>
+            )}
+
+            <div className="mt-5 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setResetModalOpen(false)}
+                disabled={resetting}
+                className="rounded-xl border border-border/80 bg-background px-4 py-2.5 text-xs font-bold text-muted-foreground transition-all hover:bg-muted/40 hover:text-foreground disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleReset()}
+                disabled={
+                  resetting
+                  || resetCountdown > 0
+                  || !session?.label
+                  || resetConfirmation.trim() !== session.label
+                }
+                className="rounded-xl bg-destructive px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {resetting
+                  ? 'Deleting...'
+                  : resetCountdown > 0
+                    ? `Yes, delete permanently (${resetCountdown})`
+                    : 'Yes, delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

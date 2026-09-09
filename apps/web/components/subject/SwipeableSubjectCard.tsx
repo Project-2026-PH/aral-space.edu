@@ -2,11 +2,11 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Subject } from '@quiz-creator/types';
-import { BookOpen, ExternalLink, Eye, Link2, Lock, Pencil, Share2, Trash2 } from 'lucide-react';
+import { BookOpen, ExternalLink, Eye, Link2, Lock, Pencil, Share2, Trash2, Archive } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-const REVEAL_WIDTH = 144; // 72px per action button
+const REVEAL_WIDTH = 216; // 72px per action button
 const SWIPE_THRESHOLD = 50;
 
 interface SwipeableSubjectCardProps {
@@ -25,6 +25,7 @@ interface SwipeableSubjectCardProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onArchive: () => void;
   onShare: () => void;
 }
 
@@ -44,6 +45,7 @@ export default function SwipeableSubjectCard({
   onClose,
   onEdit,
   onDelete,
+  onArchive,
   onShare
 }: SwipeableSubjectCardProps) {
   const router = useRouter();
@@ -227,6 +229,22 @@ export default function SwipeableSubjectCard({
             <span className="text-[11px] font-black uppercase tracking-wider">Edit</span>
           </button>
 
+          {/* Archive Action Button */}
+          <button
+            type="button"
+            aria-label={`Archive ${subject.name}`}
+            tabIndex={isOpen ? 0 : -1}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+              onArchive();
+            }}
+            className="flex w-[72px] flex-col items-center justify-center gap-1 border-l-2 border-slate-900 bg-amber-500 active:bg-amber-600 text-slate-900 font-black transition-all cursor-pointer select-none"
+          >
+            <Archive className="h-5 w-5 stroke-[2.5]" />
+            <span className="text-[11px] font-black uppercase tracking-wider">Archive</span>
+          </button>
+
           {/* Delete Action Button */}
           <button
             type="button"
@@ -362,6 +380,17 @@ export default function SwipeableSubjectCard({
                   className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-blue-500 hover:text-white hover:border-slate-900 hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
                 >
                   <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Archive ${subject.name}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onArchive();
+                  }}
+                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-amber-500 hover:text-slate-900 hover:border-slate-900 hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+                >
+                  <Archive className="h-3.5 w-3.5" />
                 </button>
                 <button
                   type="button"

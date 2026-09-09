@@ -84,6 +84,43 @@ export class CachedQuizRepository implements IQuizRepository {
     return result;
   }
 
+  async archiveSubject(subjectId: string, userId?: string): Promise<boolean> {
+    const result = await this.underlying.archiveSubject(subjectId, userId);
+    this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
+    this.cache.deleteByPrefix('quiz:');
+    this.cache.deleteByPrefix('questions:');
+    this.cache.deleteByPrefix('public_subject:');
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('archived_subjects:');
+    this.cache.deleteByPrefix('archived_quizzes:');
+    return result;
+  }
+
+  async restoreSubject(subjectId: string, userId?: string): Promise<boolean> {
+    const result = await this.underlying.restoreSubject(subjectId, userId);
+    this.cache.deleteByPrefix('subjects:');
+    this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
+    this.cache.deleteByPrefix('quiz:');
+    this.cache.deleteByPrefix('questions:');
+    this.cache.deleteByPrefix('public_subject:');
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('archived_subjects:');
+    this.cache.deleteByPrefix('archived_quizzes:');
+    return result;
+  }
+
+  async listArchivedSubjects(userId: string): Promise<Subject[]> {
+    const key = `archived_subjects:${userId}`;
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached;
+    const subjects = await this.underlying.listArchivedSubjects(userId);
+    this.cache.set(key, subjects);
+    return subjects;
+  }
+
   async getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null> {
     return this.underlying.getSubjectAccess(subjectId, userId);
   }
@@ -215,6 +252,47 @@ export class CachedQuizRepository implements IQuizRepository {
     this.cache.deleteByPrefix('public_quiz:');
     this.cache.deleteByPrefix('public_subject:');
     return result;
+  }
+
+  async archiveQuiz(id: string, userId?: string): Promise<boolean> {
+    const result = await this.underlying.archiveQuiz(id, userId);
+    this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
+    this.cache.deleteByPrefix(`quiz:${id}`);
+    this.cache.deleteByPrefix(`questions:${id}:`);
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('public_subject:');
+    this.cache.deleteByPrefix('archived_quizzes:');
+    return result;
+  }
+
+  async restoreQuiz(id: string, userId?: string): Promise<boolean> {
+    const result = await this.underlying.restoreQuiz(id, userId);
+    this.cache.deleteByPrefix('quizzes:');
+    this.cache.deleteByPrefix('library:');
+    this.cache.deleteByPrefix(`quiz:${id}`);
+    this.cache.deleteByPrefix(`questions:${id}:`);
+    this.cache.deleteByPrefix('public_quiz:');
+    this.cache.deleteByPrefix('public_subject:');
+    this.cache.deleteByPrefix('archived_quizzes:');
+    return result;
+  }
+
+  async listArchivedQuizzes(userId: string): Promise<Quiz[]> {
+    const key = `archived_quizzes:${userId}`;
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached;
+    const quizzes = await this.underlying.listArchivedQuizzes(userId);
+    this.cache.set(key, quizzes);
+    return quizzes;
+  }
+
+  async purgeUserData(userId: string): Promise<void> {
+    if (!this.underlying.purgeUserData) {
+      throw new Error('Underlying quiz repository does not support guest data deletion');
+    }
+    await this.underlying.purgeUserData(userId);
+    this.cache.clear();
   }
 
   async getQuestionsByQuizId(quizId: string, userId?: string): Promise<QuizQuestion[]> {

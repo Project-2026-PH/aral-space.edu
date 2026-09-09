@@ -35,4 +35,12 @@ export class SupabaseSessionRepository implements ISessionRepository {
   }
   async batchSaveQuestionProgress(progressList: QuestionProgress[], userId?: string) { if (userId) return Promise.all(progressList.map((progress) => this.saveQuestionProgress(progress, userId))); if (!progressList.length) return []; const { data, error } = await this.supabase.from('quiz_question_progress').upsert(progressList.map((p) => ({ session_id: p.session_id, question_id: p.question_id, streak_count: p.streak_count, has_missed: p.has_missed, locked: p.locked, locked_at: p.locked_at || null })), { onConflict: 'session_id,question_id' }).select('*'); if (error) throw error; return data || [];
   }
+
+  async purgeUserData(userId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('quiz_sessions')
+      .delete()
+      .eq('user_id', userId);
+    if (error) throw error;
+  }
 }

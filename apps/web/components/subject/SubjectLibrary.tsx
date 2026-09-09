@@ -18,6 +18,7 @@ interface SubjectLibraryProps {
   maxItems?: number;
   onViewAll?: () => void;
   onSubjectDeleted?: (subjectId: string) => void;
+  onSubjectArchived?: (subjectId: string) => void;
   onSubjectUpdated?: (subjectId: string, config: Partial<Subject>) => void;
 }
 
@@ -31,6 +32,7 @@ export default function SubjectLibrary({
   maxItems,
   onViewAll,
   onSubjectDeleted,
+  onSubjectArchived,
   onSubjectUpdated
 }: SubjectLibraryProps) {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
@@ -127,6 +129,10 @@ export default function SubjectLibrary({
                 onDelete={() => {
                   setSwipedSubjectId(null);
                   setDeleteSubject(subject);
+                }}
+                onArchive={() => {
+                  setSwipedSubjectId(null);
+                  onSubjectArchived?.(subject.id);
                 }}
                 onShare={() => setSelectedSubject(subject)}
               />

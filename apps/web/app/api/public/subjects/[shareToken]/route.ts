@@ -13,7 +13,7 @@ export const GET = createApiRoute<{ shareToken: string }>(async ({ req, params }
   const subject = await getCachedPublicSubject(token);
   if (!subject) return NextResponse.json({ error: 'Subject not found or access is restricted' }, { status: 404 });
   return { ...subject, quizzes: Array.isArray(subject.quizzes) ? subject.quizzes : [] };
-}, { cache: 'public', skipAuth: true });
+}, { cache: 'noStore', skipAuth: true });
 
 export const POST = createApiRoute<{ shareToken: string }>(async ({ req, params, userId }) => {
   const token = boundedString(params.shareToken, 'shareToken', 128, true)!;

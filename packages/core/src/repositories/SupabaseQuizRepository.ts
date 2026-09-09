@@ -81,11 +81,11 @@ export class SupabaseQuizRepository implements IQuizRepository {
       if (membershipError) throw membershipError;
       const memberIds = new Set((memberships || []).map((membership: any) => membership.subject_id));
       return ((data || []) as Subject[])
-        .filter((subject) => !userId
+        .filter((subject) => subject.archived_at == null && (!userId
           ? isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)
           : subject.user_id === userId
             || memberIds.has(subject.id)
-            || isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at))
+            || isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)))
         .map((subject) => ({
           ...subject,
           viewer_count: subject.user_id === userId ? subject.viewer_count : 0
@@ -116,10 +116,10 @@ export class SupabaseQuizRepository implements IQuizRepository {
     try {
       const { data: subject, error } = await this.supabase
         .from('subjects')
-        .select('id, user_id, is_public, share_expires_at, share_revoked_at')
+        .select('id, user_id, archived_at, is_public, share_expires_at, share_revoked_at')
         .eq('id', subjectId)
         .maybeSingle();
-      if (error || !subject || subject.user_id === viewerId) return;
+      if (error || !subject || subject.archived_at || subject.user_id === viewerId) return;
       const access = await this.getSubjectAccess(subjectId, viewerId);
       const isPublic = isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at);
       if (!access && !isPublic) return;
@@ -168,10 +168,10 @@ export class SupabaseQuizRepository implements IQuizRepository {
     try {
       const { data: subject, error } = await this.supabase
         .from('subjects')
-        .select('id, user_id, is_public, share_expires_at, share_revoked_at')
+        .select('id, user_id, archived_at, is_public, share_expires_at, share_revoked_at')
         .eq('id', subjectId)
         .maybeSingle();
-      if (error || !subject) return null;
+      if (error || !subject || subject.archived_at) return null;
       if (userId && subject.user_id === userId) {
         return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
       }
@@ -203,8 +203,8 @@ export class SupabaseQuizRepository implements IQuizRepository {
       if (error) throw error;
       const quizzes = (data || []) as Quiz[];
       return access.role === 'public'
-        ? quizzes.filter((quiz) => isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at))
-        : quizzes;
+        ? quizzes.filter((quiz) => quiz.archived_at == null && quiz.subject?.archived_at == null && isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at))
+        : quizzes.filter((quiz) => quiz.archived_at == null && quiz.subject?.archived_at == null);
     } catch (e) {}
     return this.fallback.listQuizzesBySubject(subjectId, userId);
   }
@@ -259,6 +259,284 @@ export class SupabaseQuizRepository implements IQuizRepository {
       if (!deleteError) return Boolean(deletedSubject && deletedSubject.length > 0);
     } catch (e) {}
     return false;
+  }
+
+  async archiveSubject(subjectId: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Authenticated user required for subject management');
+
+    const archivedAt = new Date().toISOString();
+    let mutationStarted = false;
+    let childStates: Array<{ id: string; archivedBySubject: boolean }> = [];
+
+    try {
+      const { data: subject, error: subjectError } = await this.supabase
+        .from('subjects')
+        .select('id, archived_at')
+        .eq('id', subjectId)
+        .eq('user_id', userId)
+        .is('archived_at', null)
+        .maybeSingle();
+      if (subjectError) throw subjectError;
+      if (!subject) return false;
+
+      const { data: activeChildren, error: childReadError } = await this.supabase
+        .from('quizzes')
+        .select('id, archived_by_subject')
+        .eq('subject_id', subjectId)
+        .is('archived_at', null);
+      if (childReadError) throw childReadError;
+
+      childStates = (activeChildren || []).map((child: any) => ({
+        id: String(child.id),
+        archivedBySubject: Boolean(child.archived_by_subject),
+      }));
+
+      // Hide the parent first. If reviewer compensation later fails, the
+      // subject remains archived rather than exposing a partial cascade.
+      mutationStarted = true;
+      const { data, error } = await this.supabase
+        .from('subjects')
+        .update({ archived_at: archivedAt })
+        .eq('id', subjectId)
+        .eq('user_id', userId)
+        .is('archived_at', null)
+        .select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('Subject changed while archiving');
+
+      if (childStates.length > 0) {
+        const { data: archivedChildren, error: quizError } = await this.supabase
+          .from('quizzes')
+          .update({ archived_at: archivedAt, archived_by_subject: true })
+          .eq('subject_id', subjectId)
+          .in('id', childStates.map((child) => child.id))
+          .is('archived_at', null)
+          .select('id');
+        if (quizError) throw quizError;
+        if ((archivedChildren || []).length !== childStates.length) {
+          throw new Error('Subject reviewers changed while archiving');
+        }
+      }
+      return true;
+    } catch (error) {
+      if (!mutationStarted) return this.fallback.archiveSubject(subjectId, userId);
+
+      const rollbackErrors: string[] = [];
+      const statesByFlag = new Map<string, string[]>();
+      for (const child of childStates) {
+        const key = String(child.archivedBySubject);
+        const ids = statesByFlag.get(key) || [];
+        ids.push(child.id);
+        statesByFlag.set(key, ids);
+      }
+
+      for (const [archivedBySubject, ids] of statesByFlag.entries()) {
+        try {
+          const { error: rollbackError } = await this.supabase
+            .from('quizzes')
+            .update({ archived_at: null, archived_by_subject: archivedBySubject === 'true' })
+            .in('id', ids)
+            .eq('archived_at', archivedAt)
+            .select('id');
+          if (rollbackError) {
+            rollbackErrors.push(`reviewer rollback: ${rollbackError.message}`);
+          } else {
+            const { data: remainingChildren, error: verifyError } = await this.supabase
+              .from('quizzes')
+              .select('id')
+              .in('id', ids)
+              .eq('archived_at', archivedAt);
+            if (verifyError) rollbackErrors.push(`reviewer rollback verification: ${verifyError.message}`);
+            else if ((remainingChildren || []).length > 0) rollbackErrors.push('reviewer rollback verification: archived reviewers remain');
+          }
+        } catch (rollbackError: any) {
+          rollbackErrors.push(`reviewer rollback: ${rollbackError?.message || String(rollbackError)}`);
+        }
+      }
+
+      // Keep the subject archived if reviewer compensation failed; that is safer
+      // than making an active subject whose reviewers are still hidden.
+      if (rollbackErrors.length === 0) {
+        try {
+          const { error: rollbackError } = await this.supabase
+            .from('subjects')
+            .update({ archived_at: null })
+            .eq('id', subjectId)
+            .eq('user_id', userId)
+            .eq('archived_at', archivedAt)
+            .select('id');
+          if (rollbackError) {
+            rollbackErrors.push(`subject rollback: ${rollbackError.message}`);
+          } else {
+            const { data: remainingSubject, error: verifyError } = await this.supabase
+              .from('subjects')
+              .select('id')
+              .eq('id', subjectId)
+              .eq('user_id', userId)
+              .eq('archived_at', archivedAt);
+            if (verifyError) rollbackErrors.push(`subject rollback verification: ${verifyError.message}`);
+            else if ((remainingSubject || []).length > 0) rollbackErrors.push('subject rollback verification: archived subject remains');
+          }
+        } catch (rollbackError: any) {
+          rollbackErrors.push(`subject rollback: ${rollbackError?.message || String(rollbackError)}`);
+        }
+      }
+
+      if (rollbackErrors.length > 0) {
+        throw new Error(`Subject archive failed and rollback was incomplete: ${rollbackErrors.join('; ')}`);
+      }
+      throw error;
+    }
+  }
+
+  async restoreSubject(subjectId: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Authenticated user required for subject management');
+
+    let mutationStarted = false;
+    let subjectMutationStarted = false;
+    let originalArchivedAt: string | null = null;
+    let childStates: Array<{ id: string; archivedAt: string }> = [];
+
+    try {
+      const { data: subject, error: subjectError } = await this.supabase
+        .from('subjects')
+        .select('id, archived_at')
+        .eq('id', subjectId)
+        .eq('user_id', userId)
+        .not('archived_at', 'is', null)
+        .maybeSingle();
+      if (subjectError) throw subjectError;
+      if (!subject) return false;
+      originalArchivedAt = subject.archived_at;
+      if (!originalArchivedAt) return false;
+
+      const { data: archivedChildren, error: childReadError } = await this.supabase
+        .from('quizzes')
+        .select('id, archived_at')
+        .eq('subject_id', subjectId)
+        .eq('archived_by_subject', true)
+        .not('archived_at', 'is', null);
+      if (childReadError) throw childReadError;
+      childStates = (archivedChildren || []).map((child: any) => ({
+        id: String(child.id),
+        archivedAt: String(child.archived_at),
+      }));
+
+      mutationStarted = true;
+      if (childStates.length > 0) {
+        const { data: restoredChildren, error: quizError } = await this.supabase
+          .from('quizzes')
+          .update({ archived_at: null, archived_by_subject: false })
+          .eq('subject_id', subjectId)
+          .in('id', childStates.map((child) => child.id))
+          .eq('archived_by_subject', true)
+          .not('archived_at', 'is', null)
+          .select('id');
+        if (quizError) throw quizError;
+        if ((restoredChildren || []).length !== childStates.length) {
+          throw new Error('Subject reviewers changed while restoring');
+        }
+      }
+
+      // Restore the parent last so reviewers remain hidden while the child
+      // state is being repaired.
+      subjectMutationStarted = true;
+      const { data, error } = await this.supabase
+        .from('subjects')
+        .update({ archived_at: null })
+        .eq('id', subjectId)
+        .eq('user_id', userId)
+        .not('archived_at', 'is', null)
+        .select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('Subject changed while restoring');
+      return true;
+    } catch (error) {
+      if (!mutationStarted) return this.fallback.restoreSubject(subjectId, userId);
+
+      const rollbackErrors: string[] = [];
+      const statesByArchivedAt = new Map<string, string[]>();
+      for (const child of childStates) {
+        const ids = statesByArchivedAt.get(child.archivedAt) || [];
+        ids.push(child.id);
+        statesByArchivedAt.set(child.archivedAt, ids);
+      }
+
+      for (const [archivedAt, ids] of statesByArchivedAt.entries()) {
+        try {
+          const { error: rollbackError } = await this.supabase
+            .from('quizzes')
+            .update({ archived_at: archivedAt, archived_by_subject: true })
+            .in('id', ids)
+            .is('archived_at', null)
+            .eq('archived_by_subject', false)
+            .select('id');
+          if (rollbackError) {
+            rollbackErrors.push(`reviewer rollback: ${rollbackError.message}`);
+          } else {
+            const { data: remainingChildren, error: verifyError } = await this.supabase
+              .from('quizzes')
+              .select('id')
+              .in('id', ids)
+              .is('archived_at', null)
+              .eq('archived_by_subject', false);
+            if (verifyError) rollbackErrors.push(`reviewer rollback verification: ${verifyError.message}`);
+            else if ((remainingChildren || []).length > 0) rollbackErrors.push('reviewer rollback verification: active reviewers remain');
+          }
+        } catch (rollbackError: any) {
+          rollbackErrors.push(`reviewer rollback: ${rollbackError?.message || String(rollbackError)}`);
+        }
+      }
+
+      // If the parent update was attempted, restore its archived state even
+      // when reviewer compensation failed. An archived parent keeps any
+      // remaining child inconsistency out of the active library.
+      if (subjectMutationStarted && originalArchivedAt) {
+        try {
+          const { error: rollbackError } = await this.supabase
+            .from('subjects')
+            .update({ archived_at: originalArchivedAt })
+            .eq('id', subjectId)
+            .eq('user_id', userId)
+            .is('archived_at', null)
+            .select('id');
+          if (rollbackError) {
+            rollbackErrors.push(`subject rollback: ${rollbackError.message}`);
+          } else {
+            const { data: activeSubject, error: verifyError } = await this.supabase
+              .from('subjects')
+              .select('id')
+              .eq('id', subjectId)
+              .eq('user_id', userId)
+              .is('archived_at', null);
+            if (verifyError) rollbackErrors.push(`subject rollback verification: ${verifyError.message}`);
+            else if ((activeSubject || []).length > 0) rollbackErrors.push('subject rollback verification: active subject remains');
+          }
+        } catch (rollbackError: any) {
+          rollbackErrors.push(`subject rollback: ${rollbackError?.message || String(rollbackError)}`);
+        }
+      }
+
+      if (rollbackErrors.length > 0) {
+        throw new Error(`Subject restore failed and rollback was incomplete: ${rollbackErrors.join('; ')}`);
+      }
+      throw error;
+    }
+  }
+
+  async listArchivedSubjects(userId: string): Promise<Subject[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('subjects')
+        .select('*')
+        .eq('user_id', userId)
+        .not('archived_at', 'is', null)
+        .order('archived_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as Subject[];
+    } catch (error) {
+      return this.fallback.listArchivedSubjects(userId);
+    }
   }
 
   async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
@@ -320,19 +598,20 @@ export class SupabaseQuizRepository implements IQuizRepository {
     try {
       const { data: subject, error: subjectError } = await this.supabase
         .from('subjects')
-        .select('id, name, color, share_token, is_public, share_expires_at, share_revoked_at, created_at')
+        .select('id, name, color, archived_at, share_token, is_public, share_expires_at, share_revoked_at, created_at')
         .eq('share_token', shareToken)
         .maybeSingle();
       if (subjectError) throw subjectError;
-      if (!subject || !isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)) return null;
+      if (!subject || subject.archived_at || !isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)) return null;
       const { data: quizzes, error: quizzesError } = await this.supabase
         .from('quizzes')
-        .select('id, title, description, question_count, generated_at, share_token, is_public, share_expires_at, share_revoked_at, created_at')
+        .select('id, title, description, question_count, generated_at, archived_at, share_token, is_public, share_expires_at, share_revoked_at, created_at')
         .eq('subject_id', subject.id)
         .order('generated_at', { ascending: false });
       if (quizzesError) throw quizzesError;
       const activeQuizzes = (quizzes || []).filter((quiz: any) =>
         isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)
+        && quiz.archived_at == null
       );
       return toPublicSubjectDto(subject as Subject, activeQuizzes as Quiz[]);
     } catch (error) {
@@ -364,18 +643,22 @@ export class SupabaseQuizRepository implements IQuizRepository {
         : { data: [], error: null };
       if (membershipError) throw membershipError;
       const subjectIds = new Set((memberships || []).map((row: any) => row.subject_id));
-      const quizzes = ((data || []) as Quiz[]).filter((quiz) => !userId
-        ? isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)
-        : quiz.user_id === userId
-          || (quiz.subject_id ? subjectIds.has(quiz.subject_id) : false)
-          || isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at));
+      const quizzes = ((data || []) as Quiz[]).filter((quiz) =>
+        quiz.archived_at == null
+        && (!quiz.subject || quiz.subject.archived_at == null)
+        && (!userId
+          ? isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)
+          : quiz.user_id === userId
+            || (quiz.subject_id ? subjectIds.has(quiz.subject_id) : false)
+            || isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at))
+      );
       return quizzes.map((quiz) => {
         const subject = quiz.subject;
         const subjectIsVisible = !subject
-          || !userId
+          || subject.archived_at == null && (!userId
           || subject.user_id === userId
           || subjectIds.has(subject.id)
-          || isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at);
+          || isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at));
         return subjectIsVisible ? quiz : { ...quiz, subject: null };
       });
     } catch (e) {}
@@ -424,6 +707,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
       if (!data) return null;
 
       const quiz = data as Quiz;
+      if (quiz.archived_at || quiz.subject?.archived_at) return null;
       let subjectIds = new Set<string>();
       if (userId) {
         const { data: memberships, error: membershipError } = await this.supabase
@@ -532,6 +816,132 @@ export class SupabaseQuizRepository implements IQuizRepository {
       if (!error) return (count || 0) > 0;
     } catch (e) {}
     return this.fallback.deleteQuiz(id, userId);
+  }
+
+  async archiveQuiz(id: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Authenticated user required for quiz management');
+    try {
+      const { data, error } = await this.supabase
+        .from('quizzes')
+        .update({ archived_at: new Date().toISOString(), archived_by_subject: false })
+        .eq('id', id)
+        .eq('user_id', userId)
+        .is('archived_at', null)
+        .select('id');
+      if (error) throw error;
+      return Boolean(data?.length);
+    } catch (error) {
+      return this.fallback.archiveQuiz(id, userId);
+    }
+  }
+
+  async restoreQuiz(id: string, userId?: string): Promise<boolean> {
+    if (!userId) throw new Error('Authenticated user required for quiz management');
+    try {
+      const { data, error } = await this.supabase
+        .from('quizzes')
+        .update({ archived_at: null, archived_by_subject: false })
+        .eq('id', id)
+        .eq('user_id', userId)
+        .not('archived_at', 'is', null)
+        .select('id');
+      if (error) throw error;
+      return Boolean(data?.length);
+    } catch (error) {
+      return this.fallback.restoreQuiz(id, userId);
+    }
+  }
+
+  async listArchivedQuizzes(userId: string): Promise<Quiz[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('quizzes')
+        .select('*, subject:subjects(*)')
+        .eq('user_id', userId)
+        .not('archived_at', 'is', null)
+        .order('archived_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as Quiz[];
+    } catch (error) {
+      return this.fallback.listArchivedQuizzes(userId);
+    }
+  }
+
+  async purgeUserData(userId: string): Promise<void> {
+    const { data: ownedSubjects, error: subjectReadError } = await this.supabase
+      .from('subjects')
+      .select('id')
+      .eq('user_id', userId);
+    if (subjectReadError) throw subjectReadError;
+
+    const subjectIds = (ownedSubjects || []).map((subject) => subject.id);
+    if (subjectIds.length > 0) {
+      const { error } = await this.supabase
+        .from('quizzes')
+        .delete()
+        .in('subject_id', subjectIds)
+        .is('user_id', null);
+      if (error) throw error;
+    }
+
+    const { error: quizDeleteError } = await this.supabase
+      .from('quizzes')
+      .delete()
+      .eq('user_id', userId);
+    if (quizDeleteError) throw quizDeleteError;
+
+    const { error: subjectDeleteError } = await this.supabase
+      .from('subjects')
+      .delete()
+      .eq('user_id', userId);
+    if (subjectDeleteError) throw subjectDeleteError;
+
+    const { error: collaboratorDeleteError } = await this.supabase
+      .from('subject_collaborators')
+      .delete()
+      .eq('user_id', userId);
+    if (collaboratorDeleteError) throw collaboratorDeleteError;
+
+    const { error: viewDeleteError } = await this.supabase
+      .from('subject_views')
+      .delete()
+      .eq('viewer_id', userId);
+    if (viewDeleteError) throw viewDeleteError;
+
+    // A redeemed guest identity can also be recorded on another owner's link.
+    // Remove only this identity from those rows; links belonging to deleted
+    // subjects were already removed by the subject delete cascade.
+    const { data: usedLinks, error: usedLinkReadError } = await this.supabase
+      .from('subject_collaborator_links')
+      .select('id, used_by, redeemed_by')
+      .eq('used_by', userId);
+    if (usedLinkReadError) throw usedLinkReadError;
+
+    const { data: redeemedLinks, error: redeemedLinkReadError } = await this.supabase
+      .from('subject_collaborator_links')
+      .select('id, used_by, redeemed_by')
+      .contains('redeemed_by', [userId]);
+    if (redeemedLinkReadError) throw redeemedLinkReadError;
+
+    const linksById = new Map<string, { id: string; used_by: string | null; redeemed_by: string[] | null }>();
+    for (const link of [...(usedLinks || []), ...(redeemedLinks || [])] as any[]) {
+      linksById.set(String(link.id), {
+        id: String(link.id),
+        used_by: link.used_by ?? null,
+        redeemed_by: Array.isArray(link.redeemed_by) ? link.redeemed_by : [],
+      });
+    }
+
+    for (const link of linksById.values()) {
+      const { error } = await this.supabase
+        .from('subject_collaborator_links')
+        .update({
+          used_by: link.used_by === userId ? null : link.used_by,
+          redeemed_by: (link.redeemed_by || []).filter((redeemedBy) => redeemedBy !== userId),
+        })
+        .eq('id', link.id);
+      if (error) throw error;
+    }
   }
 
   async getQuestionsByQuizId(quizId: string, userId?: string): Promise<QuizQuestion[]> {
@@ -753,7 +1163,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
         .eq('share_token', shareToken)
         .maybeSingle();
       if (error) throw error;
-      if (!quiz || !isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)) return null;
+      if (!quiz || quiz.archived_at || (quiz.subject as any)?.archived_at || !isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)) return null;
       const { data: questions, error: questionError } = await this.supabase
         .from('quiz_questions')
         .select('*')
@@ -769,9 +1179,9 @@ export class SupabaseQuizRepository implements IQuizRepository {
   async cloneQuizByShareToken(shareToken: string, userId?: string): Promise<Quiz> {
     let source: Quiz | null = null;
     try {
-      const { data, error } = await this.supabase.from('quizzes').select('*').eq('share_token', shareToken).maybeSingle();
+      const { data, error } = await this.supabase.from('quizzes').select('*, subject:subjects(*)').eq('share_token', shareToken).maybeSingle();
       if (error) throw error;
-      if (data && isShareTokenActive(data.is_public, data.share_expires_at, data.share_revoked_at)) source = data as Quiz;
+      if (data && data.archived_at == null && (!(data as any).subject || (data as any).subject.archived_at == null) && isShareTokenActive(data.is_public, data.share_expires_at, data.share_revoked_at)) source = data as Quiz;
       if (source) {
         if (!source.allow_cloning) throw new Error('Creator has disabled cloning for this study set.');
         const { data: questions, error: questionError } = await this.supabase.from('quiz_questions').select('*').eq('quiz_id', source.id).order('order_index', { ascending: true });

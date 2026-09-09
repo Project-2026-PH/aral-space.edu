@@ -14,6 +14,8 @@ export interface Quiz {
   subject_id?: string | null;
   user_id?: string | null;
   created_at?: string;
+  archived_at?: string | null;
+  archived_by_subject?: boolean;
   share_token?: string | null;
   is_public?: boolean;
   allow_cloning?: boolean;

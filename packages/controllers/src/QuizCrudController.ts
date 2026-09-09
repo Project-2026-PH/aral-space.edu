@@ -56,6 +56,9 @@ export class QuizCrudController {
   async createSubject(name: string, color: string, userId?: string) { return this.quizRepo.createSubject(name, color, userId); }
   async updateSubject(subjectId: string, dto: UpdateSubjectDto, userId?: string) { return this.quizRepo.updateSubject(subjectId, dto, userId); }
   async deleteSubject(subjectId: string, userId?: string) { return this.quizRepo.deleteSubject(subjectId, userId); }
+  async archiveSubject(subjectId: string, userId?: string) { return this.quizRepo.archiveSubject(subjectId, userId); }
+  async restoreSubject(subjectId: string, userId?: string) { return this.quizRepo.restoreSubject(subjectId, userId); }
+  async listArchivedSubjects(userId: string) { return this.quizRepo.listArchivedSubjects(userId); }
   async getSubjectAccess(subjectId: string, userId?: string) { return this.quizRepo.getSubjectAccess(subjectId, userId); }
   async listQuizzesBySubject(subjectId: string, userId?: string) { return this.quizRepo.listQuizzesBySubject(subjectId, userId); }
   async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string, maxUses?: number) { return this.quizRepo.createSubjectCollaboratorLink(subjectId, expiresAt, userId, maxUses); }
@@ -82,6 +85,9 @@ export class QuizCrudController {
   async createQuiz(dto: CreateQuizDto, userId?: string) { return this.quizRepo.createQuiz(dto, userId); }
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string) { return this.quizRepo.updateQuiz(id, dto, userId); }
   async deleteQuiz(id: string, userId?: string) { return this.quizRepo.deleteQuiz(id, userId); }
+  async archiveQuiz(id: string, userId?: string) { return this.quizRepo.archiveQuiz(id, userId); }
+  async restoreQuiz(id: string, userId?: string) { return this.quizRepo.restoreQuiz(id, userId); }
+  async listArchivedQuizzes(userId: string) { return this.quizRepo.listArchivedQuizzes(userId); }
   async addQuestion(quizId: string, dto: CreateQuestionDto, userId?: string) { return this.quizRepo.addQuestion(quizId, dto, userId); }
   async updateQuestion(quizId: string, questionId: string, dto: UpdateQuestionDto, userId?: string) { return this.quizRepo.updateQuestion(quizId, questionId, dto, userId); }
   async deleteQuestion(quizId: string, questionId: string, userId?: string) { return this.quizRepo.deleteQuestion(quizId, questionId, userId); }

@@ -153,16 +153,6 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
                 Share & collaborate
               </button>
             )}
-            {subject.share_token && isPublic && (
-              <Link
-                href={`/subjects/share/${subject.share_token}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
-              >
-                <ExternalLink className="h-3.5 w-3.5 stroke-[2.5]" /> Public page
-              </Link>
-            )}
           </div>
         </div>
         {error && (

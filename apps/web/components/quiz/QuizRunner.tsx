@@ -85,6 +85,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
     isExplanationVisible,
     hasRestoredProgress,
     isProgressHydrated,
+    isRefreshingQuestions,
     isCompleted,
     isMuted,
     cardTelemetry,
@@ -250,6 +251,41 @@ export default function QuizRunner(props: QuizRunnerProps) {
   if (!isProgressHydrated) {
     return <div className="mx-auto flex min-h-[50vh] max-w-md items-center justify-center text-center text-xs text-muted-foreground">Restoring your quiz progress...</div>;
   }
+
+  if (isRefreshingQuestions) {
+    return (
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="h-4 w-32 rounded-full bg-muted" />
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-full bg-muted" />
+            <div className="h-7 w-7 rounded-full bg-muted" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="h-2 w-full rounded-full bg-muted" />
+        </div>
+        <div className="min-h-[480px] rounded-3xl border border-border/40 bg-card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-24 rounded-full bg-muted" />
+            <div className="h-3 w-16 rounded-full bg-muted" />
+          </div>
+          <div className="space-y-3 pt-4">
+            <div className="h-4 w-full rounded-full bg-muted" />
+            <div className="h-4 w-4/5 rounded-full bg-muted" />
+            <div className="h-4 w-3/5 rounded-full bg-muted" />
+          </div>
+          <div className="grid grid-cols-2 gap-3 pt-6">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-14 rounded-2xl border border-border/40 bg-muted/40" />
+            ))}
+          </div>
+        </div>
+        <p className="text-center text-xs text-muted-foreground">Syncing latest questions…</p>
+      </div>
+    );
+  }
+
 
   if (isCompleted) {
     const summary = sessionSummary;

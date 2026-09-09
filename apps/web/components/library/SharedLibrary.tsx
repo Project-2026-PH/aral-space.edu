@@ -49,6 +49,7 @@ export default function SharedLibrary({ subjects, quizzes, viewerId, maxItems, o
         loading={false}
         subjects={subjects}
         heading="Shared Reviewers"
+        readOnly
         maxItems={maxItems}
         onViewAll={onViewAll}
       />

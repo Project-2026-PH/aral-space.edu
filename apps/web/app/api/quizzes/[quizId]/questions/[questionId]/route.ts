@@ -10,7 +10,7 @@ import {
 } from '@/lib/request-security';
 import { SECURITY_LIMITS } from '@/lib/security-config';
 import { parseUpdateQuestion } from '@/lib/request-validation';
-import { revalidatePublicQuizTag, revalidateQuizTag } from '@/lib/cached-queries';
+import { revalidatePublicQuizTag, revalidateQuizTag, revalidateUserLists } from '@/lib/cached-queries';
 import { hasReviewerEditAccess } from '@/lib/quiz-access';
 
 function errorResponse(error: any): NextResponse {
@@ -34,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ qu
     const updated = await controller.updateQuestion(quizId, questionId, parseUpdateQuestion(body), userId);
     if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);
+    revalidateUserLists(userId);
     return NextResponse.json(updated);
   } catch (err: any) {
     return errorResponse(err);
@@ -55,6 +56,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ q
     const success = await controller.deleteQuestion(quizId, questionId, userId);
     if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);
+    revalidateUserLists(userId);
     return NextResponse.json({ success });
   } catch (err: any) {
     return errorResponse(err);

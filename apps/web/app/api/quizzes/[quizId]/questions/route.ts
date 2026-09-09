@@ -12,7 +12,7 @@ import {
 } from '@/lib/request-security';
 import { SECURITY_LIMITS } from '@/lib/security-config';
 import { parseCreateQuestion } from '@/lib/request-validation';
-import { revalidatePublicQuizTag, revalidateQuizTag } from '@/lib/cached-queries';
+import { revalidatePublicQuizTag, revalidateQuizTag, revalidateUserLists } from '@/lib/cached-queries';
 import { hasReviewerEditAccess } from '@/lib/quiz-access';
 
 function errorResponse(error: any): NextResponse {
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ qui
     const created = await controller.addQuestion(quizId, parseCreateQuestion(body), userId);
     if (accessibleQuiz.share_token) revalidatePublicQuizTag(accessibleQuiz.share_token);
     revalidateQuizTag(quizId, userId);
+    revalidateUserLists(userId);
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
     return errorResponse(err);

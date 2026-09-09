@@ -152,10 +152,11 @@ export function useQuizSession({
       : optionReadyQuestions;
   }, [initialQuestions, mode]);
 
-  const [questions] = useState<QuizQuestion[]>(() => {
+  const [questions, setQuestions] = useState<QuizQuestion[]>(() => {
     if (shuffleQuestions) return [...processedQuestions].sort(() => Math.random() - 0.5);
     return processedQuestions;
   });
+  const [isRefreshingQuestions, setIsRefreshingQuestions] = useState(false);
   const [session] = useState<QuizSession>(initialSession);
   const initialProgressMap = useMemo(() => {
     const sourceMap = new Map(initialProgress.map((progress) => [progress.question_id, progress]));
@@ -451,14 +452,38 @@ export function useQuizSession({
     setIsExplanationVisible(false);
   }, [activeQuestion?.id, shuffleOptions]);
 
-  function startStruggleReview(ids: string[] = accumulatedStruggleIds): void {
+  async function refreshQuestionsFromApi(): Promise<QuizQuestion[]> {
+    try {
+      setIsRefreshingQuestions(true);
+      const res = await fetch(`/api/quizzes/${quiz.id}`, { cache: 'no-store' });
+      if (!res.ok) return questions;
+      const data = await res.json() as { questions?: QuizQuestion[] };
+      if (!Array.isArray(data.questions) || data.questions.length === 0) return questions;
+      const freshProcessed = QuizTransformService.prepareQuestionsForOptions(data.questions);
+      const freshQuestions = mode === 'reverse'
+        ? QuizTransformService.generateReverseQuestions(freshProcessed)
+        : freshProcessed;
+      setQuestions(freshQuestions);
+      return freshQuestions;
+    } catch {
+      return questions;
+    } finally {
+      setIsRefreshingQuestions(false);
+    }
+  }
+
+  async function startStruggleReview(ids: string[] = accumulatedStruggleIds): Promise<void> {
     if (ids.length === 0) return;
-    setAccumulatedStruggleIds(ids);
+    const freshQuestions = await refreshQuestionsFromApi();
+    // Re-filter ids to only those that still exist after the refresh
+    const validIds = ids.filter((id) => freshQuestions.some((q) => q.id === id));
+    if (validIds.length === 0) return;
+    setAccumulatedStruggleIds(validIds);
     setIsCompleted(false);
     celebrationFiredRef.current = false;
     completionSyncStartedRef.current = false;
     setIsStruggleReviewMode(true);
-    setQueueState(CognitiveMasteryQueue.initialize(ids));
+    setQueueState(CognitiveMasteryQueue.initialize(validIds));
   }
 
   function answerQuestion(option: ShuffledOption | undefined, typedAnswerMode?: 'learn' | 'identification'): void {
@@ -572,7 +597,7 @@ export function useQuizSession({
       ...accumulatedStruggleIds,
       ...nextQueue.strugglePile
     ]));
-    if (struggleIds.length > 0) startStruggleReview(struggleIds);
+    if (struggleIds.length > 0) void startStruggleReview(struggleIds);
     else complete();
   }
 
@@ -824,6 +849,7 @@ export function useQuizSession({
     pendingAnswerEvents,
     hasRestoredProgress,
     isProgressHydrated,
+    isRefreshingQuestions,
     isCompleted,
     isMuted,
     cardTelemetry: telemetry.records,

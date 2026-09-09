@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sub
     const repository = await getQuizRepository();
     const controller = new QuizCrudController(repository);
     const access = await controller.getSubjectAccess(subjectId, userId);
-    if (!access?.can_manage) return NextResponse.json({ error: 'Only the subject owner can archive it.' }, { status: 403 });
+    if (!access?.can_archive) return NextResponse.json({ error: 'You do not have permission to archive this subject.' }, { status: 403 });
     const archived = await controller.archiveSubject(subjectId, userId);
     if (!archived) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
     revalidateUserQuizDetails(userId);

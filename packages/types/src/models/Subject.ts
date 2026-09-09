@@ -24,6 +24,8 @@ export interface SubjectAccess {
   can_edit_reviewers: boolean;
   /** Can share or delete the subject. Owner-only. */
   can_manage: boolean;
+  /** Can hide this subject and its sets from this user's library. Personal to the user. */
+  can_archive: boolean;
 }
 
 export interface SubjectCollaboratorLink {

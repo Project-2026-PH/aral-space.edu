@@ -215,7 +215,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
       if (error || !subject || subject.archived_at) return null;
       if (userId && (await this.getUserArchiveIds(userId)).subjectIds.has(subjectId)) return null;
       if (userId && subject.user_id === userId) {
-        return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
+        return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true, can_archive: true };
       }
       if (userId) {
         const { data: member } = await this.supabase
@@ -224,10 +224,10 @@ export class SupabaseQuizRepository implements IQuizRepository {
           .eq('subject_id', subjectId)
           .eq('user_id', userId)
           .maybeSingle();
-        if (member) return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+        if (member) return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false, can_archive: true };
       }
       if (isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)) {
-        return { subject_id: subjectId, role: 'public', can_edit: false, can_edit_reviewers: false, can_manage: false };
+        return { subject_id: subjectId, role: 'public', can_edit: false, can_edit_reviewers: false, can_manage: false, can_archive: Boolean(userId) };
       }
     } catch (e) {}
     return this.fallback.getSubjectAccess(subjectId, userId);
@@ -274,7 +274,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
       const { data: consumed, error } = await this.supabase.from('subject_collaborator_links').update({ used_at: new Date().toISOString(), used_by: userId }).eq('token', token).is('used_at', null).select('subject_id').maybeSingle();
       if (error || !consumed) return null;
       await this.supabase.from('subject_collaborators').upsert({ subject_id: consumed.subject_id, user_id: userId });
-      return { subject_id: consumed.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+      return { subject_id: consumed.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false, can_archive: true };
     } catch (e) {}
     return this.fallback.redeemSubjectCollaboratorLink(token, userId);
   }
@@ -314,11 +314,13 @@ export class SupabaseQuizRepository implements IQuizRepository {
     let cascadeQuizIds: string[] = [];
     let cascadeArchivedAt: string | null = null;
     try {
+      const access = await this.getSubjectAccess(subjectId, userId);
+      if (!access?.can_archive) return false;
+
       const { data: subject, error: subjectError } = await this.supabase
         .from('subjects')
         .select('id')
         .eq('id', subjectId)
-        .eq('user_id', userId)
         .is('archived_at', null)
         .maybeSingle();
       if (subjectError) throw subjectError;

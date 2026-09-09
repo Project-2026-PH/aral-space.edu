@@ -2,16 +2,19 @@
 
 import React, { useEffect, useState } from 'react';
 import { PublicSubjectDto } from '@quiz-creator/types';
-import { BookOpen, ExternalLink, Home, Layers, ShieldAlert, Sparkles } from 'lucide-react';
+import { BookOpen, Archive, ExternalLink, Home, Layers, ShieldAlert, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Skeleton from '@/components/ui/Skeleton';
 
 export default function SharedSubjectPage() {
   const params = useParams();
+  const router = useRouter();
   const shareToken = params?.shareToken as string;
   const [subject, setSubject] = useState<PublicSubjectDto | null>(null);
   const [loading, setLoading] = useState(true);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,6 +42,25 @@ export default function SharedSubjectPage() {
 
     loadSubject();
   }, [shareToken]);
+
+  async function archiveSubject() {
+    if (!subject || archiving) return;
+    setArchiving(true);
+    setArchiveError(null);
+    try {
+      const response = await fetch(`/api/subjects/${encodeURIComponent(subject.id)}/archive`, {
+        method: 'POST',
+        credentials: 'same-origin'
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Unable to archive subject.');
+      router.replace('/library');
+    } catch (err: any) {
+      setArchiveError(err.message || 'Unable to archive subject.');
+    } finally {
+      setArchiving(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -122,13 +144,29 @@ export default function SharedSubjectPage() {
               </p>
             </div>
           </div>
-          <Link
-            href="/library"
-            className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
-          >
-            <Home className="h-3.5 w-3.5 stroke-[2.5]" />
-            Back to Library
-          </Link>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => void archiveSubject()}
+              disabled={archiving}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:bg-amber-500 hover:text-slate-900 hover:shadow-brutal disabled:cursor-not-allowed disabled:opacity-60 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+            >
+              <Archive className="h-3.5 w-3.5 stroke-[2.5]" />
+              {archiving ? 'Archiving...' : 'Archive subject'}
+            </button>
+            <Link
+              href="/library"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+            >
+              <Home className="h-3.5 w-3.5 stroke-[2.5]" />
+              Back to Library
+            </Link>
+          </div>
+          {archiveError && (
+            <p role="alert" className="rounded-xl border-2 border-destructive bg-destructive/10 px-3 py-2 text-xs font-black text-destructive">
+              {archiveError}
+            </p>
+          )}
         </div>
       </div>
 

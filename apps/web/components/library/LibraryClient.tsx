@@ -65,6 +65,8 @@ export default function LibraryClient({
 }: LibraryClientProps) {
   const [quizzes, setQuizzes] = useState<Quiz[]>(initialQuizzes);
   const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
+  const [sharedQuizzes, setSharedQuizzes] = useState<Quiz[]>(initialSharedQuizzes);
+  const [sharedSubjects, setSharedSubjects] = useState<Subject[]>(initialSharedSubjects);
   const [loading] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -106,11 +108,19 @@ export default function LibraryClient({
     setSubjects(initialSubjects);
   }, [initialSubjects]);
 
+  useEffect(() => {
+    setSharedQuizzes(initialSharedQuizzes);
+  }, [initialSharedQuizzes]);
+
+  useEffect(() => {
+    setSharedSubjects(initialSharedSubjects);
+  }, [initialSharedSubjects]);
+
   const filteredLibrary = useMemo(() => {
     const query = search.trim().toLowerCase();
     const matches = (value: string | undefined) => !query || Boolean(value?.toLowerCase().includes(query));
     const ownedSubjectsById = new Map(subjects.map((subject) => [subject.id, subject]));
-    const sharedSubjectsById = new Map(initialSharedSubjects.map((subject) => [subject.id, subject]));
+    const sharedSubjectsById = new Map(sharedSubjects.map((subject) => [subject.id, subject]));
 
     const matchesQuiz = (quiz: Quiz, subjectMap: Map<string, Subject>) => {
       const subject = quiz.subject ?? (quiz.subject_id ? subjectMap.get(quiz.subject_id) : undefined);
@@ -128,12 +138,12 @@ export default function LibraryClient({
       quizzes: reviewerCandidates.filter((quiz) => (
         !selectedTerm || normalizeTerm(quiz.term) === normalizeTerm(selectedTerm)
       )),
-      sharedSubjects: initialSharedSubjects.filter((subject) => matches(subject.name)),
-      sharedQuizzes: initialSharedQuizzes.filter((quiz) => matchesQuiz(quiz, sharedSubjectsById)),
+      sharedSubjects: sharedSubjects.filter((subject) => matches(subject.name)),
+      sharedQuizzes: sharedQuizzes.filter((quiz) => matchesQuiz(quiz, sharedSubjectsById)),
     };
   }, [
-    initialSharedQuizzes,
-    initialSharedSubjects,
+    sharedQuizzes,
+    sharedSubjects,
     quizzes,
     search,
     selectedSubjectId,
@@ -141,8 +151,8 @@ export default function LibraryClient({
     subjects,
   ]);
 
-  const totalItemCount = subjects.length + quizzes.length + initialSharedSubjects.length + initialSharedQuizzes.length;
-  const sharedItemCount = initialSharedSubjects.length + initialSharedQuizzes.length;
+  const totalItemCount = subjects.length + quizzes.length + sharedSubjects.length + sharedQuizzes.length;
+  const sharedItemCount = sharedSubjects.length + sharedQuizzes.length;
   const searchResultCount =
     filteredLibrary.subjects.length
     + filteredLibrary.quizzes.length
@@ -185,6 +195,8 @@ export default function LibraryClient({
       if (!res.ok) throw new Error(data.error || 'Failed to archive subject');
       setSubjects((current) => current.filter((subject) => subject.id !== subjectId));
       setQuizzes((current) => current.filter((quiz) => quiz.subject_id !== subjectId));
+      setSharedSubjects((current) => current.filter((subject) => subject.id !== subjectId));
+      setSharedQuizzes((current) => current.filter((quiz) => quiz.subject_id !== subjectId));
       setSelectedSubjectId((current) => current === subjectId ? '' : current);
     } catch (err) {
       console.error('Failed to archive subject:', err);
@@ -238,6 +250,7 @@ export default function LibraryClient({
       viewerId={viewerId}
       maxItems={preview ? PREVIEW_LIMIT : undefined}
       onViewAll={preview ? () => selectView('shared') : undefined}
+      onSubjectArchived={handleSubjectArchived}
     />
   );
 

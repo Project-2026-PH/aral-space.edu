@@ -12,9 +12,10 @@ interface SharedLibraryProps {
   viewerId: string;
   maxItems?: number;
   onViewAll?: () => void;
+  onSubjectArchived?: (subjectId: string) => void;
 }
 
-export default function SharedLibrary({ subjects, quizzes, viewerId, maxItems, onViewAll }: SharedLibraryProps) {
+export default function SharedLibrary({ subjects, quizzes, viewerId, maxItems, onViewAll, onSubjectArchived }: SharedLibraryProps) {
   if (subjects.length === 0 && quizzes.length === 0) return null;
 
   return (
@@ -27,7 +28,7 @@ export default function SharedLibrary({ subjects, quizzes, viewerId, maxItems, o
           </h2>
           <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
             <Eye aria-hidden="true" className="h-3.5 w-3.5" />
-            Shared subjects are read-only; shared reviewers can be edited.
+            Shared subjects are read-only; archive hides a subject and its reviewers from your library.
           </p>
         </div>
         <span className="rounded-lg border-2 border-slate-900 bg-[#bfdbfe] px-3 py-1 text-xs font-black text-slate-900 shadow-brutal-sm">
@@ -43,6 +44,7 @@ export default function SharedLibrary({ subjects, quizzes, viewerId, maxItems, o
         heading="Shared Subjects"
         maxItems={maxItems}
         onViewAll={onViewAll}
+        onSubjectArchived={onSubjectArchived}
       />
       <QuizLibrary
         quizzes={quizzes}

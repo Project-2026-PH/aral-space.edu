@@ -213,13 +213,13 @@ export class NeonQuizRepository implements IQuizRepository {
     if (!rows || rows.length === 0) return null;
     const row = rows[0] as any;
     if (userId && row.user_id === userId) {
-      return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
+      return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true, can_archive: true };
     }
     if (userId && row.is_collaborator) {
-      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false, can_archive: true };
     }
     if (row.is_public) {
-      return { subject_id: subjectId, role: 'public', can_edit: false, can_edit_reviewers: false, can_manage: false };
+      return { subject_id: subjectId, role: 'public', can_edit: false, can_edit_reviewers: false, can_manage: false, can_archive: Boolean(userId) };
     }
     return null;
   }
@@ -296,7 +296,7 @@ export class NeonQuizRepository implements IQuizRepository {
           VALUES (${link.subject_id}, ${userId})
           ON CONFLICT (subject_id, user_id) DO NOTHING
         `;
-        return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+        return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false, can_archive: true };
       }
 
       const maxUses = Number(link.max_uses) || 1;
@@ -322,7 +322,7 @@ export class NeonQuizRepository implements IQuizRepository {
         VALUES (${subjectId}, ${userId})
         ON CONFLICT (subject_id, user_id) DO NOTHING
       `;
-      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false, can_archive: true };
     } catch {
       const rows = await this.sql`
         UPDATE subject_collaborator_links
@@ -339,7 +339,7 @@ export class NeonQuizRepository implements IQuizRepository {
         VALUES (${subjectId}, ${userId})
         ON CONFLICT (subject_id, user_id) DO NOTHING
       `;
-      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false, can_archive: true };
     }
   }
 
@@ -365,15 +365,27 @@ export class NeonQuizRepository implements IQuizRepository {
     if (!userId) throw new Error('Authenticated user required for subject management');
     const rows = await this.sql`
       WITH target_subject AS (
-        SELECT id
-        FROM subjects
-        WHERE id = ${subjectId}
-          AND user_id = ${userId}
-          AND archived_at IS NULL
+        SELECT s.id
+        FROM subjects s
+        WHERE s.id = ${subjectId}
+          AND s.archived_at IS NULL
+          AND (
+            s.user_id = ${userId}
+            OR EXISTS (
+              SELECT 1
+              FROM subject_collaborators sc
+              WHERE sc.subject_id = s.id AND sc.user_id = ${userId}
+            )
+            OR (
+              COALESCE(s.is_public, TRUE) = TRUE
+              AND s.share_revoked_at IS NULL
+              AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
+            )
+          )
           AND NOT EXISTS (
             SELECT 1
             FROM user_subject_archives usa
-            WHERE usa.subject_id = subjects.id AND usa.user_id = ${userId}
+            WHERE usa.subject_id = s.id AND usa.user_id = ${userId}
           )
       ), archived_subject AS (
         INSERT INTO user_subject_archives (user_id, subject_id, archived_at)

@@ -93,6 +93,7 @@ export default function SubjectLibrary({
           {visibleSubjects.map((subject, index) => {
             const isPublic = subject.is_public !== false;
             const canManage = !readOnly && Boolean(viewerId && subject.user_id === viewerId);
+            const canArchive = Boolean(onSubjectArchived && viewerId && (canManage || readOnly));
             const canGeneratePublicLink = !readOnly && isPublic && !subject.share_token;
             const canOpen = readOnly || canManage || Boolean(isPublic && subject.share_token) || canGeneratePublicLink;
             const subjectHref = readOnly
@@ -112,6 +113,7 @@ export default function SubjectLibrary({
                 viewerId={viewerId}
                 readOnly={readOnly}
                 canManage={canManage}
+                canArchive={canArchive}
                 canOpen={canOpen}
                 canGeneratePublicLink={canGeneratePublicLink}
                 isPublic={isPublic}

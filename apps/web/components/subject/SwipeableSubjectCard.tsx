@@ -15,6 +15,7 @@ interface SwipeableSubjectCardProps {
   viewerId: string;
   readOnly: boolean;
   canManage: boolean;
+  canArchive: boolean;
   canOpen: boolean;
   canGeneratePublicLink: boolean;
   isPublic: boolean;
@@ -35,6 +36,7 @@ export default function SwipeableSubjectCard({
   viewerId,
   readOnly,
   canManage,
+  canArchive,
   canOpen,
   canGeneratePublicLink,
   isPublic,
@@ -419,6 +421,19 @@ export default function SwipeableSubjectCard({
                 Share
               </button>
             </div>
+          ) : canArchive ? (
+            <button
+              type="button"
+              aria-label={`Archive ${subject.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onArchive();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-700 dark:text-slate-300 shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:bg-amber-500 hover:text-slate-900 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none cursor-pointer"
+            >
+              <Archive className="h-3.5 w-3.5" />
+              Archive
+            </button>
           ) : (
             <span className="text-[11px] font-bold text-muted-foreground">Read-only</span>
           )}

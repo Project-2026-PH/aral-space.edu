@@ -556,13 +556,13 @@ export class MemoryQuizRepository implements IQuizRepository {
     const subject = this.subjects.get(subjectId);
     if (!subject || subject.archived_at || this.isSubjectArchivedForUser(subjectId, userId)) return null;
     if (userId && subject.user_id === userId) {
-      return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
+      return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true, can_archive: true };
     }
     if (userId && this.collaborators.get(subjectId)?.has(userId)) {
-      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+      return { subject_id: subjectId, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false, can_archive: true };
     }
     if (isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)) {
-      return { subject_id: subjectId, role: 'public', can_edit: false, can_edit_reviewers: false, can_manage: false };
+      return { subject_id: subjectId, role: 'public', can_edit: false, can_edit_reviewers: false, can_manage: false, can_archive: Boolean(userId) };
     }
     return null;
   }
@@ -613,7 +613,7 @@ export class MemoryQuizRepository implements IQuizRepository {
       const members = this.collaborators.get(link.subject_id) || new Set<string>();
       members.add(userId);
       this.collaborators.set(link.subject_id, members);
-      return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+      return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false, can_archive: true };
     }
 
     // New user/device: check remaining uses
@@ -630,7 +630,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     const members = this.collaborators.get(link.subject_id) || new Set<string>();
     members.add(userId);
     this.collaborators.set(link.subject_id, members);
-    return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false };
+    return { subject_id: link.subject_id, role: 'collaborator', can_edit: false, can_edit_reviewers: true, can_manage: false, can_archive: true };
   }
 
   async deleteSubject(subjectId: string, userId?: string): Promise<boolean> {
@@ -662,8 +662,10 @@ export class MemoryQuizRepository implements IQuizRepository {
   async archiveSubject(subjectId: string, userId?: string): Promise<boolean> {
     if (!userId) throw new Error('Authenticated user required for subject management');
     const subject = this.subjects.get(subjectId);
-    const key = userId ? this.archiveKey(userId, subjectId) : '';
-    if (!subject || subject.user_id !== userId || subject.archived_at || this.userSubjectArchives.has(key)) return false;
+    const key = this.archiveKey(userId, subjectId);
+    if (!subject || subject.archived_at || this.userSubjectArchives.has(key)) return false;
+    const access = await this.getSubjectAccess(subjectId, userId);
+    if (!access?.can_archive) return false;
 
     const archivedAt = new Date().toISOString();
     this.userSubjectArchives.set(key, archivedAt);
@@ -681,7 +683,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   async restoreSubject(subjectId: string, userId?: string): Promise<boolean> {
     if (!userId) throw new Error('Authenticated user required for subject management');
     const subject = this.subjects.get(subjectId);
-    if (!subject || subject.user_id !== userId) return false;
+    if (!subject) return false;
 
     const hadPersonalArchive = this.userSubjectArchives.delete(this.archiveKey(userId, subjectId));
     if (hadPersonalArchive) {
@@ -693,7 +695,7 @@ export class MemoryQuizRepository implements IQuizRepository {
       return true;
     }
 
-    if (!subject.archived_at) return false;
+    if (subject.user_id !== userId || !subject.archived_at) return false;
     subject.archived_at = null;
     for (const quiz of this.quizzes.values()) {
       if (quiz.subject_id === subjectId && quiz.archived_at && quiz.archived_by_subject) {

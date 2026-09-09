@@ -427,51 +427,6 @@ export default function LibraryClient({
 
       {activeView === 'overview' && !hasSearch && (
         <>
-          <section className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Library shortcuts">
-            <button
-              type="button"
-              onClick={() => selectView('subjects')}
-              className="group flex items-center justify-between rounded-2xl border-2 border-slate-900 bg-[#86efac] p-4 text-left text-slate-900 shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal"
-            >
-              <span className="flex items-center gap-3">
-                <BookOpen className="h-5 w-5" />
-                <span>
-                  <span className="block text-sm font-black">Subjects</span>
-                  <span className="block text-[11px] font-bold opacity-70">Organize by course</span>
-                </span>
-              </span>
-              <span className="flex items-center gap-1 text-sm font-black">{subjects.length}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></span>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectView('reviewers')}
-              className="group flex items-center justify-between rounded-2xl border-2 border-slate-900 bg-[#fde047] p-4 text-left text-slate-900 shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal"
-            >
-              <span className="flex items-center gap-3">
-                <Layers className="h-5 w-5" />
-                <span>
-                  <span className="block text-sm font-black">Reviewers</span>
-                  <span className="block text-[11px] font-bold opacity-70">Practice a set</span>
-                </span>
-              </span>
-              <span className="flex items-center gap-1 text-sm font-black">{quizzes.length}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></span>
-            </button>
-            <button
-              type="button"
-              onClick={() => selectView('shared')}
-              className="group flex items-center justify-between rounded-2xl border-2 border-slate-900 bg-[#bfdbfe] p-4 text-left text-slate-900 shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal"
-            >
-              <span className="flex items-center gap-3">
-                <LockKeyhole className="h-5 w-5" />
-                <span>
-                  <span className="block text-sm font-black">Shared</span>
-                  <span className="block text-[11px] font-bold opacity-70">Open team materials</span>
-                </span>
-              </span>
-              <span className="flex items-center gap-1 text-sm font-black">{sharedItemCount}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></span>
-            </button>
-          </section>
-
           <div id="subjects-section" className="scroll-mt-20">
             {renderOwnedSubjects(true)}
           </div>

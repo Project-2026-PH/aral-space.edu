@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Quiz, Subject } from '@quiz-creator/types';
 import { Eye, LockKeyhole } from 'lucide-react';
 import SubjectLibrary from '@/components/subject/SubjectLibrary';
@@ -16,7 +16,13 @@ interface SharedLibraryProps {
 }
 
 export default function SharedLibrary({ subjects, quizzes, viewerId, maxItems, onViewAll, onSubjectArchived }: SharedLibraryProps) {
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+
   if (subjects.length === 0 && quizzes.length === 0) return null;
+
+  const subjectFilteredQuizzes = selectedSubjectId
+    ? quizzes.filter((quiz) => quiz.subject_id === selectedSubjectId)
+    : quizzes;
 
   return (
     <section className="space-y-5" aria-labelledby="shared-library-heading">
@@ -47,9 +53,11 @@ export default function SharedLibrary({ subjects, quizzes, viewerId, maxItems, o
         onSubjectArchived={onSubjectArchived}
       />
       <QuizLibrary
-        quizzes={quizzes}
+        quizzes={subjectFilteredQuizzes}
         loading={false}
         subjects={subjects}
+        selectedSubjectId={selectedSubjectId}
+        onSubjectChange={setSelectedSubjectId}
         heading="Shared Reviewers"
         readOnly
         maxItems={maxItems}

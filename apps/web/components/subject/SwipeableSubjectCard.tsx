@@ -346,10 +346,6 @@ export default function SwipeableSubjectCard({
               onClick={(event) => event.stopPropagation()}
               className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
             >
-              <span className="inline-flex items-center gap-1">
-                <ExternalLink className="h-3.5 w-3.5" />
-                View link
-              </span>
             </Link>
           ) : isPublic ? (
             <button

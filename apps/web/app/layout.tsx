@@ -53,7 +53,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 overflow-x-hidden">
+      <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 overflow-x-clip">
         <PwaRegister />
         <UpdateNotification />
         <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-md">

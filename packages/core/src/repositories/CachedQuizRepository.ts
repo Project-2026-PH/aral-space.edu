@@ -32,6 +32,28 @@ export class CachedQuizRepository implements IQuizRepository {
     return `library:${userId || 'anon'}`;
   }
 
+  private invalidatePersonalArchiveLists(userId?: string): void {
+    const uid = userId || 'anon';
+    this.cache.delete(this.subjectKey(userId));
+    this.cache.delete(this.quizzesKey(userId));
+    this.cache.delete(this.libraryKey(userId));
+    this.cache.delete(`archived_subjects:${uid}`);
+    this.cache.delete(`archived_quizzes:${uid}`);
+  }
+
+  private invalidatePersonalQuiz(quizId: string, userId?: string): void {
+    this.cache.delete(this.quizKey(quizId, userId));
+    this.cache.delete(this.questionsKey(quizId, userId));
+  }
+
+  private invalidatePersonalDetails(userId?: string): void {
+    const suffix = `:${userId || 'anon'}`;
+    this.cache.deleteWhere((key) => (
+      (key.startsWith('quiz:') || key.startsWith('questions:'))
+      && key.endsWith(suffix)
+    ));
+  }
+
   async listSubjects(userId?: string): Promise<Subject[]> {
     const key = this.subjectKey(userId);
     const cached = this.cache.get(key);
@@ -86,29 +108,17 @@ export class CachedQuizRepository implements IQuizRepository {
 
   async archiveSubject(subjectId: string, userId?: string): Promise<boolean> {
     const result = await this.underlying.archiveSubject(subjectId, userId);
-    this.cache.deleteByPrefix('subjects:');
-    this.cache.deleteByPrefix('quizzes:');
-    this.cache.deleteByPrefix('library:');
-    this.cache.deleteByPrefix('quiz:');
-    this.cache.deleteByPrefix('questions:');
-    this.cache.deleteByPrefix('public_subject:');
-    this.cache.deleteByPrefix('public_quiz:');
-    this.cache.deleteByPrefix('archived_subjects:');
-    this.cache.deleteByPrefix('archived_quizzes:');
+    if (!result) return result;
+    this.invalidatePersonalArchiveLists(userId);
+    this.invalidatePersonalDetails(userId);
     return result;
   }
 
   async restoreSubject(subjectId: string, userId?: string): Promise<boolean> {
     const result = await this.underlying.restoreSubject(subjectId, userId);
-    this.cache.deleteByPrefix('subjects:');
-    this.cache.deleteByPrefix('quizzes:');
-    this.cache.deleteByPrefix('library:');
-    this.cache.deleteByPrefix('quiz:');
-    this.cache.deleteByPrefix('questions:');
-    this.cache.deleteByPrefix('public_subject:');
-    this.cache.deleteByPrefix('public_quiz:');
-    this.cache.deleteByPrefix('archived_subjects:');
-    this.cache.deleteByPrefix('archived_quizzes:');
+    if (!result) return result;
+    this.invalidatePersonalArchiveLists(userId);
+    this.invalidatePersonalDetails(userId);
     return result;
   }
 
@@ -256,25 +266,17 @@ export class CachedQuizRepository implements IQuizRepository {
 
   async archiveQuiz(id: string, userId?: string): Promise<boolean> {
     const result = await this.underlying.archiveQuiz(id, userId);
-    this.cache.deleteByPrefix('quizzes:');
-    this.cache.deleteByPrefix('library:');
-    this.cache.deleteByPrefix(`quiz:${id}`);
-    this.cache.deleteByPrefix(`questions:${id}:`);
-    this.cache.deleteByPrefix('public_quiz:');
-    this.cache.deleteByPrefix('public_subject:');
-    this.cache.deleteByPrefix('archived_quizzes:');
+    if (!result) return result;
+    this.invalidatePersonalArchiveLists(userId);
+    this.invalidatePersonalQuiz(id, userId);
     return result;
   }
 
   async restoreQuiz(id: string, userId?: string): Promise<boolean> {
     const result = await this.underlying.restoreQuiz(id, userId);
-    this.cache.deleteByPrefix('quizzes:');
-    this.cache.deleteByPrefix('library:');
-    this.cache.deleteByPrefix(`quiz:${id}`);
-    this.cache.deleteByPrefix(`questions:${id}:`);
-    this.cache.deleteByPrefix('public_quiz:');
-    this.cache.deleteByPrefix('public_subject:');
-    this.cache.deleteByPrefix('archived_quizzes:');
+    if (!result) return result;
+    this.invalidatePersonalArchiveLists(userId);
+    this.invalidatePersonalQuiz(id, userId);
     return result;
   }
 

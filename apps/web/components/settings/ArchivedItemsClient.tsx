@@ -190,15 +190,21 @@ export default function ArchivedItemsClient({
                           Archived {quiz.archived_at ? new Date(quiz.archived_at).toLocaleDateString() : ''}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void restoreQuiz(quiz.id)}
-                        disabled={Boolean(restoringSubjectId || restoringQuizId)}
-                        className="mt-4 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3 py-2 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {isRestoring ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                        {isRestoring ? 'Restoring...' : 'Restore reviewer'}
-                      </button>
+                      {quiz.archived_by_subject ? (
+                        <p className="mt-4 rounded-xl border-2 border-dashed border-slate-900/30 px-3 py-2 text-center text-[11px] font-bold text-muted-foreground dark:border-white/20">
+                          Restore the subject to bring this reviewer back.
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void restoreQuiz(quiz.id)}
+                          disabled={Boolean(restoringSubjectId || restoringQuizId)}
+                          className="mt-4 inline-flex items-center justify-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3 py-2 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isRestoring ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                          {isRestoring ? 'Restoring...' : 'Restore reviewer'}
+                        </button>
+                      )}
                     </article>
                   );
                 })}

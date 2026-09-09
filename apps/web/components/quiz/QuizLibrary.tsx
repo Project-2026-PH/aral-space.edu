@@ -14,6 +14,8 @@ interface QuizLibraryProps {
   subjects?: Subject[];
   selectedSubjectId?: string;
   onSubjectChange?: (subjectId: string) => void;
+  selectedTerm?: string;
+  onTermChange?: (term: string) => void;
   onQuizDeleted?: (quizId: string) => void;
   onQuizArchived?: (quizId: string) => void;
   readOnly?: boolean;
@@ -29,6 +31,8 @@ export default function QuizLibrary({
   subjects,
   selectedSubjectId = '',
   onSubjectChange,
+  selectedTerm: selectedTermProp,
+  onTermChange,
   onQuizDeleted,
   onQuizArchived,
   readOnly = false,
@@ -99,20 +103,31 @@ export default function QuizLibrary({
   }
 
   const headingId = readOnly ? 'shared-reviewer-library-heading' : 'quiz-library-heading';
-  const [selectedTerm, setSelectedTerm] = useState<string>('');
+  const [localSelectedTerm, setLocalSelectedTerm] = useState<string>('');
+  const selectedTerm = selectedTermProp ?? localSelectedTerm;
+  const normalizedSelectedTerm = selectedTerm.trim().toLowerCase();
+  const availableQuizzes = quizzes.filter((quiz) => !archivedQuizIds.has(quiz.id));
 
   const termsInQuizzes = Array.from(
-    new Set(
-      quizzes
+    new Map(
+      availableQuizzes
         .map((q) => q.term?.trim())
         .filter((t): t is string => Boolean(t))
-    )
+        .map((term) => [term.toLowerCase(), term] as const)
+    ).values()
   );
 
-  const filteredQuizzes = quizzes.filter((quiz) => {
-    if (!selectedTerm) return true;
-    return quiz.term?.trim().toLowerCase() === selectedTerm.toLowerCase();
-  }).filter((quiz) => !archivedQuizIds.has(quiz.id));
+  const handleTermChange = (term: string) => {
+    if (selectedTermProp === undefined) {
+      setLocalSelectedTerm(term);
+    }
+    onTermChange?.(term);
+  };
+
+  const filteredQuizzes = availableQuizzes.filter((quiz) => {
+    if (!normalizedSelectedTerm) return true;
+    return quiz.term?.trim().toLowerCase() === normalizedSelectedTerm;
+  });
 
   const visibleQuizzes = maxItems ? filteredQuizzes.slice(0, maxItems) : filteredQuizzes;
 
@@ -164,23 +179,23 @@ export default function QuizLibrary({
           </span>
           <button
             type="button"
-            onClick={() => setSelectedTerm('')}
+            onClick={() => handleTermChange('')}
             className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-black shadow-brutal-sm transition-all cursor-pointer ${
-              selectedTerm === ''
+              !normalizedSelectedTerm
                 ? 'bg-primary text-white'
                 : 'bg-white dark:bg-card text-foreground hover:bg-muted'
             }`}
           >
-            All ({quizzes.length})
+            All ({availableQuizzes.length})
           </button>
           {termsInQuizzes.map((t) => {
-            const count = quizzes.filter((q) => q.term?.trim().toLowerCase() === t.toLowerCase()).length;
-            const isSelected = selectedTerm.toLowerCase() === t.toLowerCase();
+            const count = availableQuizzes.filter((q) => q.term?.trim().toLowerCase() === t.toLowerCase()).length;
+            const isSelected = normalizedSelectedTerm === t.toLowerCase();
             return (
               <button
                 key={t}
                 type="button"
-                onClick={() => setSelectedTerm(isSelected ? '' : t)}
+                onClick={() => handleTermChange(isSelected ? '' : t)}
                 className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-black shadow-brutal-sm transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-primary text-white'
@@ -194,13 +209,31 @@ export default function QuizLibrary({
         </div>
       )}
 
+      {selectedTerm && !termsInQuizzes.some(
+        (term) => term.toLowerCase() === normalizedSelectedTerm
+      ) && (
+        <div className="mt-2 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-primary/10 text-primary border border-primary/20">
+            <span>Term:</span>
+            <span className="font-black">{selectedTerm}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => handleTermChange('')}
+            className="text-[10px] font-bold text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+          >
+            Clear term
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((index) => (
             <div key={index} className="h-36 sm:h-[148px] rounded-2xl border-2 border-slate-900/30 bg-muted/40 p-4 animate-pulse" />
           ))}
         </div>
-      ) : quizzes.length === 0 ? (
+      ) : availableQuizzes.length === 0 ? (
         <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-900/40 dark:border-white/30 p-8 text-center bg-white dark:bg-card">
           <BookOpen className="h-8 w-8 text-muted-foreground" />
           <p className="mt-2 text-sm font-black text-foreground">No reviewers found</p>
@@ -214,7 +247,7 @@ export default function QuizLibrary({
           <p className="mt-2 text-sm font-black text-foreground">No reviewers found for "{selectedTerm}"</p>
           <button
             type="button"
-            onClick={() => setSelectedTerm('')}
+            onClick={() => handleTermChange('')}
             className="mt-2 text-xs font-bold text-primary hover:underline cursor-pointer"
           >
             Show all reviewers

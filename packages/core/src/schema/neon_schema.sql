@@ -410,3 +410,25 @@ ON CONFLICT (id) DO UPDATE SET
     distractor_explanations = EXCLUDED.distractor_explanations,
     discriminatory_keywords = EXCLUDED.discriminatory_keywords,
     order_index = EXCLUDED.order_index;
+
+
+-- Per-guest archive preferences. These rows hide content only for the stable
+-- anonymous/authenticated identity in user_id; the shared content rows remain public.
+CREATE TABLE IF NOT EXISTS user_subject_archives (
+    user_id TEXT NOT NULL,
+    subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    archived_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, subject_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_quiz_archives (
+    user_id TEXT NOT NULL,
+    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    archived_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    archived_by_subject BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (user_id, quiz_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_subject_archives_subject ON user_subject_archives(subject_id);
+CREATE INDEX IF NOT EXISTS idx_user_quiz_archives_quiz ON user_quiz_archives(quiz_id);
+CREATE INDEX IF NOT EXISTS idx_user_quiz_archives_subject_cascade ON user_quiz_archives(user_id, archived_by_subject, archived_at DESC);

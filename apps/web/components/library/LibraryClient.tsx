@@ -38,6 +38,10 @@ type LibraryView = 'overview' | 'subjects' | 'reviewers' | 'shared';
 
 const PREVIEW_LIMIT = 6;
 
+function normalizeTerm(value: string | null | undefined) {
+  return value?.trim().toLowerCase() ?? '';
+}
+
 function EmptyLibraryResults({ label, search }: { label: string; search: string }) {
   return (
     <div className="flex min-h-40 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-900/40 bg-white p-8 text-center dark:border-white/30 dark:bg-card">
@@ -64,6 +68,7 @@ export default function LibraryClient({
   const [loading] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedTerm, setSelectedTerm] = useState('');
   const [activeView, setActiveView] = useState<LibraryView>('overview');
   const [showAiModal, setShowAiModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
@@ -112,16 +117,29 @@ export default function LibraryClient({
       return matches(quiz.title) || matches(subject?.name);
     };
 
+    const reviewerCandidates = quizzes.filter((quiz) => {
+      const matchesSubject = !selectedSubjectId || quiz.subject_id === selectedSubjectId;
+      return matchesSubject && matchesQuiz(quiz, ownedSubjectsById);
+    });
+
     return {
       subjects: subjects.filter((subject) => matches(subject.name)),
-      quizzes: quizzes.filter((quiz) => {
-        const matchesSubject = !selectedSubjectId || quiz.subject_id === selectedSubjectId;
-        return matchesSubject && matchesQuiz(quiz, ownedSubjectsById);
-      }),
+      reviewerCandidates,
+      quizzes: reviewerCandidates.filter((quiz) => (
+        !selectedTerm || normalizeTerm(quiz.term) === normalizeTerm(selectedTerm)
+      )),
       sharedSubjects: initialSharedSubjects.filter((subject) => matches(subject.name)),
       sharedQuizzes: initialSharedQuizzes.filter((quiz) => matchesQuiz(quiz, sharedSubjectsById)),
     };
-  }, [initialSharedQuizzes, initialSharedSubjects, quizzes, search, selectedSubjectId, subjects]);
+  }, [
+    initialSharedQuizzes,
+    initialSharedSubjects,
+    quizzes,
+    search,
+    selectedSubjectId,
+    selectedTerm,
+    subjects,
+  ]);
 
   const totalItemCount = subjects.length + quizzes.length + initialSharedSubjects.length + initialSharedQuizzes.length;
   const sharedItemCount = initialSharedSubjects.length + initialSharedQuizzes.length;
@@ -198,11 +216,13 @@ export default function LibraryClient({
 
   const renderOwnedReviewers = (preview = false, heading = 'Your Reviewers') => (
     <QuizLibrary
-      quizzes={filteredLibrary.quizzes}
+      quizzes={filteredLibrary.reviewerCandidates}
       loading={loading}
       subjects={subjects}
       selectedSubjectId={selectedSubjectId}
       onSubjectChange={setSelectedSubjectId}
+      selectedTerm={selectedTerm}
+      onTermChange={setSelectedTerm}
       heading={heading}
       maxItems={preview ? PREVIEW_LIMIT : undefined}
       onViewAll={preview ? () => selectView('reviewers') : undefined}

@@ -9,6 +9,11 @@ function generateShareToken(): string {
   return generateSecureToken(32);
 }
 
+type MemoryQuizArchive = {
+  archived_at: string;
+  archived_by_subject: boolean;
+};
+
 export class MemoryQuizRepository implements IQuizRepository {
   private subjects: Map<string, Subject> = new Map();
   private quizzes: Map<string, Quiz> = new Map();
@@ -16,6 +21,20 @@ export class MemoryQuizRepository implements IQuizRepository {
   private collaboratorLinks: Map<string, { subject_id: string; expires_at: string | null; used_at: string | null; user_id: string | null; max_uses: number; uses_count: number; redeemed_by: Set<string> }> = new Map();
   private collaborators: Map<string, Set<string>> = new Map();
   private subjectViews: Map<string, Set<string>> = new Map();
+  private userSubjectArchives: Map<string, string> = new Map();
+  private userQuizArchives: Map<string, MemoryQuizArchive> = new Map();
+
+  private archiveKey(userId: string, itemId: string): string {
+    return `${userId}\u0000${itemId}`;
+  }
+
+  private isSubjectArchivedForUser(subjectId: string, userId?: string): boolean {
+    return Boolean(userId && this.userSubjectArchives.has(this.archiveKey(userId, subjectId)));
+  }
+
+  private getQuizArchive(quizId: string, userId?: string): MemoryQuizArchive | undefined {
+    return userId ? this.userQuizArchives.get(this.archiveKey(userId, quizId)) : undefined;
+  }
 
   constructor() {
     this.seedDefaultData();
@@ -159,7 +178,7 @@ export class MemoryQuizRepository implements IQuizRepository {
   async listSubjects(userId?: string): Promise<Subject[]> {
     const list = Array.from(this.subjects.values());
     return list.filter((subject) => {
-      if (subject.archived_at) return false;
+      if (subject.archived_at || this.isSubjectArchivedForUser(subject.id, userId)) return false;
       if (userId && (subject.user_id === userId || this.collaborators.get(subject.id)?.has(userId))) return true;
       return isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at);
     });
@@ -183,9 +202,9 @@ export class MemoryQuizRepository implements IQuizRepository {
   async listQuizzes(userId?: string): Promise<Quiz[]> {
     const all = Array.from(this.quizzes.values());
     const filtered = all.filter((quiz) => {
-      if (quiz.archived_at) return false;
+      if (quiz.archived_at || this.getQuizArchive(quiz.id, userId)) return false;
       const subject = quiz.subject_id ? this.subjects.get(quiz.subject_id) : null;
-      if (subject?.archived_at) return false;
+      if (subject?.archived_at || (subject && this.isSubjectArchivedForUser(subject.id, userId))) return false;
       if (userId && (quiz.user_id === userId || Boolean(quiz.subject_id && this.collaborators.get(quiz.subject_id)?.has(userId)))) return true;
       return isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at);
     });
@@ -197,8 +216,9 @@ export class MemoryQuizRepository implements IQuizRepository {
 
   async getQuizById(id: string, userId?: string): Promise<Quiz | null> {
     const quiz = this.quizzes.get(id);
-    if (!quiz || quiz.archived_at) return null;
+    if (!quiz || quiz.archived_at || this.getQuizArchive(id, userId)) return null;
     if (quiz.subject_id && this.subjects.get(quiz.subject_id)?.archived_at) return null;
+    if (quiz.subject_id && this.isSubjectArchivedForUser(quiz.subject_id, userId)) return null;
     const isOwner = Boolean(userId && quiz.user_id === userId);
     const isCollaborator = Boolean(userId && quiz.subject_id && this.collaborators.get(quiz.subject_id)?.has(userId));
     if (!isOwner && !isCollaborator && !isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)) return null;
@@ -277,23 +297,35 @@ export class MemoryQuizRepository implements IQuizRepository {
     for (const [qId, q] of this.questions.entries()) {
       if (q.quiz_id === id) this.questions.delete(qId);
     }
+    for (const key of Array.from(this.userQuizArchives.keys())) {
+      if (key.split('\u0000')[1] === id) this.userQuizArchives.delete(key);
+    }
     return deleted;
   }
 
   async archiveQuiz(id: string, userId?: string): Promise<boolean> {
     if (!userId) throw new Error('Authenticated user required for quiz management');
     const quiz = this.quizzes.get(id);
-    if (!quiz || quiz.user_id !== userId || quiz.archived_at) return false;
-    quiz.archived_at = new Date().toISOString();
-    quiz.archived_by_subject = false;
-    this.quizzes.set(id, quiz);
+    if (!quiz || quiz.user_id !== userId || quiz.archived_at || this.getQuizArchive(id, userId)) return false;
+    this.userQuizArchives.set(this.archiveKey(userId, id), {
+      archived_at: new Date().toISOString(),
+      archived_by_subject: false
+    });
     return true;
   }
 
   async restoreQuiz(id: string, userId?: string): Promise<boolean> {
     if (!userId) throw new Error('Authenticated user required for quiz management');
     const quiz = this.quizzes.get(id);
-    if (!quiz || quiz.user_id !== userId || !quiz.archived_at) return false;
+    if (!quiz || quiz.user_id !== userId) return false;
+    const key = this.archiveKey(userId, id);
+    const personalArchive = this.userQuizArchives.get(key);
+    if (personalArchive?.archived_by_subject) return false;
+    if (personalArchive) {
+      this.userQuizArchives.delete(key);
+      return true;
+    }
+    if (!quiz.archived_at) return false;
     quiz.archived_at = null;
     quiz.archived_by_subject = false;
     this.quizzes.set(id, quiz);
@@ -301,10 +333,32 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async listArchivedQuizzes(userId: string): Promise<Quiz[]> {
-    return Array.from(this.quizzes.values())
-      .filter((quiz) => quiz.user_id === userId && Boolean(quiz.archived_at))
-      .sort((a, b) => new Date(b.archived_at || 0).getTime() - new Date(a.archived_at || 0).getTime())
-      .map((quiz) => ({ ...quiz, subject: quiz.subject_id ? this.subjects.get(quiz.subject_id) || null : null }));
+    const archived = new Map<string, Quiz>();
+    for (const [key, archive] of this.userQuizArchives.entries()) {
+      const [archiveUserId, quizId] = key.split('\u0000');
+      if (archiveUserId !== userId) continue;
+      const quiz = this.quizzes.get(quizId);
+      if (!quiz) continue;
+      archived.set(quizId, {
+        ...quiz,
+        archived_at: archive.archived_at,
+        archived_by_subject: archive.archived_by_subject,
+        subject: quiz.subject_id ? this.subjects.get(quiz.subject_id) || null : null
+      });
+    }
+
+    for (const quiz of this.quizzes.values()) {
+      if (quiz.user_id === userId && quiz.archived_at && !archived.has(quiz.id)) {
+        archived.set(quiz.id, {
+          ...quiz,
+          subject: quiz.subject_id ? this.subjects.get(quiz.subject_id) || null : null
+        });
+      }
+    }
+
+    return Array.from(archived.values()).sort((a, b) => (
+      new Date(b.archived_at || 0).getTime() - new Date(a.archived_at || 0).getTime()
+    ));
   }
 
   async purgeUserData(userId: string): Promise<void> {
@@ -338,6 +392,15 @@ export class MemoryQuizRepository implements IQuizRepository {
       this.subjects.delete(subjectId);
       this.collaborators.delete(subjectId);
       this.subjectViews.delete(subjectId);
+    }
+
+    for (const [key] of Array.from(this.userSubjectArchives.entries())) {
+      const [archiveUserId, subjectId] = key.split('\u0000');
+      if (archiveUserId === userId || ownedSubjectIds.has(subjectId)) this.userSubjectArchives.delete(key);
+    }
+    for (const [key] of Array.from(this.userQuizArchives.entries())) {
+      const [archiveUserId, quizId] = key.split('\u0000');
+      if (archiveUserId === userId || !this.quizzes.has(quizId)) this.userQuizArchives.delete(key);
     }
 
     for (const [subjectId, members] of this.collaborators.entries()) {
@@ -491,7 +554,7 @@ export class MemoryQuizRepository implements IQuizRepository {
 
   async getSubjectAccess(subjectId: string, userId?: string): Promise<SubjectAccess | null> {
     const subject = this.subjects.get(subjectId);
-    if (!subject || subject.archived_at) return null;
+    if (!subject || subject.archived_at || this.isSubjectArchivedForUser(subjectId, userId)) return null;
     if (userId && subject.user_id === userId) {
       return { subject_id: subjectId, role: 'owner', can_edit: true, can_edit_reviewers: true, can_manage: true };
     }
@@ -508,7 +571,8 @@ export class MemoryQuizRepository implements IQuizRepository {
     const access = await this.getSubjectAccess(subjectId, userId);
     if (!access) throw new Error('Subject not found or access is restricted');
     return Array.from(this.quizzes.values())
-      .filter((quiz) => quiz.subject_id === subjectId && !quiz.archived_at)
+      .filter((quiz) => quiz.subject_id === subjectId && !quiz.archived_at && !this.getQuizArchive(quiz.id, userId))
+      .filter(() => !this.isSubjectArchivedForUser(subjectId, userId))
       .filter((quiz) => access.role !== 'public' || isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at))
       .map((quiz) => ({ ...quiz, subject: this.subjects.get(subjectId) || null }));
   }
@@ -585,6 +649,12 @@ export class MemoryQuizRepository implements IQuizRepository {
     for (const token of Array.from(this.collaboratorLinks.keys())) {
       if (this.collaboratorLinks.get(token)?.subject_id === subjectId) this.collaboratorLinks.delete(token);
     }
+    for (const [key] of Array.from(this.userSubjectArchives.entries())) {
+      if (key.split('\u0000')[1] === subjectId) this.userSubjectArchives.delete(key);
+    }
+    for (const [key] of Array.from(this.userQuizArchives.entries())) {
+      if (!this.quizzes.has(key.split('\u0000')[1])) this.userQuizArchives.delete(key);
+    }
     this.collaborators.delete(subjectId);
     return this.subjects.delete(subjectId);
   }
@@ -592,23 +662,38 @@ export class MemoryQuizRepository implements IQuizRepository {
   async archiveSubject(subjectId: string, userId?: string): Promise<boolean> {
     if (!userId) throw new Error('Authenticated user required for subject management');
     const subject = this.subjects.get(subjectId);
-    if (!subject || subject.user_id !== userId || subject.archived_at) return false;
-    subject.archived_at = new Date().toISOString();
+    const key = userId ? this.archiveKey(userId, subjectId) : '';
+    if (!subject || subject.user_id !== userId || subject.archived_at || this.userSubjectArchives.has(key)) return false;
+
+    const archivedAt = new Date().toISOString();
+    this.userSubjectArchives.set(key, archivedAt);
     for (const quiz of this.quizzes.values()) {
-      if (quiz.subject_id === subjectId && !quiz.archived_at) {
-        quiz.archived_at = subject.archived_at;
-        quiz.archived_by_subject = true;
-        this.quizzes.set(quiz.id, quiz);
+      if (quiz.subject_id === subjectId && !quiz.archived_at && !this.getQuizArchive(quiz.id, userId)) {
+        this.userQuizArchives.set(this.archiveKey(userId, quiz.id), {
+          archived_at: archivedAt,
+          archived_by_subject: true
+        });
       }
     }
-    this.subjects.set(subjectId, subject);
     return true;
   }
 
   async restoreSubject(subjectId: string, userId?: string): Promise<boolean> {
     if (!userId) throw new Error('Authenticated user required for subject management');
     const subject = this.subjects.get(subjectId);
-    if (!subject || subject.user_id !== userId || !subject.archived_at) return false;
+    if (!subject || subject.user_id !== userId) return false;
+
+    const hadPersonalArchive = this.userSubjectArchives.delete(this.archiveKey(userId, subjectId));
+    if (hadPersonalArchive) {
+      for (const quiz of this.quizzes.values()) {
+        if (quiz.subject_id !== subjectId) continue;
+        const key = this.archiveKey(userId, quiz.id);
+        if (this.userQuizArchives.get(key)?.archived_by_subject) this.userQuizArchives.delete(key);
+      }
+      return true;
+    }
+
+    if (!subject.archived_at) return false;
     subject.archived_at = null;
     for (const quiz of this.quizzes.values()) {
       if (quiz.subject_id === subjectId && quiz.archived_at && quiz.archived_by_subject) {
@@ -622,9 +707,23 @@ export class MemoryQuizRepository implements IQuizRepository {
   }
 
   async listArchivedSubjects(userId: string): Promise<Subject[]> {
-    return Array.from(this.subjects.values())
-      .filter((subject) => subject.user_id === userId && Boolean(subject.archived_at))
-      .sort((a, b) => new Date(b.archived_at || 0).getTime() - new Date(a.archived_at || 0).getTime());
+    const archived = new Map<string, Subject>();
+    for (const [key, archivedAt] of this.userSubjectArchives.entries()) {
+      const [archiveUserId, subjectId] = key.split('\u0000');
+      if (archiveUserId !== userId) continue;
+      const subject = this.subjects.get(subjectId);
+      if (subject) archived.set(subjectId, { ...subject, archived_at: archivedAt });
+    }
+
+    for (const subject of this.subjects.values()) {
+      if (subject.user_id === userId && subject.archived_at && !archived.has(subject.id)) {
+        archived.set(subject.id, { ...subject });
+      }
+    }
+
+    return Array.from(archived.values()).sort((a, b) => (
+      new Date(b.archived_at || 0).getTime() - new Date(a.archived_at || 0).getTime()
+    ));
   }
 
   async recordSubjectView(subjectId: string, viewerId: string): Promise<void> {

@@ -20,6 +20,28 @@ export class NeonQuizRepository implements IQuizRepository {
     }
   }
 
+  private async getUserArchiveIds(userId?: string): Promise<{ subjectIds: Set<string>; quizIds: Set<string> }> {
+    if (!userId) return { subjectIds: new Set(), quizIds: new Set() };
+
+    try {
+      const [subjectRows, quizRows] = await Promise.all([
+        this.sql`SELECT subject_id FROM user_subject_archives WHERE user_id = ${userId}`,
+        this.sql`SELECT quiz_id FROM user_quiz_archives WHERE user_id = ${userId}`
+      ]);
+      return {
+        subjectIds: new Set(subjectRows.map((row: any) => String(row.subject_id))),
+        quizIds: new Set(quizRows.map((row: any) => String(row.quiz_id)))
+      };
+    } catch (error: any) {
+      // Keep legacy-only reads working while the relation tables are absent,
+      // but do not hide permission or transient storage failures.
+      if (error?.code === '42P01') {
+        return { subjectIds: new Set(), quizIds: new Set() };
+      }
+      throw error;
+    }
+  }
+
   private async requireSubjectAssignment(subjectId: string | null | undefined, userId?: string): Promise<void> {
     if (!subjectId) return;
     if (!userId) {
@@ -87,7 +109,8 @@ export class NeonQuizRepository implements IQuizRepository {
             AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
           ORDER BY s.name ASC, s.id ASC
         `;
-    return rows as Subject[];
+    const archiveIds = await this.getUserArchiveIds(userId);
+    return (rows as Subject[]).filter((subject) => !archiveIds.subjectIds.has(subject.id));
   }
 
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {
@@ -186,6 +209,7 @@ export class NeonQuizRepository implements IQuizRepository {
             AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
           LIMIT 1
         `;
+    if (userId && (await this.getUserArchiveIds(userId)).subjectIds.has(subjectId)) return null;
     if (!rows || rows.length === 0) return null;
     const row = rows[0] as any;
     if (userId && row.user_id === userId) {
@@ -223,7 +247,11 @@ export class NeonQuizRepository implements IQuizRepository {
             AND q.archived_at IS NULL
           ORDER BY q.generated_at DESC, q.id ASC
         `;
-    return rows as Quiz[];
+    const archiveIds = await this.getUserArchiveIds(userId);
+    return (rows as Quiz[]).filter((quiz) => (
+      !archiveIds.quizIds.has(quiz.id)
+      && (!quiz.subject_id || !archiveIds.subjectIds.has(quiz.subject_id))
+    ));
   }
 
   async createSubjectCollaboratorLink(subjectId: string, expiresAt: string | null, userId: string, maxUses: number = 5): Promise<SubjectCollaboratorLink> {
@@ -339,18 +367,31 @@ export class NeonQuizRepository implements IQuizRepository {
       WITH target_subject AS (
         SELECT id
         FROM subjects
-        WHERE id = ${subjectId} AND user_id = ${userId} AND archived_at IS NULL
-      ), archived_quizzes AS (
-        UPDATE quizzes
-        SET archived_at = now(), archived_by_subject = TRUE
-        WHERE subject_id IN (SELECT id FROM target_subject)
+        WHERE id = ${subjectId}
+          AND user_id = ${userId}
           AND archived_at IS NULL
-        RETURNING id
+          AND NOT EXISTS (
+            SELECT 1
+            FROM user_subject_archives usa
+            WHERE usa.subject_id = subjects.id AND usa.user_id = ${userId}
+          )
+      ), archived_subject AS (
+        INSERT INTO user_subject_archives (user_id, subject_id, archived_at)
+        SELECT ${userId}, id, now()
+        FROM target_subject
+        ON CONFLICT (user_id, subject_id)
+        DO UPDATE SET archived_at = EXCLUDED.archived_at
+        RETURNING subject_id
+      ), archived_quizzes AS (
+        INSERT INTO user_quiz_archives (user_id, quiz_id, archived_at, archived_by_subject)
+        SELECT ${userId}, q.id, now(), TRUE
+        FROM quizzes q
+        JOIN archived_subject s ON s.subject_id = q.subject_id
+        WHERE q.archived_at IS NULL
+        ON CONFLICT (user_id, quiz_id) DO NOTHING
+        RETURNING quiz_id
       )
-      UPDATE subjects
-      SET archived_at = now()
-      WHERE id IN (SELECT id FROM target_subject)
-      RETURNING id
+      SELECT subject_id AS id FROM archived_subject
     `;
     return Boolean(rows && rows.length > 0);
   }
@@ -359,19 +400,19 @@ export class NeonQuizRepository implements IQuizRepository {
     if (!userId) throw new Error('Authenticated user required for subject management');
     const rows = await this.sql`
       WITH restored_subject AS (
-        UPDATE subjects
-        SET archived_at = NULL
-        WHERE id = ${subjectId} AND user_id = ${userId} AND archived_at IS NOT NULL
-        RETURNING id
+        DELETE FROM user_subject_archives
+        WHERE subject_id = ${subjectId} AND user_id = ${userId}
+        RETURNING subject_id
       ), restored_quizzes AS (
-        UPDATE quizzes
-        SET archived_at = NULL, archived_by_subject = FALSE
-        WHERE subject_id IN (SELECT id FROM restored_subject)
-          AND archived_at IS NOT NULL
-          AND archived_by_subject = TRUE
-        RETURNING id
+        DELETE FROM user_quiz_archives uqa
+        USING restored_subject rs, quizzes q
+        WHERE uqa.user_id = ${userId}
+          AND uqa.quiz_id = q.id
+          AND q.subject_id = rs.subject_id
+          AND uqa.archived_by_subject = TRUE
+        RETURNING uqa.quiz_id
       )
-      SELECT id FROM restored_subject
+      SELECT subject_id AS id FROM restored_subject
     `;
     return Boolean(rows && rows.length > 0);
   }
@@ -379,11 +420,28 @@ export class NeonQuizRepository implements IQuizRepository {
   async listArchivedSubjects(userId: string): Promise<Subject[]> {
     const rows = await this.sql`
       SELECT *
-      FROM subjects
-      WHERE user_id = ${userId} AND archived_at IS NOT NULL
-      ORDER BY archived_at DESC, name ASC, id ASC
+      FROM (
+        SELECT s.*, usa.archived_at AS viewer_archived_at
+        FROM user_subject_archives usa
+        JOIN subjects s ON s.id = usa.subject_id
+        WHERE usa.user_id = ${userId}
+        UNION ALL
+        SELECT s.*, NULL::timestamptz AS viewer_archived_at
+        FROM subjects s
+        WHERE s.user_id = ${userId}
+          AND s.archived_at IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM user_subject_archives usa
+            WHERE usa.subject_id = s.id AND usa.user_id = ${userId}
+          )
+      ) archived
+      ORDER BY COALESCE(viewer_archived_at, archived_at) DESC, name ASC, id ASC
     `;
-    return rows as Subject[];
+    return (rows as any[]).map((row) => ({
+      ...row,
+      archived_at: row.viewer_archived_at || row.archived_at
+    })) as Subject[];
   }
 
   async getSubjectShareConfig(subjectId: string, userId?: string): Promise<{ share_token: string; is_public: boolean; share_expires_at?: string | null; share_revoked_at?: string | null }> {
@@ -517,7 +575,11 @@ export class NeonQuizRepository implements IQuizRepository {
             AND (q.share_expires_at IS NULL OR q.share_expires_at > now())
           ORDER BY q.generated_at DESC, q.id ASC
         `;
-    return rows as Quiz[];
+    const archiveIds = await this.getUserArchiveIds(userId);
+    return (rows as Quiz[]).filter((quiz) => (
+      !archiveIds.quizIds.has(quiz.id)
+      && (!quiz.subject_id || !archiveIds.subjectIds.has(quiz.subject_id))
+    ));
   }
 
   async listQuizzesAndSubjects(userId?: string): Promise<LibraryData> {
@@ -593,7 +655,14 @@ export class NeonQuizRepository implements IQuizRepository {
         `;
 
     if (!rows || rows.length === 0) return null;
-    return rows[0] as Quiz;
+    const quiz = rows[0] as Quiz;
+    if (userId) {
+      const archiveIds = await this.getUserArchiveIds(userId);
+      if (archiveIds.quizIds.has(quiz.id) || (quiz.subject_id && archiveIds.subjectIds.has(quiz.subject_id))) {
+        return null;
+      }
+    }
+    return quiz;
   }
 
   async createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz> {
@@ -744,10 +813,14 @@ export class NeonQuizRepository implements IQuizRepository {
   async archiveQuiz(id: string, userId?: string): Promise<boolean> {
     if (!userId) throw new Error('Authenticated user required for quiz management');
     const rows = await this.sql`
-      UPDATE quizzes
-      SET archived_at = now(), archived_by_subject = FALSE
-      WHERE id = ${id} AND user_id = ${userId} AND archived_at IS NULL
-      RETURNING id
+      INSERT INTO user_quiz_archives (user_id, quiz_id, archived_at, archived_by_subject)
+      SELECT ${userId}, id, now(), FALSE
+      FROM quizzes
+      WHERE id = ${id}
+        AND user_id = ${userId}
+        AND archived_at IS NULL
+      ON CONFLICT (user_id, quiz_id) DO NOTHING
+      RETURNING quiz_id AS id
     `;
     return Boolean(rows && rows.length > 0);
   }
@@ -755,27 +828,55 @@ export class NeonQuizRepository implements IQuizRepository {
   async restoreQuiz(id: string, userId?: string): Promise<boolean> {
     if (!userId) throw new Error('Authenticated user required for quiz management');
     const rows = await this.sql`
-      UPDATE quizzes
-      SET archived_at = NULL, archived_by_subject = FALSE
-      WHERE id = ${id} AND user_id = ${userId} AND archived_at IS NOT NULL
-      RETURNING id
+      DELETE FROM user_quiz_archives
+      WHERE quiz_id = ${id}
+        AND user_id = ${userId}
+        AND archived_by_subject = FALSE
+      RETURNING quiz_id AS id
     `;
     return Boolean(rows && rows.length > 0);
   }
 
   async listArchivedQuizzes(userId: string): Promise<Quiz[]> {
     const rows = await this.sql`
-      SELECT q.*,
-        CASE WHEN s.id IS NOT NULL
-          THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id, 'archived_at', s.archived_at)
-          ELSE NULL
-        END AS subject
-      FROM quizzes q
-      LEFT JOIN subjects s ON s.id = q.subject_id
-      WHERE q.user_id = ${userId} AND q.archived_at IS NOT NULL
-      ORDER BY q.archived_at DESC, q.generated_at DESC, q.id ASC
+      SELECT *
+      FROM (
+        SELECT q.*,
+          CASE WHEN s.id IS NOT NULL
+            THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id, 'archived_at', s.archived_at)
+            ELSE NULL
+          END AS subject,
+          uqa.archived_at AS viewer_archived_at,
+          uqa.archived_by_subject AS viewer_archived_by_subject
+        FROM user_quiz_archives uqa
+        JOIN quizzes q ON q.id = uqa.quiz_id
+        LEFT JOIN subjects s ON s.id = q.subject_id
+        WHERE uqa.user_id = ${userId}
+        UNION ALL
+        SELECT q.*,
+          CASE WHEN s.id IS NOT NULL
+            THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id, 'archived_at', s.archived_at)
+            ELSE NULL
+          END AS subject,
+          NULL::timestamptz AS viewer_archived_at,
+          NULL::boolean AS viewer_archived_by_subject
+        FROM quizzes q
+        LEFT JOIN subjects s ON s.id = q.subject_id
+        WHERE q.user_id = ${userId}
+          AND q.archived_at IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM user_quiz_archives uqa
+            WHERE uqa.quiz_id = q.id AND uqa.user_id = ${userId}
+          )
+      ) archived
+      ORDER BY COALESCE(viewer_archived_at, archived_at) DESC, generated_at DESC, id ASC
     `;
-    return rows as Quiz[];
+    return (rows as any[]).map((row) => ({
+      ...row,
+      archived_at: row.viewer_archived_at || row.archived_at,
+      archived_by_subject: row.viewer_archived_by_subject ?? row.archived_by_subject
+    })) as Quiz[];
   }
 
   async purgeUserData(userId: string): Promise<void> {
@@ -798,6 +899,15 @@ export class NeonQuizRepository implements IQuizRepository {
       )
       DELETE FROM subjects
       WHERE id IN (SELECT id FROM owned_subjects)
+    `;
+
+    await this.sql`
+      DELETE FROM user_subject_archives
+      WHERE user_id = ${userId}
+    `;
+    await this.sql`
+      DELETE FROM user_quiz_archives
+      WHERE user_id = ${userId}
     `;
 
     await this.sql`

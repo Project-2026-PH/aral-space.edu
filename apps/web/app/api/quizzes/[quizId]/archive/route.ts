@@ -3,7 +3,7 @@ import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { getQuizRepository } from '@/lib/db';
 import { assertAllowedOrigin, enforceRateLimit } from '@/lib/request-security';
-import { revalidatePublicQuizCaches, revalidatePublicQuizTag, revalidatePublicSubjectCaches, revalidateQuizTag, revalidateUserLists } from '@/lib/cached-queries';
+import { revalidateUserLists, revalidateUserQuizDetails } from '@/lib/cached-queries';
 import { isQuizOwner } from '@/lib/quiz-access';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ quizId: string }> }) {
@@ -17,13 +17,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ qui
     const controller = new QuizCrudController(repository);
     const quiz = await controller.getQuizById(quizId, userId);
     if (!quiz || !isQuizOwner(quiz, userId)) return NextResponse.json({ error: 'Only the reviewer owner can archive it.' }, { status: 403 });
-    const share = await controller.getShareConfig(quizId, userId).catch(() => null);
     const archived = await controller.archiveQuiz(quizId, userId);
     if (!archived) return NextResponse.json({ error: 'Reviewer not found' }, { status: 404 });
-    if (share?.share_token) revalidatePublicQuizTag(share.share_token);
-    revalidatePublicQuizCaches();
-    revalidatePublicSubjectCaches();
-    revalidateQuizTag(quizId, userId, quiz.subject_id);
+    revalidateUserQuizDetails(userId);
     revalidateUserLists(userId);
     return NextResponse.json({ archived: true });
   } catch (error: any) {

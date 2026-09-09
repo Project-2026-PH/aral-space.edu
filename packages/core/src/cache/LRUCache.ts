@@ -117,6 +117,14 @@ export class LRUCache<K = string, V = unknown> {
     }
   }
 
+  deleteWhere(predicate: (key: K) => boolean): void {
+    for (const key of this.cache.keys()) {
+      if (predicate(key)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
   clear(): void {
     this.cache.clear();
   }

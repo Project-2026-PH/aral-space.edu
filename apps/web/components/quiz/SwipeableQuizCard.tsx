@@ -18,6 +18,7 @@ interface SwipeableQuizCardProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  subjectId?: string;
 }
 
 export default function SwipeableQuizCard({
@@ -28,7 +29,8 @@ export default function SwipeableQuizCard({
   onOpen,
   onClose,
   onEdit,
-  onDelete
+  onDelete,
+  subjectId,
 }: SwipeableQuizCardProps) {
   const router = useRouter();
   const [offset, setOffset] = useState(0);
@@ -43,6 +45,9 @@ export default function SwipeableQuizCard({
   const cardRef = useRef<HTMLDivElement>(null);
 
   const subjectName = subject?.name;
+  const reviewHref = subjectId
+    ? `/review/${quiz.id}?subjectId=${encodeURIComponent(subjectId)}`
+    : `/review/${quiz.id}`;
 
   // Synchronize external isOpen state
   useEffect(() => {
@@ -237,7 +242,7 @@ export default function SwipeableQuizCard({
         className="relative z-10 flex min-h-36 sm:min-h-[148px] h-full w-full flex-col justify-between bg-white dark:bg-card p-4 sm:p-4.5 select-none"
       >
         <Link
-          href={`/review/${quiz.id}`}
+          href={reviewHref}
           aria-label={`Review ${quiz.title}`}
           onClick={(e) => {
             if (isOpen || hasMovedRef.current) {
@@ -353,7 +358,7 @@ export default function SwipeableQuizCard({
               </span>
             )}
             <Link
-              href={`/review/${quiz.id}`}
+              href={reviewHref}
               onClick={(e) => {
                 if (isOpen || hasMovedRef.current) {
                   e.preventDefault();

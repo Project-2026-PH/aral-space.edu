@@ -175,6 +175,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
       <QuizLibrary
         quizzes={subjectQuizzes}
         loading={false}
+        subjectId={subject.id}
         readOnly={!access.can_edit_reviewers}
         onQuizDeleted={(quizId) => {
           setSubjectQuizzes((current) => current.filter((quiz) => quiz.id !== quizId));

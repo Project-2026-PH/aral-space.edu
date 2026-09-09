@@ -19,6 +19,7 @@ interface QuizLibraryProps {
   heading?: string;
   maxItems?: number;
   onViewAll?: () => void;
+  subjectId?: string;
 }
 
 export default function QuizLibrary({
@@ -32,6 +33,7 @@ export default function QuizLibrary({
   heading = 'Reviewers',
   maxItems,
   onViewAll,
+  subjectId,
 }: QuizLibraryProps) {
   const router = useRouter();
   const [swipedQuizId, setSwipedQuizId] = useState<string | null>(null);
@@ -199,6 +201,7 @@ export default function QuizLibrary({
                 key={quiz.id}
                 quiz={quiz}
                 subject={subject}
+                subjectId={subjectId}
                 readOnly={readOnly}
                 isOpen={swipedQuizId === quiz.id}
                 onOpen={() => setSwipedQuizId(quiz.id)}

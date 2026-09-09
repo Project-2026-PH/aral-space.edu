@@ -219,20 +219,18 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const isMultipleChoiceMode = currentMode === 'multiple_choice';
   const isDesktopViewportMode = isMultipleChoiceMode || currentMode === 'identification';
   const isResumePromptMode = mode === 'multiple_choice' || mode === 'identification';
-  const hasExistingMasteryProgress = totalLockedCount > 0;
-
   useEffect(() => {
     if (
       !isProgressHydrated ||
       isCompleted ||
       !isResumePromptMode ||
       resumePromptShownRef.current ||
-      (!hasRestoredProgress && !hasExistingMasteryProgress)
+      !hasRestoredProgress
     ) return;
 
     resumePromptShownRef.current = true;
     setShowResumePrompt(true);
-  }, [hasExistingMasteryProgress, hasRestoredProgress, isCompleted, isProgressHydrated, isResumePromptMode]);
+  }, [hasRestoredProgress, isCompleted, isProgressHydrated, isResumePromptMode]);
 
   const resetSavedReview = () => {
     resetProgress();

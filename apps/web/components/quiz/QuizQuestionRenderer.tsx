@@ -155,7 +155,13 @@ function AiExplanationCard({
           </div>
         </div>
         <div className="flex items-center gap-1 text-muted-foreground">
-          <span className="text-[10px] font-medium mr-0.5">Helpful?</span>
+          <span
+            className="text-[10px] font-medium mr-0.5"
+            role="status"
+            aria-live="polite"
+          >
+            {aiRating ? 'Thanks for the feedback!' : 'Helpful?'}
+          </span>
           <button
             type="button"
             onClick={() => onRate?.('up')}

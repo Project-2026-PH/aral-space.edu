@@ -107,6 +107,16 @@ html.theme-changing *::after {
   animation: none !important;
 }
 
+/* Keep the control itself animated while the rest of the page swaps themes. */
+html.theme-changing .ui-switch,
+html.theme-changing .ui-switch *,
+html.theme-changing .ui-switch *::before,
+html.theme-changing .ui-switch *::after {
+  transition-property: background-color, opacity, transform, left !important;
+  transition-duration: 180ms !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
 .theme-fade-overlay {
   position: fixed;
   inset: 0;

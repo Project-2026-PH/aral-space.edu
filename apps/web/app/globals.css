@@ -97,6 +97,28 @@ body.dark::-webkit-scrollbar-thumb:hover {
   --ring: 238 82% 65%;
 }
 
+/* Theme changes should swap colors in one paint instead of animating the entire DOM. */
+html.theme-changing *,
+html.theme-changing *::before,
+html.theme-changing *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+.theme-fade-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 1;
+  will-change: opacity;
+  transition: opacity 180ms ease-out;
+}
+
+.theme-fade-overlay.is-fading {
+  opacity: 0;
+}
+
 html,
 body {
   max-width: 100%;

@@ -337,7 +337,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
       onKeyDown={handleSurfaceKeyDown}
     >
       <div className="flex items-center justify-between">
-        <Link href={`/review/${quiz.id}`} className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />Return to Reviewer</Link>
+        <Link href={`/review/${encodeURIComponent(quiz.slug || quiz.id)}`} className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" />Return to Reviewer</Link>
         <div className="flex items-center gap-2.5 sm:gap-3">
           <WindFlameBadge
             streak={currentStreak}

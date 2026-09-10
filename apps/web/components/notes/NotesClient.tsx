@@ -34,7 +34,7 @@ export default function NotesClient() {
   const [hydrated, setHydrated] = useState(false);
   const [savingReviewer, setSavingReviewer] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [createdReviewer, setCreatedReviewer] = useState<{ id: string; title: string } | null>(null);
+  const [createdReviewer, setCreatedReviewer] = useState<{ id: string; slug?: string | null; title: string } | null>(null);
   const [saveMenuOpen, setSaveMenuOpen] = useState(false);
 
   const notesRef = useRef(notes);
@@ -190,7 +190,7 @@ export default function NotesClient() {
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error || 'Could not save the reviewer.');
-      setCreatedReviewer({ id: data.id, title: selectedNote.title.trim() || 'Notes reviewer' });
+      setCreatedReviewer({ id: data.id, slug: data.slug, title: selectedNote.title.trim() || 'Notes reviewer' });
       setStatus('Reviewer generated! Your note remains saved here as a draft.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not save the reviewer.');
@@ -300,7 +300,7 @@ export default function NotesClient() {
           </div>
           <div className="flex items-center gap-2">
             <a
-              href={`/quizzes/${createdReviewer.id}`}
+              href={`/quizzes/${encodeURIComponent(createdReviewer.slug || createdReviewer.id)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"

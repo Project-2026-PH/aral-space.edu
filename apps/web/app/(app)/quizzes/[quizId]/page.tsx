@@ -1,8 +1,9 @@
-import { notFound } from 'next/navigation';
+import { redirect, notFound } from 'next/navigation';
 import QuizOverviewClient from '@/components/quiz/QuizOverviewClient';
 import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { getQuizRepository } from '@/lib/db';
+import { resolveQuizRoute } from '@/lib/route-locators';
 import { hasReviewerEditAccess, isQuizOwner } from '@/lib/quiz-access';
 
 export default async function QuizDetailPage({
@@ -13,8 +14,12 @@ export default async function QuizDetailPage({
   const { quizId } = await params;
   const userId = await getAnonymousUserId();
   const quizRepo = await getQuizRepository();
+  const match = await resolveQuizRoute(quizRepo, quizId, userId);
+  if (!match) notFound();
+  if (match.isLegacyId && match.entity.slug) redirect(`/quizzes/${encodeURIComponent(match.entity.slug)}`);
+
   const controller = new QuizCrudController(quizRepo);
-  const quiz = await controller.getQuiz(quizId, userId);
+  const quiz = await controller.getQuiz(match.id, userId);
 
   if (!quiz) notFound();
 

@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   title: ' Aral Space',
   description: 'Local-First reviewer generator.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/ARAL_SPACE_LOGO.png',
+    shortcut: '/ARAL_SPACE_LOGO.png',
+    apple: '/ARAL_SPACE_LOGO.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

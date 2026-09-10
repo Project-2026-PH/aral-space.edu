@@ -620,7 +620,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
       const cloned = await res.json();
       setClonedSuccess(true);
       setTimeout(() => {
-        router.push(`/quizzes/${cloned.id}`);
+        router.push(`/quizzes/${encodeURIComponent(cloned.slug || cloned.id)}`);
       }, 800);
     } catch (err: any) {
       alert(err.message || 'Could not clone study set.');
@@ -683,7 +683,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
               <span>Review Again</span>
             </button>
             <Link
-              href={`/practice/${quiz.id}?mode=multiple_choice${sharedQuery}`}
+              href={`/practice/${encodeURIComponent(quiz.slug || quiz.id)}?mode=multiple_choice${sharedQuery}`}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-6 py-3.5 text-xs font-bold text-foreground transition-all hover:bg-muted active:scale-95"
             >
               <Layers className="h-4 w-4 text-primary" />
@@ -772,14 +772,14 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             Flashcards
           </button>
           <Link
-            href={`/practice/${quiz.id}?mode=identification${sharedQuery}`}
+            href={`/practice/${encodeURIComponent(quiz.slug || quiz.id)}?mode=identification${sharedQuery}`}
             className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <PenTool className="h-6 w-6 text-primary" />
             Identification
           </Link>
           <Link
-            href={`/practice/${quiz.id}?mode=multiple_choice${sharedQuery}`}
+            href={`/practice/${encodeURIComponent(quiz.slug || quiz.id)}?mode=multiple_choice${sharedQuery}`}
             className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Layers className="h-6 w-6 text-primary" />

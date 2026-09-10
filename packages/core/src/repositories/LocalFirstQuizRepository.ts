@@ -4,6 +4,7 @@ import { normalizeQuestionFields } from './questionFields';
 import { SAMPLE_SUBJECT, SAMPLE_QUIZ, SAMPLE_QUIZ_QUESTIONS, SAMPLE_QUIZ_ID } from '../services/SampleQuizService';
 import { generateSecureToken, isShareTokenActive } from '../security/shareTokens';
 import { toPublicQuizDto, toPublicSubjectDto } from '../security/publicDtos';
+import { createUniqueSlug, slugify } from '../utils/slug';
 
 function generateShareToken(): string {
   return generateSecureToken(32);
@@ -45,12 +46,34 @@ export class LocalFirstQuizRepository implements IQuizRepository {
   constructor() {
     this.hydrateFromStorage();
     this.seedDefaultDataIfEmpty();
+    this.ensureSlugs();
+  }
+
+  private ensureSlugs(): void {
+    const subjectSlugs = new Set<string>();
+    for (const subject of this.inMemorySubjects.values()) {
+      let slug = subject.slug || slugify(subject.name, 'subject');
+      let suffix = 2;
+      while (subjectSlugs.has(slug)) slug = `${slugify(subject.name, 'subject')}-${suffix++}`;
+      subject.slug = slug;
+      subjectSlugs.add(slug);
+    }
+
+    const quizSlugs = new Set<string>();
+    for (const quiz of this.inMemoryQuizzes.values()) {
+      let slug = quiz.slug || slugify(quiz.title, 'quiz');
+      let suffix = 2;
+      while (quizSlugs.has(slug)) slug = `${slugify(quiz.title, 'quiz')}-${suffix++}`;
+      quiz.slug = slug;
+      quizSlugs.add(slug);
+    }
+    this.persistToStorage();
   }
 
   private seedDefaultDataIfEmpty(): void {
     if (!this.inMemoryQuizzes.has(SAMPLE_QUIZ_ID)) {
-      this.inMemorySubjects.set(SAMPLE_SUBJECT.id, SAMPLE_SUBJECT);
-      this.inMemoryQuizzes.set(SAMPLE_QUIZ.id, SAMPLE_QUIZ);
+      this.inMemorySubjects.set(SAMPLE_SUBJECT.id, { ...SAMPLE_SUBJECT, slug: SAMPLE_SUBJECT.slug ?? slugify(SAMPLE_SUBJECT.name) });
+      this.inMemoryQuizzes.set(SAMPLE_QUIZ.id, { ...SAMPLE_QUIZ, slug: SAMPLE_QUIZ.slug ?? slugify(SAMPLE_QUIZ.title) });
       SAMPLE_QUIZ_QUESTIONS.forEach(q => {
         this.inMemoryQuestions.set(q.id, q);
       });
@@ -181,6 +204,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
     const subject: Subject = {
       id,
       name,
+      slug: await createUniqueSlug(name, async (candidate) => Array.from(this.inMemorySubjects.values()).some((item) => item.slug === candidate), 'subject'),
       color,
       user_id: userId,
       share_token: generateShareToken(),
@@ -227,6 +251,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
     const newQuiz: Quiz = {
       id: quizId,
       title: dto.title,
+      slug: await createUniqueSlug(dto.title, async (candidate) => Array.from(this.inMemoryQuizzes.values()).some((item) => item.slug === candidate), 'quiz'),
       description: dto.description || null,
       term: dto.term || null,
       question_count: dto.questions.length,

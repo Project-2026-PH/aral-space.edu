@@ -553,6 +553,7 @@ export default function QuizOverviewClient({
         open={showStartModal}
         onOpenChange={setShowStartModal}
         quizId={quiz.id}
+        quizSlug={quiz.slug}
         title={quiz.title}
       />
 

@@ -49,8 +49,8 @@ export default function SwipeableQuizCard({
 
   const subjectName = subject?.name;
   const reviewHref = subjectId
-    ? `/review/${quiz.id}?subjectId=${encodeURIComponent(subjectId)}`
-    : `/review/${quiz.id}`;
+    ? `/review/${encodeURIComponent(quiz.slug || quiz.id)}?subjectId=${encodeURIComponent(subjectId)}`
+    : `/review/${encodeURIComponent(quiz.slug || quiz.id)}`;
 
   // Synchronize external isOpen state
   useEffect(() => {
@@ -327,7 +327,7 @@ export default function SwipeableQuizCard({
         <div className="mt-3 flex items-center justify-between gap-1.5 border-t-2 border-slate-900/20 dark:border-white/20 pt-2.5">
           {!readOnly ? (
             <Link
-              href={`/quizzes/${quiz.id}`}
+              href={`/quizzes/${encodeURIComponent(quiz.slug || quiz.id)}`}
               onClick={(e) => {
                 if (isOpen || hasMovedRef.current) {
                   e.preventDefault();

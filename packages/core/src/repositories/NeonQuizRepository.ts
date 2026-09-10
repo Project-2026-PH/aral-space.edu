@@ -4,6 +4,7 @@ import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 import { normalizeQuestionFields } from './questionFields';
 import { generateSecureToken, isShareTokenActive } from '../security/shareTokens';
 import { toPublicQuizDto, toPublicSubjectDto } from '../security/publicDtos';
+import { createUniqueSlug } from '../utils/slug';
 
 function generateShareToken(): string {
   return generateSecureToken(32);
@@ -114,9 +115,13 @@ export class NeonQuizRepository implements IQuizRepository {
   }
 
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {
+    const slug = await createUniqueSlug(name, async (candidate) => {
+      const rows = await this.sql`SELECT 1 FROM subjects WHERE slug = ${candidate} LIMIT 1`;
+      return rows.length > 0;
+    }, 'subject');
     const rows = await this.sql`
-      INSERT INTO subjects (name, color, user_id, share_token, is_public)
-      VALUES (${name}, ${color}, ${userId || null}, ${generateShareToken()}, true)
+      INSERT INTO subjects (name, slug, color, user_id, share_token, is_public)
+      VALUES (${name}, ${slug}, ${color}, ${userId || null}, ${generateShareToken()}, true)
       RETURNING *
     `;
     return rows[0] as Subject;
@@ -679,6 +684,10 @@ export class NeonQuizRepository implements IQuizRepository {
 
   async createQuiz(dto: CreateQuizDto, userId?: string): Promise<Quiz> {
     await this.requireSubjectAssignment(dto.subject_id, userId);
+    const slug = await createUniqueSlug(dto.title, async (candidate) => {
+      const rows = await this.sql`SELECT 1 FROM quizzes WHERE slug = ${candidate} LIMIT 1`;
+      return rows.length > 0;
+    }, 'quiz');
     const questionPayload = JSON.stringify(dto.questions.map((question, order_index) => {
       const fields = normalizeQuestionFields(question);
       return {
@@ -700,6 +709,7 @@ export class NeonQuizRepository implements IQuizRepository {
       WITH created_quiz AS (
         INSERT INTO quizzes (
           title,
+          slug,
           description,
           term,
           question_count,
@@ -713,6 +723,7 @@ export class NeonQuizRepository implements IQuizRepository {
         )
         VALUES (
           ${dto.title},
+          ${slug},
           ${dto.description || null},
           ${dto.term || null},
           ${dto.questions.length},

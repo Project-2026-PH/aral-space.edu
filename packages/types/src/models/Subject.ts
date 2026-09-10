@@ -1,6 +1,7 @@
 export interface Subject {
   id: string;
   name: string;
+  slug?: string | null;
   color: string;
   user_id?: string;
   created_at?: string;

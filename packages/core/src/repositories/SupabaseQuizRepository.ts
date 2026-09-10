@@ -5,6 +5,7 @@ import { MemoryQuizRepository } from './MemoryQuizRepository';
 import { normalizeQuestionFields } from './questionFields';
 import { generateSecureToken, isShareTokenActive } from '../security/shareTokens';
 import { toPublicQuizDto, toPublicSubjectDto } from '../security/publicDtos';
+import { createUniqueSlug } from '../utils/slug';
 
 function generateShareToken(): string {
   return generateSecureToken(32);
@@ -137,10 +138,17 @@ export class SupabaseQuizRepository implements IQuizRepository {
 
   async createSubject(name: string, color: string, userId?: string): Promise<Subject> {
     try {
+      const { data: existing } = await this.supabase
+        .from('subjects')
+        .select('slug')
+        .like('slug', `${name}%`);
+      const used = new Set((existing || []).map((row) => row.slug));
+      const slug = await createUniqueSlug(name, async (candidate) => used.has(candidate), 'subject');
       const { data, error } = await this.supabase
         .from('subjects')
         .insert({
           name,
+          slug,
           color,
           user_id: userId,
           share_token: generateShareToken(),
@@ -721,10 +729,14 @@ export class SupabaseQuizRepository implements IQuizRepository {
     await this.requireSubjectAssignment(dto.subject_id, userId);
     const shareToken = generateShareToken();
     try {
+      const { data: existing } = await this.supabase.from('quizzes').select('slug');
+      const used = new Set((existing || []).map((row) => row.slug));
+      const slug = await createUniqueSlug(dto.title, async (candidate) => used.has(candidate), 'quiz');
       const { data: quizData, error: quizError } = await this.supabase
         .from('quizzes')
         .insert({
           title: dto.title,
+          slug,
           description: dto.description || null,
           term: dto.term || null,
           question_count: dto.questions.length,

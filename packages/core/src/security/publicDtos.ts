@@ -10,6 +10,7 @@ export function toPublicQuizDto(
   return {
     id: quiz.id,
     title: quiz.title,
+    slug: quiz.slug || null,
     description: quiz.description || null,
     question_count: quiz.question_count || questions.length,
     generated_at: quiz.generated_at,
@@ -54,6 +55,7 @@ export function toPublicSubjectDto(subject: Subject, quizzes: Quiz[]): PublicSub
     quizzes: quizzes.map((quiz) => ({
       id: quiz.id,
       title: quiz.title,
+      slug: quiz.slug || null,
       description: quiz.description || null,
       question_count: quiz.question_count,
       generated_at: quiz.generated_at,

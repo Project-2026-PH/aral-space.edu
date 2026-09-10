@@ -693,7 +693,7 @@ export default function ManualQuizCreator({
         );
       });
       window.localStorage.removeItem(MANUAL_DRAFT_STORAGE_KEY);
-      router.push(`/quizzes/${data.id}`);
+      router.push(`/quizzes/${encodeURIComponent(data.slug || data.id)}`);
     } catch (err: any) {
       setError(err.message || 'Failed to save study set.');
     } finally {

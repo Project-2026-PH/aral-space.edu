@@ -164,6 +164,7 @@ export class QuizGenerationController {
       message: 'Complete',
       detail: `Quiz ready! (${generated.questions.length} questions, adapted to your style)`,
       quizId: createdQuiz.id,
+      quizSlug: createdQuiz.slug || null,
       stage: 'complete',
       modelUsed: generated.sourceModel,
       pipelineMode: dto.pipelineMode || 'auto',

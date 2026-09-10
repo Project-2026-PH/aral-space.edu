@@ -12,6 +12,7 @@ export * from './repositories/LocalFirstSessionRepository';
 export * from './repositories/RepositoryFactory';
 
 export * from './cache/LRUCache';
+export * from './utils/slug';
 
 export * from './services/AnswerValidationService';
 export * from './services/AnswerValidationService';

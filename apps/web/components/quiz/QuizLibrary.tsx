@@ -272,7 +272,7 @@ export default function QuizLibrary({
                 }}
                 onEdit={() => {
                   setSwipedQuizId(null);
-                  router.push(`/quizzes/${quiz.id}`);
+                  router.push(`/quizzes/${encodeURIComponent(quiz.slug || quiz.id)}`);
                 }}
                 onDelete={() => {
                   setSwipedQuizId(null);

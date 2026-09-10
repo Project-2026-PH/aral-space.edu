@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
+  const transitionFrameRef = useRef<number | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const fadeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -20,19 +23,63 @@ export default function ThemeToggle() {
       document.documentElement.classList.remove('dark');
       setTheme('light');
     }
+
+    return () => {
+      if (transitionFrameRef.current !== null) {
+        cancelAnimationFrame(transitionFrameRef.current);
+      }
+      if (fadeTimerRef.current !== null) {
+        window.clearTimeout(fadeTimerRef.current);
+      }
+      overlayRef.current?.remove();
+      overlayRef.current = null;
+    };
   }, []);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(nextTheme);
+    const root = document.documentElement;
 
-    if (nextTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+    if (transitionFrameRef.current !== null) {
+      cancelAnimationFrame(transitionFrameRef.current);
     }
+    if (fadeTimerRef.current !== null) {
+      window.clearTimeout(fadeTimerRef.current);
+    }
+    overlayRef.current?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'theme-fade-overlay';
+    overlay.style.backgroundColor = nextTheme === 'dark'
+      ? 'hsl(224 25% 9%)'
+      : 'hsl(30 20% 98%)';
+    document.body.appendChild(overlay);
+    overlayRef.current = overlay;
+
+    // Avoid animating every themed element while the root theme class changes.
+    root.classList.add('theme-changing');
+    setTheme(nextTheme);
+    root.classList.toggle('dark', nextTheme === 'dark');
+    localStorage.setItem('theme', nextTheme);
+
+    requestAnimationFrame(() => {
+      overlay.classList.add('is-fading');
+    });
+
+    fadeTimerRef.current = window.setTimeout(() => {
+      overlay.remove();
+      if (overlayRef.current === overlay) {
+        overlayRef.current = null;
+        fadeTimerRef.current = null;
+      }
+    }, 220);
+
+    transitionFrameRef.current = requestAnimationFrame(() => {
+      transitionFrameRef.current = requestAnimationFrame(() => {
+        root.classList.remove('theme-changing');
+        transitionFrameRef.current = null;
+      });
+    });
   };
 
   if (!mounted) {

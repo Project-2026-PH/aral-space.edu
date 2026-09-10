@@ -4,6 +4,7 @@ import { normalizeQuestionFields } from './questionFields';
 import { SAMPLE_SUBJECT, SAMPLE_QUIZ, SAMPLE_QUIZ_QUESTIONS } from '../services/SampleQuizService';
 import { generateSecureToken, isShareTokenActive } from '../security/shareTokens';
 import { toPublicQuizDto, toPublicSubjectDto } from '../security/publicDtos';
+import { createUniqueSlug, slugify } from '../utils/slug';
 
 function generateShareToken(): string {
   return generateSecureToken(32);
@@ -42,8 +43,8 @@ export class MemoryQuizRepository implements IQuizRepository {
 
   private seedDefaultData() {
     // Seed Sample Filipino History Reviewer by default
-    this.subjects.set(SAMPLE_SUBJECT.id, SAMPLE_SUBJECT);
-    this.quizzes.set(SAMPLE_QUIZ.id, SAMPLE_QUIZ);
+    this.subjects.set(SAMPLE_SUBJECT.id, { ...SAMPLE_SUBJECT, slug: SAMPLE_SUBJECT.slug ?? slugify(SAMPLE_SUBJECT.name) });
+    this.quizzes.set(SAMPLE_QUIZ.id, { ...SAMPLE_QUIZ, slug: SAMPLE_QUIZ.slug ?? slugify(SAMPLE_QUIZ.title) });
     SAMPLE_QUIZ_QUESTIONS.forEach(q => {
       this.questions.set(q.id, q);
     });
@@ -189,6 +190,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     const subject: Subject = {
       id,
       name,
+      slug: await createUniqueSlug(name, async (candidate) => Array.from(this.subjects.values()).some((item) => item.slug === candidate), 'subject'),
       color,
       user_id: userId,
       share_token: generateShareToken(),
@@ -234,6 +236,7 @@ export class MemoryQuizRepository implements IQuizRepository {
     const newQuiz: Quiz = {
       id: quizId,
       title: dto.title,
+      slug: await createUniqueSlug(dto.title, async (candidate) => Array.from(this.quizzes.values()).some((item) => item.slug === candidate), 'quiz'),
       description: dto.description || null,
       term: dto.term || null,
       question_count: dto.questions.length,

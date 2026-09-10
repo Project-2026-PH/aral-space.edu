@@ -1,8 +1,9 @@
-import { notFound } from 'next/navigation';
+import { redirect, notFound } from 'next/navigation';
 import { Quiz, QuizQuestion } from '@quiz-creator/types';
 import { QuizCrudController } from '@quiz-creator/controllers/QuizCrudController';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { getQuizRepository } from '@/lib/db';
+import { resolveQuizRoute } from '@/lib/route-locators';
 import FlashcardReview from '@/components/quiz/FlashcardReview';
 
 export default async function ReviewPage({
@@ -16,8 +17,16 @@ export default async function ReviewPage({
   const query = await searchParams;
   const userId = await getAnonymousUserId();
   const quizRepo = await getQuizRepository();
+  const match = await resolveQuizRoute(quizRepo, quizId, userId);
+  if (match?.isLegacyId && match.entity.slug) {
+    const queryString = new URLSearchParams(query as Record<string, string>).toString();
+    redirect(`/review/${encodeURIComponent(match.entity.slug)}${queryString ? `?${queryString}` : ''}`);
+  }
+  const resolvedQuizId = match?.id || quizId;
   const controller = new QuizCrudController(quizRepo);
-  let quiz: Quiz | null = await controller.getQuiz(quizId, userId);
+  let quiz: Quiz | null = match
+    ? await controller.getQuiz(resolvedQuizId, userId)
+    : await controller.getQuiz(quizId, userId);
 
   const validShareToken = query.shareToken && query.shareToken !== 'undefined' ? query.shareToken : undefined;
   const validSubjectShareToken = query.subjectShareToken && query.subjectShareToken !== 'undefined' ? query.subjectShareToken : undefined;
@@ -28,7 +37,7 @@ export default async function ReviewPage({
 
   if (!quiz && validShareToken) {
     const sharedQuiz = await quizRepo.getQuizByShareToken(validShareToken);
-    if (sharedQuiz && sharedQuiz.id === quizId) {
+    if (sharedQuiz && (sharedQuiz.id === resolvedQuizId || sharedQuiz.slug === quizId)) {
       quiz = {
         ...sharedQuiz,
         questions: sharedQuiz.questions.map((question): QuizQuestion => ({
@@ -42,10 +51,10 @@ export default async function ReviewPage({
 
   if (!quiz && validSubjectShareToken) {
     const publicSubject = await quizRepo.getSubjectByShareToken(validSubjectShareToken);
-    if (publicSubject && publicSubject.quizzes?.some((q) => q.id === quizId)) {
-      const baseQuiz = await quizRepo.getQuizById(quizId);
+    if (publicSubject && publicSubject.quizzes?.some((q) => q.id === resolvedQuizId || q.slug === quizId)) {
+      const baseQuiz = await quizRepo.getQuizById(resolvedQuizId);
       if (baseQuiz) {
-        const questions = await quizRepo.getQuestionsByQuizId(quizId);
+        const questions = await quizRepo.getQuestionsByQuizId(resolvedQuizId);
         quiz = {
           ...baseQuiz,
           questions: questions.map((question): QuizQuestion => ({

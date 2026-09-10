@@ -85,6 +85,7 @@ export interface QuizGenerationProgressDto {
   message: string;
   detail?: string;
   quizId?: string;
+  quizSlug?: string | null;
   tokensCount?: number;
   stage?: 'extracting' | 'reviewing' | 'complete' | 'fallback' | 'error';
   stageNumber?: number;

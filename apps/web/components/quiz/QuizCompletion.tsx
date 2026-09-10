@@ -182,7 +182,7 @@ export default function QuizCompletion({
           </button>
         ) : (
           <Link
-            href={`/practice/${quiz.id}`}
+            href={`/practice/${encodeURIComponent(quiz.slug || quiz.id)}`}
             className="inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3 text-xs font-bold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all active:scale-95"
           >
             <RotateCcw className="h-4 w-4" />
@@ -200,7 +200,7 @@ export default function QuizCompletion({
           </button>
         )}
         <Link
-          href={`/quizzes/${quiz.id}`}
+          href={`/quizzes/${encodeURIComponent(quiz.slug || quiz.id)}`}
           className="rounded-2xl border border-border bg-card px-6 py-3 text-xs font-semibold text-foreground hover:bg-muted/60 transition-all active:scale-95"
         >
           Back to Subject

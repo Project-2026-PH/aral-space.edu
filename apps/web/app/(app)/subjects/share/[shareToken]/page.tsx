@@ -203,7 +203,7 @@ export default function SharedSubjectPage() {
                 </div>
                 <div className="mt-5 border-t-2 border-slate-900/20 dark:border-white/20 pt-4">
                   <Link
-                    href={`/review/${quiz.id}?${quiz.share_token ? `shareToken=${encodeURIComponent(quiz.share_token)}&` : ''}subjectShareToken=${encodeURIComponent(subject.share_token)}`}
+                    href={`/review/${encodeURIComponent(quiz.slug || quiz.id)}?${quiz.share_token ? `shareToken=${encodeURIComponent(quiz.share_token)}&` : ''}subjectShareToken=${encodeURIComponent(subject.share_token)}`}
                     className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-1.5 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
                   >
                     <ExternalLink className="h-3.5 w-3.5 stroke-[2.5]" />

@@ -83,6 +83,7 @@ export interface SubjectShareConfig {
 export interface PublicSubjectQuizDto {
   id: string;
   title: string;
+  slug?: string | null;
   description?: string | null;
   question_count: number;
   generated_at: string;
@@ -106,6 +107,7 @@ export interface PublicSubjectDto {
 export interface PublicQuizDto {
   id: string;
   title: string;
+  slug?: string | null;
   description?: string | null;
   question_count: number;
   generated_at: string;

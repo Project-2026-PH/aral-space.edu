@@ -4,6 +4,7 @@ import { QuizQuestion } from './QuizQuestion';
 export interface Quiz {
   id: string;
   title: string;
+  slug?: string | null;
   description?: string | null;
   term?: string | null;
   question_count: number;
@@ -29,6 +30,7 @@ export interface Quiz {
 export interface QuizMetadata {
   id: string;
   title: string;
+  slug?: string | null;
   description?: string | null;
   term?: string | null;
   question_count: number;

@@ -97,9 +97,9 @@ export default function SubjectLibrary({
             const canGeneratePublicLink = !readOnly && isPublic && !subject.share_token;
             const canOpen = readOnly || canManage || Boolean(isPublic && subject.share_token) || canGeneratePublicLink;
             const subjectHref = readOnly
-              ? `/subjects/${subject.id}`
+              ? `/subjects/${encodeURIComponent(subject.slug || subject.id)}`
               : canManage
-                ? `/subjects/${subject.id}`
+                ? `/subjects/${encodeURIComponent(subject.slug || subject.id)}`
                 : subject.share_token
                   ? `/subjects/share/${subject.share_token}`
                   : '';

@@ -10,6 +10,7 @@ interface QuizStartConfigModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quizId: string;
+  quizSlug?: string | null;
   title: string;
 }
 
@@ -17,6 +18,7 @@ export default function QuizStartConfigModal({
   open,
   onOpenChange,
   quizId,
+  quizSlug,
   title
 }: QuizStartConfigModalProps) {
   const router = useRouter();
@@ -32,7 +34,8 @@ export default function QuizStartConfigModal({
       shuffleOptions: String(shuffleOptions)
     }).toString();
 
-    router.push(mode === 'flashcard' ? `/review/${quizId}` : `/practice/${quizId}?${query}`);
+    const locator = encodeURIComponent(quizSlug || quizId);
+    router.push(mode === 'flashcard' ? `/review/${locator}` : `/practice/${locator}?${query}`);
   }
 
   const modes = [

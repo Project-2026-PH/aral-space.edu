@@ -414,7 +414,7 @@ export default function LibraryClient({
                       </div>
                     </Link>
 
-                    <button
+                    {/* <button
                       type="button"
                       role="menuitem"
                       onClick={() => {
@@ -430,7 +430,7 @@ export default function LibraryClient({
                         <p className="font-bold">Create Subject</p>
                         <p className="text-[10px] text-muted-foreground">Organize your topics</p>
                       </div>
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               )}

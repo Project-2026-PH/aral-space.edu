@@ -567,7 +567,7 @@ export default function AiQuizGenerator({
         if (onGenerated) {
           onGenerated(data.id);
         } else {
-          router.push(`/quizzes/${data.id}`);
+          router.push(`/quizzes/${encodeURIComponent(data.slug || data.id)}`);
         }
         return;
       }
@@ -626,6 +626,7 @@ export default function AiQuizGenerator({
       const decoder = new TextDecoder();
       let done = false;
       let finalQuizId: string | null = null;
+      let finalQuizSlug: string | null = null;
 
       while (!done) {
         const { value, done: doneReading } = await reader.read();
@@ -642,6 +643,7 @@ export default function AiQuizGenerator({
                 if (data.detail) setProgressDetail(data.detail);
                 if (data.tokensCount) setTokensCount(data.tokensCount);
                 if (data.quizId) finalQuizId = data.quizId;
+                if (data.quizSlug) finalQuizSlug = data.quizSlug;
                 if (data.message === 'Error') {
                   throw new Error(data.detail || 'Generation failed');
                 }
@@ -662,7 +664,7 @@ export default function AiQuizGenerator({
         if (onGenerated) {
           onGenerated(finalQuizId);
         } else {
-          router.push(`/quizzes/${finalQuizId}`);
+          router.push(`/quizzes/${encodeURIComponent(finalQuizSlug || finalQuizId)}`);
         }
       }
     } catch (err: any) {

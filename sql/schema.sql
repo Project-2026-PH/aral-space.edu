@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS subjects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
+  slug TEXT,
   color TEXT NOT NULL DEFAULT '#6366f1',
   user_id UUID,
   share_token TEXT UNIQUE,
@@ -15,6 +16,7 @@ CREATE TABLE IF NOT EXISTS subjects (
 CREATE TABLE IF NOT EXISTS quizzes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
+  slug TEXT,
   question_count INTEGER NOT NULL DEFAULT 0,
   generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   handout_name TEXT,
@@ -102,8 +104,30 @@ ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS allow_public_answer_key BOOLEAN NOT
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_expires_at TIMESTAMPTZ;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS share_revoked_at TIMESTAMPTZ;
 ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
-ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS archived_by_subject BOOLEAN NOT NULL DEFAULT FALSE;
-UPDATE subjects SET is_public = TRUE WHERE is_public IS NULL;
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS slug TEXT;
+ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS slug TEXT;
+
+WITH ranked AS (
+  SELECT id,
+    COALESCE(NULLIF(trim(BOTH '-' FROM regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g')), ''), 'subject') AS base,
+    row_number() OVER (PARTITION BY COALESCE(NULLIF(trim(BOTH '-' FROM regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g')), ''), 'subject') ORDER BY id) AS position
+  FROM subjects WHERE slug IS NULL
+)
+UPDATE subjects s SET slug = CASE WHEN ranked.position = 1 THEN ranked.base ELSE ranked.base || '-' || ranked.position END
+FROM ranked WHERE s.id = ranked.id;
+
+WITH ranked AS (
+  SELECT id,
+    COALESCE(NULLIF(trim(BOTH '-' FROM regexp_replace(lower(title), '[^a-z0-9]+', '-', 'g')), ''), 'quiz') AS base,
+    row_number() OVER (PARTITION BY COALESCE(NULLIF(trim(BOTH '-' FROM regexp_replace(lower(title), '[^a-z0-9]+', '-', 'g')), ''), 'quiz') ORDER BY id) AS position
+  FROM quizzes WHERE slug IS NULL
+)
+UPDATE quizzes q SET slug = CASE WHEN ranked.position = 1 THEN ranked.base ELSE ranked.base || '-' || ranked.position END
+FROM ranked WHERE q.id = ranked.id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subjects_slug_unique ON subjects(slug) WHERE slug IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_quizzes_slug_unique ON quizzes(slug) WHERE slug IS NOT NULL;
+
 UPDATE quizzes SET is_public = TRUE WHERE is_public IS NULL;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS answer_text TEXT;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type TEXT NOT NULL DEFAULT 'multiple_choice';

@@ -257,7 +257,7 @@ export default function SwipeableQuizCard({
           transition: isDragging ? 'none' : 'transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1)',
           touchAction: !readOnly && isMobile ? 'pan-y' : 'auto'
         }}
-        className="relative z-10 flex min-h-36 sm:min-h-[148px] h-full w-full flex-col justify-between bg-white dark:bg-card p-4 sm:p-4.5 select-none"
+        className="relative z-10 flex min-h-36 sm:min-h-[148px] h-full w-full flex-col justify-between bg-white dark:bg-card p-3.5 sm:p-4 select-none"
       >
         <Link
           href={reviewHref}
@@ -323,69 +323,73 @@ export default function SwipeableQuizCard({
           ) : null}
         </Link>
 
-        <div className="mt-3 flex items-center justify-between border-t-2 border-slate-900/20 dark:border-white/20 pt-3">
+        <div className="mt-3 flex items-center justify-between gap-1.5 border-t-2 border-slate-900/20 dark:border-white/20 pt-2.5">
           {!readOnly ? (
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/quizzes/${quiz.id}`}
-                onClick={(e) => {
-                  if (isOpen || hasMovedRef.current) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }}
-                className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
-              >
-                Manage
-              </Link>
-              {/* Desktop archive and delete shortcut buttons */}
-              <button
-                type="button"
-                aria-label={`Archive ${quiz.title}`}
-                onClick={(e) => {
+            <Link
+              href={`/quizzes/${quiz.id}`}
+              onClick={(e) => {
+                if (isOpen || hasMovedRef.current) {
+                  e.preventDefault();
                   e.stopPropagation();
-                  onArchive();
-                }}
-                className="hidden sm:inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-400 transition-colors cursor-pointer"
-              >
-                <Archive className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                aria-label={`Delete ${quiz.title}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                className="hidden sm:inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                aria-label={`Edit ${quiz.title}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit();
-                }}
-                className="hidden sm:inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-blue-600/10 hover:text-blue-600 transition-colors cursor-pointer"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-            </div>
+                }
+              }}
+              className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2 shrink-0"
+            >
+              Manage
+            </Link>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground shrink-0">
               Read-only
             </span>
           )}
 
-          <div className="flex items-center gap-1.5">
-            {/* Mobile gesture hint */}
+          <div className="flex items-center gap-1 shrink-0">
             {!readOnly && (
-              <span className="sm:hidden text-[10px] font-bold text-muted-foreground/80 flex items-center gap-0.5 select-none pr-0.5">
-                Swipe ‹
-              </span>
+              <>
+                {/* Desktop archive, delete, edit shortcut buttons */}
+                <div className="hidden sm:flex items-center gap-0.5 shrink-0">
+                  <button
+                    type="button"
+                    aria-label={`Archive ${quiz.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onArchive();
+                    }}
+                    className="inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-400 transition-colors cursor-pointer shrink-0"
+                  >
+                    <Archive className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${quiz.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete();
+                    }}
+                    className="inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer shrink-0"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Edit ${quiz.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit();
+                    }}
+                    className="inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-blue-600/10 hover:text-blue-600 transition-colors cursor-pointer shrink-0"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* Mobile gesture hint */}
+                <span className="sm:hidden text-[10px] font-bold text-muted-foreground/80 flex items-center gap-0.5 select-none pr-0.5">
+                  Swipe ‹
+                </span>
+              </>
             )}
+
             <Link
               href={reviewHref}
               onClick={(e) => {
@@ -394,7 +398,7 @@ export default function SwipeableQuizCard({
                   e.stopPropagation();
                 }
               }}
-              className="flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-3 py-1 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
+              className="flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-2.5 py-1 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
             >
               <Play className="h-3 w-3 fill-current" />
               <span>Practice</span>

@@ -291,27 +291,27 @@ export default function SwipeableSubjectCard({
           transition: isDragging ? 'none' : 'transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1)',
           touchAction: canManage && isMobile ? 'pan-y' : 'auto'
         }}
-        className={`relative z-10 flex min-h-36 sm:min-h-[148px] h-full w-full flex-col justify-between bg-white dark:bg-card p-4 sm:p-4.5 focus:outline-none focus:ring-2 focus:ring-primary/40 select-none ${
+        className={`relative z-10 flex min-h-36 sm:min-h-[148px] h-full w-full flex-col justify-between bg-white dark:bg-card p-3.5 sm:p-4 focus:outline-none focus:ring-2 focus:ring-primary/40 select-none ${
           canOpen ? 'cursor-pointer' : ''
         }`}
       >
         <div>
-          <div className="flex items-start justify-between gap-2.5">
-            <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-1 min-w-0 items-center gap-2">
               <span
                 aria-hidden="true"
                 style={{ backgroundColor: subject.color }}
-                className="h-9 w-9 shrink-0 rounded-xl border-2 border-slate-900 shadow-brutal-sm transition-transform duration-200 group-hover:scale-105"
+                className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-xl border-2 border-slate-900 shadow-brutal-sm transition-transform duration-200 group-hover:scale-105"
               />
-              <div className="min-w-0">
-                <h3 className="truncate text-sm font-black text-foreground transition-colors group-hover:text-primary">
+              <div className="min-w-0 flex-1">
+                <h3 className="line-clamp-1 text-sm font-black text-foreground transition-colors group-hover:text-primary">
                   {subject.name}
                 </h3>
-                <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
-                  <BookOpen className="h-3 w-3" />
-                  {quizCount} {quizCount === 1 ? 'study set' : 'study sets'}
+                <p className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
+                  <BookOpen className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{quizCount} {quizCount === 1 ? 'study set' : 'study sets'}</span>
                   {!readOnly && canManage && (
-                    <span className="ml-1 inline-flex items-center gap-1" title="Unique viewers">
+                    <span className="ml-1 inline-flex items-center gap-0.5 shrink-0" title="Unique viewers">
                       <Eye aria-hidden="true" className="h-3 w-3" />
                       {subject.viewer_count ?? 0}
                     </span>
@@ -320,14 +320,14 @@ export default function SwipeableSubjectCard({
               </div>
             </div>
             <span
-              className={`inline-flex shrink-0 items-center gap-1 rounded-md border-2 border-slate-900 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm transition-transform duration-200 group-hover:scale-105 ${
+              className={`inline-flex shrink-0 items-center gap-1 rounded-md border-2 border-slate-900 px-1.5 py-0.5 text-[10px] font-black shadow-brutal-sm transition-transform duration-200 group-hover:scale-105 ${
                 isPublic
                   ? 'bg-[#bfdbfe] text-slate-900'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
               {isPublic ? <Link2 className="h-3 w-3 stroke-[2.5]" /> : <Lock className="h-3 w-3 stroke-[2.5]" />}
-              {isPublic ? 'Link Active' : 'Private'}
+              <span>{isPublic ? 'Link Active' : 'Private'}</span>
             </span>
           </div>
 
@@ -338,7 +338,7 @@ export default function SwipeableSubjectCard({
           )}
         </div>
 
-        <div className="mt-3 flex items-center justify-between border-t-2 border-slate-900/20 dark:border-white/20 pt-3">
+        <div className="mt-3 flex items-center justify-between gap-1.5 border-t-2 border-slate-900/20 dark:border-white/20 pt-2.5">
           {subject.share_token && isPublic ? (
             <Link
               href={`/subjects/share/${subject.share_token}`}
@@ -355,18 +355,18 @@ export default function SwipeableSubjectCard({
                 event.stopPropagation();
                 onShare();
               }}
-              className="text-xs font-black text-primary transition-colors hover:text-foreground underline underline-offset-4 decoration-2 cursor-pointer"
+              className="text-xs font-black text-primary transition-colors hover:text-foreground underline underline-offset-4 decoration-2 cursor-pointer shrink-0"
             >
               Get share link
             </button>
           ) : (
-            <span className="text-[11px] font-bold text-muted-foreground">Link disabled</span>
+            <span className="text-[11px] font-bold text-muted-foreground shrink-0">Link disabled</span>
           )}
 
           {canManage ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               {/* Desktop-only action buttons (Edit + Delete + Share) */}
-              <div className="hidden sm:flex items-center gap-1.5">
+              <div className="hidden sm:flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   aria-label={`Edit ${subject.name}`}
@@ -374,7 +374,7 @@ export default function SwipeableSubjectCard({
                     event.stopPropagation();
                     onEdit();
                   }}
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-blue-500 hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-blue-500 hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
@@ -385,7 +385,7 @@ export default function SwipeableSubjectCard({
                     event.stopPropagation();
                     onArchive();
                   }}
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-amber-500 hover:text-slate-900 hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-amber-500 hover:text-slate-900 hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
                 >
                   <Archive className="h-3.5 w-3.5" />
                 </button>
@@ -396,7 +396,7 @@ export default function SwipeableSubjectCard({
                     event.stopPropagation();
                     onDelete();
                   }}
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-destructive hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-destructive hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -414,7 +414,7 @@ export default function SwipeableSubjectCard({
                   event.stopPropagation();
                   onShare();
                 }}
-                className="inline-flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-3 py-1 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-2.5 py-1 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
               >
                 <Share2 className="h-3.5 w-3.5" />
                 Share
@@ -428,13 +428,13 @@ export default function SwipeableSubjectCard({
                 event.stopPropagation();
                 onArchive();
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-700 dark:text-slate-300 shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none hover:bg-amber-500 hover:text-slate-900 active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-700 dark:text-slate-300 shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none hover:bg-amber-500 hover:text-slate-900 active:scale-95 cursor-pointer shrink-0"
             >
               <Archive className="h-3.5 w-3.5" />
               Archive
             </button>
           ) : (
-            <span className="text-[11px] font-bold text-muted-foreground">Read-only</span>
+            <span className="text-[11px] font-bold text-muted-foreground shrink-0">Read-only</span>
           )}
         </div>
       </article>

@@ -83,13 +83,13 @@ export default function SubjectLibrary({
       </div>
 
       {loading ? (
-        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2].map((item) => (
             <div key={item} className="h-36 sm:h-[148px] rounded-2xl border-2 border-slate-900/30 dark:border-white/20 bg-muted/40 p-4 animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {visibleSubjects.map((subject, index) => {
             const isPublic = subject.is_public !== false;
             const canManage = !readOnly && Boolean(viewerId && subject.user_id === viewerId);

@@ -228,7 +228,7 @@ export default function QuizLibrary({
       )}
 
       {loading ? (
-        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[1, 2, 3].map((index) => (
             <div key={index} className="h-36 sm:h-[148px] rounded-2xl border-2 border-slate-900/30 bg-muted/40 p-4 animate-pulse" />
           ))}
@@ -254,7 +254,7 @@ export default function QuizLibrary({
           </button>
         </div>
       ) : (
-        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="home-card-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {visibleQuizzes.map((quiz) => {
             const subject = quiz.subject ?? subjects?.find((candidate) => candidate.id === quiz.subject_id);
 

@@ -665,6 +665,7 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
 
 @media (prefers-reduced-motion: reduce) {
 
+  .animate-doodle-float,
   .animate-float-slow,
   .animate-shadow-pulse {
     animation-duration: 1ms;

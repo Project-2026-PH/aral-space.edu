@@ -9,13 +9,17 @@ import QuizLibrary from '@/components/quiz/QuizLibrary';
 import SharedLibrary from '@/components/library/SharedLibrary';
 import {
   ArrowRight,
+  Atom,
   BookOpen,
   FileText,
   FilePlus2,
+  FlaskConical,
+  GraduationCap,
   Layers,
   LoaderCircle,
   LockKeyhole,
   Plus,
+  Rocket,
   Search,
   Sparkles,
   X,
@@ -258,10 +262,40 @@ export default function LibraryClient({
     <div className="home-page mx-auto max-w-5xl space-y-7 px-4 py-6 pb-24 sm:px-6 lg:px-8 desktop-zoom-133">
       {/* Library command center */}
       <section
-        className="home-hero space-y-4 rounded-3xl border-3 border-slate-900 bg-slate-50 p-4 shadow-brutal dark:border-white/30 dark:bg-card sm:p-6"
+        className="home-hero relative isolate space-y-4 overflow-hidden rounded-3xl border-3 border-slate-900 bg-slate-50 p-4 shadow-brutal transition-colors duration-500 dark:border-white/30 dark:bg-card sm:p-6"
         aria-labelledby="library-navigation-heading"
       >
-        <div className="space-y-0">
+        <div
+          className="pointer-events-none absolute inset-0 overflow-hidden text-sky-600 opacity-[0.07] transition-colors duration-500 dark:text-violet-300 dark:opacity-[0.14]"
+          aria-hidden="true"
+        >
+          <Rocket
+            className="animate-doodle-float absolute -left-4 top-8 h-24 w-24"
+            style={{ animationDelay: '-1.2s' }}
+          />
+          <GraduationCap
+            className="animate-doodle-float absolute left-[38%] -top-5 h-16 w-16"
+            style={{ animationDelay: '-3.1s' }}
+          />
+          <Atom
+            className="animate-doodle-float absolute right-[18%] top-12 h-20 w-20"
+            style={{ animationDelay: '-0.6s' }}
+          />
+          <FlaskConical
+            className="animate-doodle-float absolute -right-5 -bottom-8 h-28 w-28"
+            style={{ animationDelay: '-2.4s' }}
+          />
+          <BookOpen
+            className="animate-doodle-float absolute left-[16%] -bottom-7 h-20 w-20"
+            style={{ animationDelay: '-4s' }}
+          />
+          <Sparkles
+            className="animate-doodle-float absolute right-6 bottom-10 h-9 w-9"
+            style={{ animationDelay: '-1.8s' }}
+          />
+        </div>
+
+        <div className="relative z-10 space-y-0">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <span className="home-hero-badge inline-flex items-center gap-1.5 rounded-lg border-2 border-slate-900 bg-[#fde047] px-2 py-0.5 text-[11px] font-black text-slate-900 shadow-brutal-sm">
@@ -286,7 +320,7 @@ export default function LibraryClient({
           </div>
         </div>
 
-        <div className="relative">
+        <div className="relative z-10">
           <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-700 dark:text-slate-300" />
           <label htmlFor="library-search" className="sr-only">Search your library</label>
           <input
@@ -309,7 +343,7 @@ export default function LibraryClient({
           )}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-1 overflow-x-auto rounded-xl border-2 border-slate-900 bg-white p-1 dark:border-white/30 dark:bg-slate-900 scrollbar-none" role="tablist" aria-label="Library sections">
             {viewTabs.map((tab) => {
               const isActive = activeView === tab.id;

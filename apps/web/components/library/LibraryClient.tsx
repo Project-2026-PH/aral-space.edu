@@ -339,7 +339,7 @@ export default function LibraryClient({
             <button
               type="button"
               onClick={() => setShowAiModal(true)}
-              className="home-primary-action flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary px-3.5 py-2 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              className="home-primary-action flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-3.5 py-2 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
             >
               <Sparkles className="h-3.5 w-3.5" />
               <span>Generate with AI</span>
@@ -351,7 +351,7 @@ export default function LibraryClient({
                 aria-label="More creation options"
                 aria-haspopup="menu"
                 aria-expanded={showQuickCreate}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white shadow-md shadow-primary/30 transition-all duration-200 hover:scale-105 hover:bg-primary/90 active:scale-95"
+                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
               >
                 <Plus
                   aria-hidden="true"

@@ -55,7 +55,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
       <div className="flex flex-col gap-5 rounded-3xl border-3 border-slate-900 dark:border-white/40 bg-white dark:bg-card p-4 sm:p-6 shadow-brutal">
         <Link
           href="/library"
-          className="inline-flex w-fit items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+          className="inline-flex w-fit items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
         >
           <ArrowLeft className="h-3.5 w-3.5 stroke-[2.5]" /> Back to library
         </Link>

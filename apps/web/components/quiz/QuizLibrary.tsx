@@ -180,7 +180,7 @@ export default function QuizLibrary({
           <button
             type="button"
             onClick={() => handleTermChange('')}
-            className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-black shadow-brutal-sm transition-all cursor-pointer ${
+            className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-black shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer ${
               !normalizedSelectedTerm
                 ? 'bg-primary text-white'
                 : 'bg-white dark:bg-card text-foreground hover:bg-muted'
@@ -196,7 +196,7 @@ export default function QuizLibrary({
                 key={t}
                 type="button"
                 onClick={() => handleTermChange(isSelected ? '' : t)}
-                className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-black shadow-brutal-sm transition-all cursor-pointer ${
+                className={`rounded-lg border-2 border-slate-900 px-2.5 py-1 text-xs font-black shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-primary text-white'
                     : 'bg-white dark:bg-card text-foreground hover:bg-muted'

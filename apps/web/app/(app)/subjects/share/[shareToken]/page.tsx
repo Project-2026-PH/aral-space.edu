@@ -149,14 +149,14 @@ export default function SharedSubjectPage() {
               type="button"
               onClick={() => void archiveSubject()}
               disabled={archiving}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:bg-amber-500 hover:text-slate-900 hover:shadow-brutal disabled:cursor-not-allowed disabled:opacity-60 active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none hover:bg-amber-500 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95 cursor-pointer"
             >
               <Archive className="h-3.5 w-3.5 stroke-[2.5]" />
               {archiving ? 'Archiving...' : 'Archive subject'}
             </button>
             <Link
               href="/library"
-              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-black text-slate-900 dark:text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
             >
               <Home className="h-3.5 w-3.5 stroke-[2.5]" />
               Back to Library

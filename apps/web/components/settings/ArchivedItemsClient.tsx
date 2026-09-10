@@ -68,7 +68,7 @@ export default function ArchivedItemsClient({
       <section className="space-y-4 rounded-3xl border-3 border-slate-900 bg-slate-50 p-4 shadow-brutal dark:border-white/30 dark:bg-card sm:p-6">
         <Link
           href="/library"
-          className="inline-flex w-fit items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white px-3 py-1.5 text-xs font-black text-slate-900 shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal dark:bg-slate-800 dark:text-white"
+          className="inline-flex w-fit items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white px-3 py-1.5 text-xs font-black text-slate-900 shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none dark:bg-slate-800 dark:text-white active:scale-95 cursor-pointer"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to library

@@ -207,7 +207,7 @@ export default function SwipeableSubjectCard({
     <div
       ref={cardRef}
       style={{ animationDelay: `${index * 70}ms` }}
-      className="subject-card-enter group relative min-h-36 sm:min-h-[148px] rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-slate-900 shadow-brutal transition-all hover:-translate-y-1 hover:shadow-[6px_6px_0px_#0f172a] overflow-hidden"
+      className="subject-card-enter group relative min-h-36 sm:min-h-[148px] rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card shadow-brutal transition-all duration-200 hover:-translate-y-1 hover:shadow-[6px_6px_0px_#0f172a] dark:hover:shadow-[6px_6px_0px_rgba(255,255,255,0.4)] overflow-hidden"
     >
       {/* Mobile-only Underlay Action Layer */}
       {canManage && (
@@ -415,7 +415,7 @@ export default function SwipeableSubjectCard({
                   event.stopPropagation();
                   onShare();
                 }}
-                className="inline-flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary px-3 py-1 text-xs font-black text-white shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-3 py-1 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
               >
                 <Share2 className="h-3.5 w-3.5" />
                 Share
@@ -429,7 +429,7 @@ export default function SwipeableSubjectCard({
                 event.stopPropagation();
                 onArchive();
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-700 dark:text-slate-300 shadow-brutal-sm transition-all hover:-translate-y-0.5 hover:bg-amber-500 hover:text-slate-900 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-black text-slate-700 dark:text-slate-300 shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none hover:bg-amber-500 hover:text-slate-900 active:scale-95 cursor-pointer"
             >
               <Archive className="h-3.5 w-3.5" />
               Archive

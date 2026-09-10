@@ -149,14 +149,6 @@ Raw Text / HTML Clipboard
   `"the marketplace, the physical world for people and things, and the marketspace, a virtual world of information."`
 * Separates alternating appositives into discrete study cards.
 
-#### Tier 8: Local SmolLM2 In-Browser Fallback Engine (`parseWithSmolLM2`)
-* **Purpose:** Provides high-accuracy AI fallback for unstructured, complex, or conversational sentences where strict regex patterns fail.
-* **Technology:** Runs `HuggingFaceTB/SmolLM2-360M-Instruct` 4-bit quantized locally in the user's browser via WebGPU/WASM using `@huggingface/transformers`.
-* **Execution:** Asynchronously triggered when the user pastes substantive raw text ($\ge 15$ chars) that heuristic tiers cannot separate.
-* **Output:** Extracts `{ term, question }` JSON, ensuring the definition is reformatted as a clean identification prompt without removing exact factual content.
-  > *"the marketplace, the physical world for people and things, and the marketspace, a virtual world of information."*
-* Pairs alternating noun phrases and descriptive clauses with strict length and verb validation.
-
 ### 2.3 Editor Synchronization & Prompt Paste Interception
 When pasting into the question prompt editor ([`RichTextEditor.tsx`](file:///c:/Users/User/IntelliJ/quiz-creator/apps/web/components/editor/RichTextEditor.tsx)):
 * Programmatic paste interception in [`ManualQuizCreator.tsx`](file:///c:/Users/User/IntelliJ/quiz-creator/apps/web/components/quiz/ManualQuizCreator.tsx) extracts term/definition pairs and sets `options: [term]` and `question_text: definition`.

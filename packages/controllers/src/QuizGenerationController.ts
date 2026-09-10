@@ -70,7 +70,9 @@ export class QuizGenerationController {
     let liveTokens = 0;
     const generated = await this.genService.generateQuiz({
       handoutPages: pages,
-      subjectName: dto.title || dto.handoutName || uniqueChapters[0],
+      // The quiz title is user metadata, not source context. Passing it as a
+      // subject hint can contaminate generation with a stale/previous topic.
+      subjectName: undefined,
       pageStart: dto.pageStart,
       pageEnd: dto.pageEnd,
       pipelineMode: dto.pipelineMode || 'auto',

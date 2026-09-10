@@ -41,29 +41,31 @@ export class GeminiExtractor {
     if (authoringProfile?.styleSummary) {
       styleInstruction += `\n7. User Style Adaptation: ${authoringProfile.styleSummary}`;
     }
-    if (authoringProfile?.sampleQuestions && authoringProfile.sampleQuestions.length > 0) {
-      styleInstruction += `\n8. Match the formatting, difficulty, and tone of the user's previously authored questions:\n${authoringProfile.sampleQuestions
-        .map((s, idx) => `   [Exemplar ${idx + 1}] Question: "${s.question}" | Options: [${s.options.join(', ')}]${s.explanation ? ` | Explanation: ${s.explanation}` : ''}`)
-        .join('\n')}`;
-    }
 
-    return `You are an expert curriculum designer and exam question author${subjectName ? ` specializing in ${subjectName}` : ''}.
+    const metadataInstruction = subjectName
+      ? `\nThe label "${subjectName}" is metadata only. It is not source evidence and MUST NOT introduce facts, topics, or terminology absent from the source pages.`
+      : '';
+
+    return `You are an expert curriculum designer and exam question author. The supplied source pages are the only authority; do not use outside knowledge to add topics or facts.${metadataInstruction}
 Thoroughly analyze the source handout provided below and extract high-yield conceptual multiple-choice questions.
 
 Source Material:
 ${formattedContent}
 
 Requirements:
-1. Target: Exactly ${targetCount} rigorous, concept-testing multiple choice questions.
+1. Target: Exactly ${targetCount} rigorous, concept-testing multiple choice questions. If the source does not support a question, do not invent one.
 2. Each question MUST have exactly 4 plausible, distinct options.
-3. Psychometric Rigor: Distractors MUST represent common misconceptions or realistic alternatives. NEVER use "All of the above", "None of the above", or "Both A and B".
+3. Psychometric Rigor: Distractors MUST represent common misconceptions or realistic alternatives grounded in the source. NEVER use "All of the above", "None of the above", or "Both A and B".
 4. correct_answer MUST be the 0-indexed integer (0, 1, 2, or 3) precisely pointing to the correct choice.
-5. explanation MUST cite why the answer is correct according to the text.
+5. explanation MUST cite why the answer is correct according to the source text.
 6. correct_explanation: Verbatim rule or principle explaining why the answer is correct.
 7. distractor_explanations: An object mapping each distractor option index (e.g. {"1": "...", "2": "..."}) explaining why that choice is incorrect.
-8. discriminatory_keywords: Array of specific technical keywords separating the correct choice from the nearest distractor.
-9. source_pages MUST be an array of page numbers where the concept appears.
-10. Full-Document Coverage: Questions MUST span across the entire document (beginning, middle, and end) without clustering only at the start.${multiChapterInstruction}${styleInstruction}
+8. discriminatory_keywords: Array of specific technical keywords from the source separating the correct choice from the nearest distractor.
+9. evidence_quote MUST be an exact contiguous excerpt copied from the source material, 8 to 500 characters, that directly supports the question and correct answer. Do not paraphrase it.
+10. source_pages MUST contain only the page number(s) where evidence_quote appears. The page number must match the PAGE header, never a guessed or printed page number.
+11. Full-Document Coverage: Questions MUST span across the entire document (beginning, middle, and end) without clustering only at the start.${multiChapterInstruction}${styleInstruction}
+
+Return only the JSON array matching the response schema. Any question that cannot be supported by an exact evidence_quote must be omitted rather than hallucinated.
 `;
   }
 
@@ -83,19 +85,20 @@ Requirements:
           correct_explanation: { type: Type.STRING },
           distractor_explanations: {
             type: Type.OBJECT,
-            description: "Map of option index string to why it is incorrect"
+            description: 'Map of option index string to why it is incorrect'
           },
           discriminatory_keywords: {
             type: Type.ARRAY,
             items: { type: Type.STRING }
           },
+          evidence_quote: { type: Type.STRING },
           source_pages: {
             type: Type.ARRAY,
             items: { type: Type.INTEGER }
           },
           chapter: { type: Type.STRING }
         },
-        required: ["question", "options", "correct_answer", "explanation"]
+        required: ['question', 'options', 'correct_answer', 'explanation', 'evidence_quote', 'source_pages']
       }
     };
   }
@@ -113,7 +116,7 @@ Requirements:
         config: {
           responseMimeType: 'application/json',
           responseSchema: GeminiExtractor.getQuestionSchema(),
-          temperature: 0.2
+          temperature: 0.0
         }
       });
 

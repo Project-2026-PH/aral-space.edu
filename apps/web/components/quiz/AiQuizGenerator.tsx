@@ -23,12 +23,20 @@ import { AiPipelineMode, HandoutPage, IngestedFileInfo } from '@quiz-creator/typ
 import { loadLocalAuthoringSignals } from '@/lib/authoringPreferences';
 import NewSubjectModal from '../subject/NewSubjectModal';
 
+export interface IngestedFlashcardPair {
+  term: string;
+  definition: string;
+  source_pages: number[];
+}
+
 export interface IngestedFileState {
   id: string;
   name: string;
   size: number;
   pageCount: number;
   pages: HandoutPage[];
+  pairs?: IngestedFlashcardPair[];
+  model?: string;
   status: 'parsing' | 'ready' | 'error';
   error?: string;
 }
@@ -46,6 +54,7 @@ interface AiQuizDraft {
   title: string;
   selectedSubject: string;
   inputMode: 'upload' | 'text';
+  outputMode: 'multiple_choice' | 'flashcard';
   text: string;
   files: IngestedFileState[];
 }
@@ -67,6 +76,7 @@ function parseAiQuizDraft(raw: string | null): AiQuizDraft | null {
       typeof parsed.title !== 'string' ||
       typeof parsed.selectedSubject !== 'string' ||
       (parsed.inputMode !== 'upload' && parsed.inputMode !== 'text') ||
+      (parsed.outputMode !== undefined && parsed.outputMode !== 'multiple_choice' && parsed.outputMode !== 'flashcard') ||
       typeof parsed.text !== 'string' ||
       !Array.isArray(parsed.files)
     ) {
@@ -79,6 +89,7 @@ function parseAiQuizDraft(raw: string | null): AiQuizDraft | null {
       title: parsed.title,
       selectedSubject: parsed.selectedSubject,
       inputMode: parsed.inputMode,
+      outputMode: parsed.outputMode === 'flashcard' ? 'flashcard' : 'multiple_choice',
       text: parsed.text,
       files: parsed.files as IngestedFileState[]
     };
@@ -98,6 +109,7 @@ export default function AiQuizGenerator({
   const [subjectList, setSubjectList] = useState<Array<{ id: string; name: string; color?: string }>>(subjects);
   const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || '');
   const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [outputMode, setOutputMode] = useState<'multiple_choice' | 'flashcard'>('multiple_choice');
   const pipelineMode: AiPipelineMode = 'auto';
 
   // Input source mode: 'upload' (folder/multi-file) or 'text' (raw notes)
@@ -185,6 +197,7 @@ export default function AiQuizGenerator({
           title,
           selectedSubject,
           inputMode,
+          outputMode,
           text,
           files
         };
@@ -196,13 +209,14 @@ export default function AiQuizGenerator({
     }, 500);
 
     return () => window.clearTimeout(timeout);
-  }, [draftHydrated, title, selectedSubject, inputMode, text, files]);
+  }, [draftHydrated, title, selectedSubject, inputMode, outputMode, text, files]);
 
   function restoreDraft() {
     if (!draftRecovery) return;
     setTitle(draftRecovery.title);
     setSelectedSubject(draftRecovery.selectedSubject);
     setInputMode(draftRecovery.inputMode);
+    setOutputMode(draftRecovery.outputMode || 'multiple_choice');
     setText(draftRecovery.text);
     setFiles(draftRecovery.files);
     setDraftRecovery(null);
@@ -220,6 +234,7 @@ export default function AiQuizGenerator({
   }
 
   const totalPagesCount = files.reduce((acc, f) => acc + (f.status === 'ready' ? f.pageCount : 0), 0);
+  const totalFlashcardCount = files.reduce((acc, f) => acc + (f.pairs?.length || 0), 0);
 
   // Format file size for clean UI presentation
   function formatBytes(bytes: number): string {
@@ -234,18 +249,22 @@ export default function AiQuizGenerator({
   async function processSingleFile(file: File): Promise<IngestedFileState> {
     const fileId = `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 7)}`;
     try {
-      if (file.name.endsWith('.pdf') || file.type === 'application/pdf') {
-        const MAX_BYTES = 4.5 * 1024 * 1024;
+      const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+      if (isPdf) {
+        const MAX_BYTES = 25 * 1024 * 1024;
         if (file.size > MAX_BYTES) {
           throw new Error(
-            `"${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds Vercel 4.5MB limit. Please upload a smaller PDF.`
+            `"${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the 25 MB PDF limit. Please upload a smaller PDF.`
           );
         }
 
-        console.log(`[Frontend] Parsing PDF "${file.name}" (${file.size} bytes) via /api/parse-document...`);
+        const endpoint = outputMode === 'flashcard'
+          ? '/api/parse-document-flashcard'
+          : '/api/parse-document';
+        console.log(`[Frontend] Parsing PDF "${file.name}" (${file.size} bytes) via ${endpoint}...`);
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch('/api/parse-document', {
+        const res = await fetch(endpoint, {
           method: 'POST',
           body: formData,
         });
@@ -254,6 +273,26 @@ export default function AiQuizGenerator({
           throw new Error(errData.error || `Server returned ${res.status}`);
         }
         const data = await res.json();
+
+        if (outputMode === 'flashcard') {
+          const pairs: IngestedFlashcardPair[] = Array.isArray(data.pairs) ? data.pairs : [];
+          if (pairs.length === 0) {
+            throw new Error(`No verbatim term/definition pairs were found in "${file.name}".`);
+          }
+          const pageCount: number = data.pageCount || 1;
+          console.log(`[Frontend] PDF "${file.name}" extracted ${pairs.length} verbatim flashcards.`);
+          return {
+            id: fileId,
+            name: file.name,
+            size: file.size,
+            pageCount,
+            pages: [],
+            pairs,
+            model: typeof data.model === 'string' ? data.model : undefined,
+            status: 'ready'
+          };
+        }
+
         const pages: HandoutPage[] = data.pages || [];
         const pageCount: number = data.pageCount || pages.length || 1;
         console.log(`[Frontend] PDF "${file.name}" parsed: detected ${pageCount} pages, extracted ${pages.length} chunks.`);
@@ -266,6 +305,10 @@ export default function AiQuizGenerator({
           status: 'ready'
         };
       } else {
+        if (outputMode === 'flashcard') {
+          throw new Error('Flashcard / Identification mode currently supports PDF uploads only.');
+        }
+
         // Plain text / Markdown notes
         const textContent = await file.text();
         const lines = textContent.split('\n');
@@ -434,10 +477,24 @@ export default function AiQuizGenerator({
     setFiles([]);
   }
 
+  function handleOutputModeChange(nextMode: 'multiple_choice' | 'flashcard') {
+    if (nextMode !== outputMode && files.length > 0) {
+      setFiles([]);
+      setError('The uploaded files were cleared because the extraction mode changed. Please upload them again.');
+    }
+    if (nextMode === 'flashcard') setInputMode('upload');
+    setOutputMode(nextMode);
+  }
+
   async function handleGenerate() {
     // Check if input is provided in current mode
     const hasFiles = inputMode === 'upload' && files.length > 0;
     const hasText = inputMode === 'text' && text.trim().length > 0;
+
+    if (inputMode === 'upload' && files.some((file) => file.status !== 'ready')) {
+      setError('One or more files could not be read. Please remove them and upload a text-based PDF or run OCR before trying again.');
+      return;
+    }
 
     if (!hasFiles && !hasText && !title.trim()) {
       setError(
@@ -450,11 +507,71 @@ export default function AiQuizGenerator({
 
     setGenerating(true);
     setProgress(5);
-    setProgressMessage('Analyzing study material...');
-    setProgressDetail('Configuring optimal pedagogy strategy & authoring style...');
+    setProgressMessage(outputMode === 'flashcard' ? 'Preparing verbatim flashcards...' : 'Analyzing study material...');
+    setProgressDetail(
+      outputMode === 'flashcard'
+        ? 'Preserving source wording and building identification cards...'
+        : 'Configuring optimal pedagogy strategy & authoring style...'
+    );
     setError(null);
 
     try {
+      const generatedTitle = title.trim() || (
+        hasFiles
+          ? (files.length > 1 ? `${files.length} Chapters Comprehensive Review` : files[0].name.replace(/\.[^/.]+$/, ''))
+          : 'AI Generated Exam Reviewer'
+      );
+
+      if (outputMode === 'flashcard') {
+        if (inputMode !== 'upload') {
+          throw new Error('Flashcard / Identification mode requires one or more PDF uploads.');
+        }
+
+        const pairs = files.flatMap((file) => file.pairs || []);
+        if (pairs.length === 0) {
+          throw new Error('No verbatim term/definition pairs were extracted. Upload a searchable PDF with explicit definitions.');
+        }
+
+        setProgress(60);
+        setProgressMessage('Creating identification cards...');
+        const models = Array.from(new Set(files.map((file) => file.model).filter(Boolean)));
+        const response = await fetch('/api/quizzes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: generatedTitle,
+            subject_id: selectedSubject || null,
+            source_model: models.length > 0 ? `gemini/${models.join(',')}` : 'gemini/flashcard-extractor',
+            questions: pairs.map((pair) => ({
+              // Deliberately do not phrase or paraphrase this definition. This is
+              // the same identification contract used by clipboard ingestion.
+              question_text: pair.definition,
+              answer_text: pair.term,
+              question_type: 'typed_answer',
+              options: [pair.term],
+              correct_answer: 0,
+              explanation: null,
+              source_pages: pair.source_pages
+            }))
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Server returned ${response.status}`);
+        if (!data.id) throw new Error('The flashcard quiz was created without an id.');
+
+        setProgress(100);
+        setProgressMessage('Flashcards ready');
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(AI_DRAFT_STORAGE_KEY);
+        }
+        if (onGenerated) {
+          onGenerated(data.id);
+        } else {
+          router.push(`/quizzes/${data.id}`);
+        }
+        return;
+      }
+
       let aggregatedPages: HandoutPage[] = [];
       let filesSummary: IngestedFileInfo[] | undefined;
 
@@ -481,12 +598,6 @@ export default function AiQuizGenerator({
           fileSize: f.size
         }));
       }
-
-      const generatedTitle = title.trim() || (
-        hasFiles
-          ? (files.length > 1 ? `${files.length} Chapters Comprehensive Review` : files[0].name.replace(/\.[^/.]+$/, ''))
-          : 'AI Generated Exam Reviewer'
-      );
 
       console.log(`[Frontend] Submitting generate-quiz request:`, {
         pipelineMode,
@@ -606,10 +717,50 @@ export default function AiQuizGenerator({
           <div>
             <div>Reviewer Generator</div>
             <div className="text-[11px] font-normal text-muted-foreground">
-              Auto-routes material size, cross-chapter distribution & distractor rigor
+              {outputMode === 'flashcard'
+                ? 'Verbatim term/definition extraction with deterministic identification cards'
+                : 'Auto-routes material size, cross-chapter distribution & distractor rigor'}
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Output Format */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            Reviewer Format
+          </label>
+          <div className="inline-flex p-0.5 rounded-xl border border-border bg-muted/50 text-[11px]">
+            <button
+              type="button"
+              onClick={() => handleOutputModeChange('multiple_choice')}
+              disabled={generating}
+              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${outputMode === 'multiple_choice'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+                }`}
+            >
+              Multiple Choice
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOutputModeChange('flashcard')}
+              disabled={generating}
+              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${outputMode === 'flashcard'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+                }`}
+            >
+              Flashcard / Identification
+            </button>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          {outputMode === 'flashcard'
+            ? 'PDF definitions are copied verbatim into identification cards. No paraphrasing or multiple-choice generation.'
+            : 'Gemini generates multiple-choice questions with distractors from your source material.'}
+        </p>
       </div>
 
       {/* Quiz Title */}
@@ -750,7 +901,9 @@ export default function AiQuizGenerator({
                     Drag & drop chapter PDFs or an entire folder here
                   </h3>
                   <p className="text-[11px] text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                    Supports multiple chapter PDFs, handouts, or course directories. Multi-chapter reviewer automatically balances questions across every file.
+                    {outputMode === 'flashcard'
+                      ? 'Upload searchable PDFs up to 25 MB. Gemini preserves each extracted term and definition verbatim for identification practice.'
+                      : 'Supports multiple chapter PDFs, handouts, or course directories. Multi-chapter reviewer automatically balances questions across every file.'}
                   </p>
                 </div>
 
@@ -781,7 +934,7 @@ export default function AiQuizGenerator({
             {isProcessingFiles && (
               <div className="flex items-center gap-2.5 p-3 rounded-2xl border border-primary/20 bg-primary/5 text-xs text-primary font-semibold animate-pulse">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Parsing and categorizing chapter pages into streams...</span>
+                <span>Starting...</span>
               </div>
             )}
 
@@ -796,11 +949,11 @@ export default function AiQuizGenerator({
                       <span>{files.length} {files.length === 1 ? 'Chapter' : 'Chapters'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted font-bold text-xs text-foreground font-mono">
-                      <span>{totalPagesCount} Total Pages</span>
+                      <span>{outputMode === 'flashcard' ? `${totalFlashcardCount} Flashcards` : `${totalPagesCount} Total Pages`}</span>
                     </div>
                     <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold">
                       <CheckCircle2 className="h-3 w-3" />
-                      <span>Proportionally Balanced</span>
+                      <span>{outputMode === 'flashcard' ? 'Verbatim Source Preserved' : 'Proportionally Balanced'}</span>
                     </div>
                   </div>
 
@@ -840,8 +993,10 @@ export default function AiQuizGenerator({
                           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                             <span className="text-primary font-semibold">Ch. {idx + 1}</span>
                             <span>•</span>
-                            <span>{file.pageCount} {file.pageCount === 1 ? 'page' : 'pages'}</span>
-                            {totalPagesCount > 0 && (
+                            <span>{outputMode === 'flashcard'
+                              ? `${file.pairs?.length || 0} ${file.pairs?.length === 1 ? 'pair' : 'pairs'}`
+                              : `${file.pageCount} ${file.pageCount === 1 ? 'page' : 'pages'}`}</span>
+                            {outputMode === 'multiple_choice' && totalPagesCount > 0 && (
                               <>
                                 <span>•</span>
                                 <span>~{Math.round((file.pageCount / totalPagesCount) * 100)}% weight</span>
@@ -854,7 +1009,7 @@ export default function AiQuizGenerator({
                       <div className="flex items-center gap-2 shrink-0">
                         {file.status === 'ready' ? (
                           <span className="inline-flex items-center rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 border border-emerald-500/20">
-                            {file.pageCount}p ready
+                            {outputMode === 'flashcard' ? `${file.pairs?.length || 0} pairs ready` : `${file.pageCount}p ready`}
                           </span>
                         ) : (
                           <span className="inline-flex items-center rounded-lg bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive">
@@ -955,9 +1110,11 @@ export default function AiQuizGenerator({
             <>
               <Sparkles className="h-4 w-4" />
               <span>
-                {inputMode === 'upload' && files.length > 0
-                  ? `Generate Reviewer(${files.length} ${files.length === 1 ? 'file' : 'chapters'}, ${totalPagesCount}p)`
-                  : 'Generate Reviewer'}
+                {outputMode === 'flashcard'
+                  ? `Create Flashcards${files.length > 0 ? ` (${totalFlashcardCount} cards)` : ''}`
+                  : inputMode === 'upload' && files.length > 0
+                    ? `Generate Reviewer(${files.length} ${files.length === 1 ? 'file' : 'chapters'}, ${totalPagesCount}p)`
+                    : 'Generate Reviewer'}
               </span>
               <ArrowRight className="h-3.5 w-3.5" />
             </>

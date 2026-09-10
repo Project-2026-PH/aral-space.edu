@@ -100,6 +100,8 @@ export interface RawAiQuestion {
   correct_answer: number;
   explanation: string;
   source_pages?: number[];
+  /** Exact source excerpt used to ground the question and resolve its page number. */
+  evidence_quote?: string;
   chapter?: string;
   correct_explanation?: string;
   distractor_explanations?: Record<number, string>;

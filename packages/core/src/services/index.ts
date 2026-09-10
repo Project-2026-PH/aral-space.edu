@@ -5,6 +5,7 @@ export * from './NotesReviewerBuilder';
 export * from './QuizGenerationService';
 export * from './ai/AiModelConfig';
 export * from './ai/GeminiExtractor';
+export * from './ai/GeminiFlashcardExtractor';
 export * from './ai/GroqReviewer';
 export * from './ai/VerbatimExtractor';
 export * from './ai/VerbatimQuizBuilder';

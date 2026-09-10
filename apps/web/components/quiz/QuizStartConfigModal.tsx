@@ -22,7 +22,7 @@ export default function QuizStartConfigModal({
   title
 }: QuizStartConfigModalProps) {
   const router = useRouter();
-  const [mode, setMode] = useState<QuizMode>('learn');
+  const [mode, setMode] = useState<QuizMode>('flashcard');
   const [shuffleQuestions, setShuffleQuestions] = useState(false);
   const [shuffleOptions, setShuffleOptions] = useState(true);
 

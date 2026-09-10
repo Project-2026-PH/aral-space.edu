@@ -3,9 +3,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import RichTooltip from '@/components/ui/RichTooltip';
 import { Quiz, Subject } from '@quiz-creator/types';
-import { Archive, Layers, Pencil, Play, Trash2 } from 'lucide-react';
+import { Archive, BarChart3, Check, Layers, MoreHorizontal, Pencil, Play, Trash2, X } from 'lucide-react';
+import {
+  getQuizPerformanceSnapshot,
+  subscribeToQuizPerformance,
+  type QuizPerformanceMode,
+  type QuizPerformanceSnapshot
+} from '@/lib/quizPerformance';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 const REVEAL_WIDTH = 216; // 72px per action button
 const SWIPE_THRESHOLD = 50;
@@ -35,10 +40,15 @@ export default function SwipeableQuizCard({
   onArchive,
   subjectId,
 }: SwipeableQuizCardProps) {
-  const router = useRouter();
   const [offset, setOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<QuizPerformanceMode>('flashcard');
+  const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
+  const [performance, setPerformance] = useState<QuizPerformanceSnapshot>(() =>
+    getQuizPerformanceSnapshot(quiz.id, 'flashcard', quiz.question_count)
+  );
 
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -71,6 +81,14 @@ export default function SwipeableQuizCard({
     window.addEventListener('resize', checkViewport, { passive: true });
     return () => window.removeEventListener('resize', checkViewport);
   }, []);
+
+  useEffect(() => {
+    const refreshPerformance = () => {
+      setPerformance(getQuizPerformanceSnapshot(quiz.id, selectedMode, quiz.question_count));
+    };
+    refreshPerformance();
+    return subscribeToQuizPerformance(quiz.id, refreshPerformance);
+  }, [quiz.id, quiz.question_count, selectedMode]);
 
   // Gesture handling (active on mobile only for editable reviewers)
   function handlePointerDown(e: React.PointerEvent) {
@@ -177,6 +195,9 @@ export default function SwipeableQuizCard({
       return;
     }
 
+    // Interactive controls own their click behavior and must not flip the card.
+    if ((e.target as HTMLElement).closest('a, button, select')) return;
+
     // If card was open, tapping it simply closes the actions
     if (isOpen) {
       e.preventDefault();
@@ -184,6 +205,15 @@ export default function SwipeableQuizCard({
       onClose();
       return;
     }
+
+    setIsFlipped((flipped) => !flipped);
+    setIsModeMenuOpen(false);
+  }
+
+  function showProgress(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsFlipped(true);
   }
 
   return (
@@ -259,8 +289,14 @@ export default function SwipeableQuizCard({
           transition: isDragging ? 'none' : 'transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1)',
           touchAction: !readOnly && isMobile ? 'pan-y' : 'auto'
         }}
-        className="relative z-10 flex min-h-36 sm:min-h-[148px] h-full w-full flex-col justify-between bg-white dark:bg-card p-3.5 sm:p-4 select-none"
+        className="relative z-10 min-h-36 sm:min-h-[148px] h-full w-full [perspective:1200px] select-none"
       >
+        <div
+          className={`relative min-h-36 sm:min-h-[148px] h-full w-full transition-transform duration-500 [transform-style:preserve-3d] ${
+            isFlipped ? '[transform:rotateY(-180deg)]' : ''
+          }`}
+        >
+          <div className="relative flex min-h-36 sm:min-h-[148px] h-full w-full flex-col justify-between bg-white dark:bg-card p-3.5 sm:p-4 [backface-visibility:hidden]">
         <Link
           href={reviewHref}
           aria-label={`Review ${quiz.title}`}
@@ -324,6 +360,16 @@ export default function SwipeableQuizCard({
             </p>
           ) : null}
         </Link>
+
+        <button
+          type="button"
+          onClick={showProgress}
+          aria-label={`View progress for ${quiz.title}`}
+          className="mt-2 inline-flex w-fit items-center gap-1 rounded-lg border border-primary/25 bg-primary/5 px-2 py-1 text-[10px] font-black text-primary transition-colors hover:bg-primary/10"
+        >
+          <BarChart3 className="h-3 w-3" />
+          View progress
+        </button>
 
         <div className="mt-3 flex items-center justify-between gap-1.5 border-t-2 border-slate-900/20 dark:border-white/20 pt-2.5">
           {!readOnly ? (
@@ -423,6 +469,121 @@ export default function SwipeableQuizCard({
               <Play className="h-3 w-3 fill-current" />
               <span>Practice</span>
             </Link>
+          </div>
+        </div>
+        </div>
+
+          <div
+            className="absolute inset-0 flex min-h-36 sm:min-h-[148px] h-full w-full flex-col justify-between overflow-hidden bg-white dark:bg-card p-3.5 sm:p-4 [backface-visibility:hidden] [transform:rotateY(-180deg)]"
+          >
+            <div className="relative flex items-start justify-between gap-2">
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label="Choose performance mode"
+                  aria-expanded={isModeMenuOpen}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setIsModeMenuOpen((open) => !open);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg border-2 border-slate-900 bg-white px-1.5 py-1 text-[10px] font-black text-slate-900 shadow-brutal-sm transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none dark:bg-slate-800 dark:text-white"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                  <span>{selectedMode === 'multiple_choice' ? 'Multiple choice' : selectedMode === 'identification' ? 'Identification' : 'Flashcards'}</span>
+                </button>
+                {isModeMenuOpen && (
+                  <div className="absolute left-0 top-9 z-20 min-w-36 rounded-xl border-2 border-slate-900 bg-white p-1.5 shadow-brutal-sm dark:bg-slate-800">
+                    {([
+                      ['flashcard', 'Flashcards'],
+                      ['identification', 'Identification'],
+                      ['multiple_choice', 'Multiple choice']
+                    ] as const).map(([mode, label]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedMode(mode);
+                          setIsModeMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[10px] font-black transition-colors ${selectedMode === mode ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-muted'}`}
+                      >
+                        <span>{label}</span>
+                        {selectedMode === mode && <Check className="h-3 w-3" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                aria-label="Flip card back"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setIsFlipped(false);
+                  setIsModeMenuOpen(false);
+                }}
+                className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex min-h-0 items-center gap-3 py-1">
+              {performance.hasData ? (
+                <>
+                  <div className="relative h-16 w-16 shrink-0" aria-label={`${performance.progressPercent}% progress`}>
+                    <svg className="h-full w-full -rotate-90" viewBox="0 0 76 76" role="img" aria-hidden="true">
+                      <circle cx="38" cy="38" r="32" fill="none" stroke="currentColor" strokeWidth="7" className="text-slate-200 dark:text-slate-700" />
+                      <circle
+                        cx="38"
+                        cy="38"
+                        r="32"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="7"
+                        strokeLinecap="round"
+                        className="text-primary transition-[stroke-dashoffset] duration-500"
+                        strokeDasharray={`${2 * Math.PI * 32}`}
+                        strokeDashoffset={`${2 * Math.PI * 32 * (1 - performance.progressPercent / 100)}`}
+                      />
+                    </svg>
+                    <span className="absolute inset-0 flex items-center justify-center text-sm font-black text-foreground">
+                      {performance.progressPercent}%
+                    </span>
+                  </div>
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="truncate text-sm font-black text-foreground">{quiz.title}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Progress</p>
+                    <p className="text-xs font-bold text-foreground">{performance.answeredCount}/{quiz.question_count} answered</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground">
+                      Avg. score: <span className="font-black text-primary">{performance.averageScore}%</span>
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full rounded-xl border border-dashed border-slate-900/25 bg-muted/30 px-3 py-4 text-center dark:border-white/20">
+                  <p className="text-xs font-black text-foreground">No data available for this mode.</p>
+                  <p className="mt-1 text-[10px] font-semibold text-muted-foreground">Complete a question in {selectedMode === 'multiple_choice' ? 'Multiple choice' : selectedMode === 'identification' ? 'Identification' : 'Flashcards'} mode to begin tracking.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground">
+                <span>Question results</span>
+                {performance.hasData && <span>{performance.correctCount} correct</span>}
+              </div>
+              <div className="flex h-9 w-full items-end gap-0.5 overflow-hidden" aria-label="Question results: green correct, red incorrect, gray unanswered">
+                {performance.questionStatuses.map((status, index) => (
+                  <span
+                    key={`${quiz.id}-${selectedMode}-${index}`}
+                    title={`Question ${index + 1}: ${status}`}
+                    className={`h-full min-w-0 flex-1 rounded-t-[2px] transition-colors ${status === 'correct' ? 'bg-emerald-500' : status === 'incorrect' ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </article>

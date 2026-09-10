@@ -22,7 +22,7 @@ export default async function PracticePage({
 }) {
   const { quizId } = await params;
   const query = await searchParams;
-  const mode = (query.mode as QuizMode) || 'learn';
+  const mode = (query.mode as QuizMode) || 'flashcard';
   const shuffleQuestions = query.shuffleQuestions === 'true';
   const shuffleOptions = query.shuffleOptions !== 'false';
   const userId = await getAnonymousUserId();

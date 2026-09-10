@@ -29,6 +29,11 @@ import Modal from '@/components/ui/Modal';
 import QuizQuestionFormModal from '@/components/quiz/QuizQuestionFormModal';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
 import { getQuizStreakRecord, recordSessionCompletion } from '@/lib/streakTracker';
+import {
+  completeQuizPerformanceSession,
+  recordQuizPerformanceAnswer,
+  resetQuizPerformanceSession
+} from '@/lib/quizPerformance';
 import RichTextContent from '@/components/editor/RichTextContent';
 import { richTextToPlainText } from '@/lib/richText';
 
@@ -182,6 +187,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const frontContentRef = useRef<HTMLDivElement>(null);
   const backContentRef = useRef<HTMLDivElement>(null);
   const lastReviewRefreshRef = useRef(Date.now());
+  const performanceSessionIdRef = useRef(`flashcard-${quiz.id}-${userId || 'guest'}-${Date.now()}`);
 
   useEffect(() => {
     quizAudio.preload();
@@ -414,6 +420,11 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
       setIncorrectIds([]);
       setSwipeOffset(0);
       setIsCompleted(true);
+      completeQuizPerformanceSession({
+        quizId: quiz.id,
+        mode: 'flashcard',
+        sessionId: performanceSessionIdRef.current
+      });
       if (typeof window !== 'undefined' && saveProgress) {
         try {
           window.localStorage.removeItem(getFlashcardSessionKey(quiz.id, userId));
@@ -436,6 +447,11 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function handleRestartReview() {
+    resetQuizPerformanceSession({
+      quizId: quiz.id,
+      mode: 'flashcard',
+      sessionId: performanceSessionIdRef.current
+    });
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.removeItem(getFlashcardSessionKey(quiz.id, userId));
@@ -573,6 +589,16 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function recordCardResult(known: boolean) {
+    if (!currentCard) return;
+
+    recordQuizPerformanceAnswer({
+      quizId: quiz.id,
+      mode: 'flashcard',
+      sessionId: performanceSessionIdRef.current,
+      questionId: currentCard.id,
+      isCorrect: known
+    });
+
     if (known) {
       setStreak((prev) => {
         const nextStreak = prev + 1;
@@ -593,6 +619,11 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function handleShuffleSettingChange(enabled: boolean) {
+    resetQuizPerformanceSession({
+      quizId: quiz.id,
+      mode: 'flashcard',
+      sessionId: performanceSessionIdRef.current
+    });
     setShuffleQuestions(enabled);
     const nextCards = enabled ? shuffleList(questions) : [...questions];
     setCards(nextCards);

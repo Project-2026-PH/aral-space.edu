@@ -37,6 +37,11 @@ import {
 import { QuizSessionSync } from '@/lib/quizSessionSync';
 import { useQuizTelemetry } from '@/hooks/useQuizTelemetry';
 import { getQuizStreakRecord, recordSessionCompletion } from '@/lib/streakTracker';
+import {
+  completeQuizPerformanceSession,
+  recordQuizPerformanceAnswer,
+  resetQuizPerformanceSession
+} from '@/lib/quizPerformance';
 import type { PersonalizedFeedbackConfig } from '@/lib/personalized-feedback';
 
 interface UseQuizSessionProps {
@@ -530,6 +535,13 @@ export function useQuizSession({
     }
 
     telemetry.recordAnswer(activeQuestion, option.isCorrect, latencyMs);
+    recordQuizPerformanceAnswer({
+      quizId: quiz.id,
+      mode,
+      sessionId: session.id,
+      questionId,
+      isCorrect: option.isCorrect
+    });
     if (option.isCorrect) quizAudio.playCorrectSound();
 
     const transition = calculateAnswerTransition({
@@ -673,6 +685,11 @@ export function useQuizSession({
     setIsCompleted(true);
     const summary = telemetry.generateSummary(questions);
     setSessionSummary(summary);
+    completeQuizPerformanceSession({
+      quizId: quiz.id,
+      mode,
+      sessionId: session.id
+    });
 
     if (!celebrationFiredRef.current) {
       celebrationFiredRef.current = true;
@@ -759,6 +776,11 @@ export function useQuizSession({
   }
 
   function resetProgress() {
+    resetQuizPerformanceSession({
+      quizId: quiz.id,
+      mode,
+      sessionId: session.id
+    });
     removeQuizProgressSnapshot(quiz.id, session.id);
     void syncClientRef.current.completeSession(session, quiz.id, telemetry.generateSummary(questions));
 
@@ -800,6 +822,8 @@ export function useQuizSession({
     setSessionSummary(null);
     setCorrectAnswerIds(new Set());
     setCurrentStreak(0);
+    completionSyncStartedRef.current = false;
+    celebrationFiredRef.current = false;
     telemetry.restore({});
     latestSnapshotRef.current = null;
     restoringSnapshotRef.current = null;

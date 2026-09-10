@@ -527,6 +527,7 @@ export default function LibraryClient({
       <GenerateQuizModal
         open={showAiModal}
         onOpenChange={setShowAiModal}
+        subjects={subjects}
       />
       <FloatingBottomNav
         onOpenAiModal={() => setShowAiModal(true)}

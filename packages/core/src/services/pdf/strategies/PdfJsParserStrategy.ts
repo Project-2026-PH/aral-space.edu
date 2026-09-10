@@ -12,10 +12,39 @@ export class PdfJsParserStrategy implements IPdfParserStrategy {
 
   private static pdfjsModule: any = null;
 
+  private static async resolveWorkerSrc(): Promise<string> {
+    const resolve = (import.meta as ImportMeta & {
+      resolve?: (specifier: string) => string;
+    }).resolve;
+    const workerSpecifier = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
+
+    if (typeof resolve === 'function') {
+      return resolve(workerSpecifier);
+    }
+
+    // Vitest and some bundlers expose import.meta without Node's resolve()
+    // implementation. Resolve lazily so React Native bundles do not eagerly
+    // depend on Node-only modules.
+    const [{ createRequire }, { pathToFileURL }] = await Promise.all([
+      import('node:module'),
+      import('node:url'),
+    ]);
+    const require = createRequire(import.meta.url);
+    return pathToFileURL(require.resolve(workerSpecifier)).href;
+  }
+
   private static async getPdfJs(): Promise<any> {
     if (!PdfJsParserStrategy.pdfjsModule) {
       // Dynamic import protects bundle boundaries (e.g. Metro / React Native in @quiz-creator/mobile)
-      PdfJsParserStrategy.pdfjsModule = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      const mod = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      // Node.js uses PDF.js's fake-worker path, which still needs a worker
+      // module source to bootstrap the worker implementation. An empty string
+      // is treated as "not configured" and causes:
+      // `Setting up fake worker failed: No "GlobalWorkerOptions.workerSrc" specified.`
+      // Resolve the worker from the installed pdfjs-dist package so this works
+      // in Next.js server routes without relying on a browser Worker URL.
+      mod.GlobalWorkerOptions.workerSrc = await PdfJsParserStrategy.resolveWorkerSrc();
+      PdfJsParserStrategy.pdfjsModule = mod;
     }
     return PdfJsParserStrategy.pdfjsModule;
   }
@@ -60,8 +89,17 @@ export class PdfJsParserStrategy implements IPdfParserStrategy {
         pageCount: doc.numPages,
       };
     } catch (err: any) {
-      if (err?.name === 'PasswordException' || err?.message?.toLowerCase().includes('password')) {
-        throw new PdfEncryptedError(fileName, true, `PDF "${fileName}" is encrypted or password-protected.`);
+      if (
+        err?.name === 'PasswordException' ||
+        err?.message?.toLowerCase().includes('password') ||
+        err?.message?.toLowerCase().includes('encrypt')
+      ) {
+        const requiresPassword = err?.name === 'PasswordException';
+        throw new PdfEncryptedError(
+          fileName,
+          requiresPassword,
+          `PDF "${fileName}" is encrypted or password-protected. Please upload an unencrypted PDF.`
+        );
       }
       throw err;
     }

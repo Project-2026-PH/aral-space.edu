@@ -39,6 +39,11 @@ const nextConfig = {
     ];
   },
   experimental: {
+    // Keep multipart requests flowing through middleware at the 25 MB document limit.
+    middlewareClientMaxBodySize: '25mb',
+    serverActions: {
+      bodySizeLimit: '25mb',
+    },
     // Keep server manifest writes in the main process for reliable Windows builds.
     webpackBuildWorker: false,
     // Avoid bundling the full icon package for every named icon import.

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import EditorialHeroGrid from '@/components/home/EditorialHeroGrid';
@@ -11,8 +11,9 @@ export interface HomeClientProps {
   initialSubjects?: unknown[];
   viewerId?: string;
 }
+const [started, setStarted] = useState(false);
 
-export default function HomeClient({}: HomeClientProps) {
+export default function HomeClient({ }: HomeClientProps) {
   return (
     <div className="home-page pb-16 overflow-x-hidden">
       {/* Neo-brutalist Editorial Hero (Full Width Edge-to-Edge) */}
@@ -43,7 +44,7 @@ export default function HomeClient({}: HomeClientProps) {
               className="inline-flex items-center justify-center gap-2.5 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] px-10 py-4 sm:py-5 text-base sm:text-lg font-black uppercase tracking-wide text-white border-2 border-slate-900 shadow-brutal transition-all duration-150 hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:scale-[0.98]"
             >
               <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
-              <span>Get Started</span>
+              <button onClick={() => setStarted(true)} disabled={started}>{started ? 'Setting up...' : 'Start'}</button>
             </Link>
           </div>
         </div>

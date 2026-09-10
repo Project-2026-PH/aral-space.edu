@@ -6,6 +6,15 @@ import { VerbatimQuizBuilder } from './ai/VerbatimQuizBuilder';
 import { AiModelConfig } from './ai/AiModelConfig';
 import { LocalQuizGenerator } from './LocalQuizGenerator';
 
+class SourceGroundingError extends Error {
+  readonly code = 'SOURCE_NOT_GROUNDED';
+
+  constructor() {
+    super('The generated questions could not be grounded in the uploaded source. Please try again with a text-selectable PDF.');
+    this.name = 'SourceGroundingError';
+  }
+}
+
 export interface GenerateOptions {
   handoutPages: HandoutPage[];
   subjectName?: string;
@@ -50,6 +59,91 @@ export class QuizGenerationService {
         typeof q.explanation === 'string' &&
         q.explanation.trim().length > 0
       );
+    });
+  }
+
+  /**
+   * Reconciles model citations against the actual extracted pages. A model-provided
+   * evidence_quote is mandatory for new AI output; its exact match determines the
+   * persisted page numbers. Legacy/mock output without a quote is retained, but
+   * invalid citations are removed and weak citations are replaced when lexical
+   * evidence identifies a better page.
+   */
+  static groundQuestions(questions: RawAiQuestion[], pages: HandoutPage[]): RawAiQuestion[] {
+    if (!Array.isArray(questions) || pages.length === 0) return [];
+
+    const stopWords = new Set([
+      'about', 'after', 'again', 'also', 'because', 'being', 'between', 'could', 'does',
+      'during', 'from', 'have', 'into', 'more', 'most', 'other', 'over', 'same', 'some',
+      'than', 'that', 'their', 'there', 'these', 'they', 'this', 'those', 'through',
+      'under', 'what', 'when', 'where', 'which', 'while', 'with', 'would', 'according',
+      'following', 'question', 'correct', 'answer', 'source', 'concept', 'process'
+    ]);
+    const tokenize = (value: string): string[] => Array.from(new Set(
+      value.toLowerCase().match(/[a-z0-9]{4,}/g)?.filter((token) => !stopWords.has(token)) || []
+    ));
+    const scorePage = (question: RawAiQuestion, page: HandoutPage): number => {
+      const answer = question.options?.[question.correct_answer] || '';
+      const evidenceText = [
+        question.question,
+        answer,
+        question.explanation,
+        question.correct_explanation,
+        ...(question.discriminatory_keywords || [])
+      ].join(' ');
+      const pageTokens = new Set(tokenize(page.text));
+      return tokenize(evidenceText).reduce((score, token) => score + (pageTokens.has(token) ? 1 : 0), 0);
+    };
+
+    return questions.flatMap((question) => {
+      const rawEvidence = (question as RawAiQuestion & { evidence_quote?: unknown }).evidence_quote;
+      const evidenceQuote = typeof rawEvidence === 'string' ? rawEvidence.trim() : '';
+
+      if (evidenceQuote) {
+        const evidencePages = pages.filter((page) =>
+          VerbatimQuizBuilder.verifyVerbatimSubstring(page.text, evidenceQuote)
+        );
+        if (evidencePages.length === 0) {
+          console.warn('[QuizGenerationService] Dropping question with evidence_quote absent from source pages.');
+          return [];
+        }
+
+        const answer = question.options?.[question.correct_answer] || '';
+        const quoteTokens = new Set(tokenize(evidenceQuote));
+        const conceptTokens = tokenize(`${question.question} ${answer}`);
+        if (conceptTokens.length > 0 && !conceptTokens.some((token) => quoteTokens.has(token))) {
+          console.warn('[QuizGenerationService] Dropping question whose answer is not supported by evidence_quote.');
+          return [];
+        }
+
+        return [{
+          ...question,
+          evidence_quote: evidenceQuote,
+          source_pages: Array.from(new Set(evidencePages.map((page) => page.pageNumber)))
+        }];
+      }
+
+      const validPageNumbers = new Set(pages.map((page) => page.pageNumber));
+      const declaredPages = Array.isArray(question.source_pages)
+        ? question.source_pages.filter((page) => Number.isInteger(page) && validPageNumbers.has(page))
+        : [];
+      const rankedPages = pages
+        .map((page) => ({ page, score: scorePage(question, page) }))
+        .sort((a, b) => b.score - a.score);
+      const best = rankedPages[0];
+      const declaredScore = declaredPages.reduce((highest, pageNumber) => {
+        const score = rankedPages.find((entry) => entry.page.pageNumber === pageNumber)?.score || 0;
+        return Math.max(highest, score);
+      }, 0);
+
+      let sourcePages = declaredPages;
+      if (sourcePages.length === 0 && best && best.score >= 2) {
+        sourcePages = [best.page.pageNumber];
+      } else if (best && best.score >= 2 && best.score > declaredScore + 1) {
+        sourcePages = [best.page.pageNumber];
+      }
+
+      return [{ ...question, source_pages: Array.from(new Set(sourcePages)) }];
     });
   }
 
@@ -216,7 +310,7 @@ export class QuizGenerationService {
     if (mode === 'groq_direct' && groqKey) {
       const groqModel = AiModelConfig.getGroqModel();
       console.log(`[QuizGenerationService] Executing groq_direct with model "${groqModel}"...`);
-      options.onStageChange?.('extracting', `Generating questions with Groq (${groqModel})...`, groqModel);
+      options.onStageChange?.('extracting', `Generating questions...(${groqModel})...`, groqModel);
       const result = await this.groqReviewer.generateDirect({
         apiKey: groqKey,
         modelName: groqModel,
@@ -226,9 +320,12 @@ export class QuizGenerationService {
         authoringProfile: options.authoringProfile,
         onChunk: options.onChunk
       });
-      console.log(`[QuizGenerationService] groq_direct completed in ${Date.now() - pipelineStartTime}ms with ${result.questions.length} questions.`);
+      const groundedQuestions = QuizGenerationService.groundQuestions(result.questions, options.handoutPages);
+      if (groundedQuestions.length === 0) {
+        throw new SourceGroundingError();
+      }
       return {
-        questions: result.questions,
+        questions: groundedQuestions,
         sourceModel: `groq/${result.model}`,
         tokensUsed: result.tokensUsed,
         pipelineMode: 'groq_direct'
@@ -251,14 +348,19 @@ export class QuizGenerationService {
           onChunk: options.onChunk
         });
         console.log(`[QuizGenerationService] gemini_direct completed in ${Date.now() - pipelineStartTime}ms with ${result.questions.length} questions.`);
+        const groundedQuestions = QuizGenerationService.groundQuestions(result.questions, options.handoutPages);
+        if (groundedQuestions.length === 0) {
+          throw new SourceGroundingError();
+        }
         return {
-          questions: result.questions,
+          questions: groundedQuestions,
           sourceModel: `gemini/${result.model}`,
           tokensUsed: result.tokensUsed,
           pipelineMode: 'gemini_direct'
         };
       } catch (geminiErr: any) {
         console.error(`[QuizGenerationService] Direct Gemini extraction failed: ${geminiErr.message}`);
+        if (geminiErr?.code === 'SOURCE_NOT_GROUNDED') throw geminiErr;
         if (groqKey) {
           const fallbackGroqModel = AiModelConfig.getGroqModel();
           console.log(`[QuizGenerationService] Falling back to Groq with "${fallbackGroqModel}"...`);
@@ -272,8 +374,12 @@ export class QuizGenerationService {
             authoringProfile: options.authoringProfile,
             onChunk: options.onChunk
           });
+          const groundedQuestions = QuizGenerationService.groundQuestions(groqDirect.questions, options.handoutPages);
+          if (groundedQuestions.length === 0) {
+            throw new SourceGroundingError();
+          }
           return {
-            questions: groqDirect.questions,
+            questions: groundedQuestions,
             sourceModel: `groq/${groqDirect.model}`,
             tokensUsed: groqDirect.tokensUsed,
             pipelineMode: 'groq_fallback'
@@ -302,9 +408,17 @@ export class QuizGenerationService {
           authoringProfile: options.authoringProfile,
           onChunk: options.onChunk
         });
-        console.log(`[QuizGenerationService] Stage 1/2 Gemini draft succeeded in ${Date.now() - stage1Start}ms (${stage1Result.questions.length} candidate questions)`);
+        stage1Result = {
+          ...stage1Result,
+          questions: QuizGenerationService.groundQuestions(stage1Result.questions, options.handoutPages)
+        };
+        if (stage1Result.questions.length === 0) {
+          throw new SourceGroundingError();
+        }
+        console.log(`[QuizGenerationService] Stage 1/2 Gemini draft succeeded in ${Date.now() - stage1Start}ms (${stage1Result.questions.length} grounded candidate questions)`);
       } catch (geminiErr: any) {
         console.error(`[QuizGenerationService] Stage 1/2 Gemini extraction failed after ${Date.now() - stage1Start}ms:`, geminiErr.message);
+        if (geminiErr?.code === 'SOURCE_NOT_GROUNDED') throw geminiErr;
         // Fallback to Groq direct if Gemini fails and Groq is available
         if (groqKey) {
           const fallbackGroqModel = AiModelConfig.getGroqModel();
@@ -319,8 +433,12 @@ export class QuizGenerationService {
             authoringProfile: options.authoringProfile,
             onChunk: options.onChunk
           });
+          const groundedQuestions = QuizGenerationService.groundQuestions(groqDirect.questions, options.handoutPages);
+          if (groundedQuestions.length === 0) {
+            throw new SourceGroundingError();
+          }
           return {
-            questions: groqDirect.questions,
+            questions: groundedQuestions,
             sourceModel: `groq/${groqDirect.model}`,
             tokensUsed: groqDirect.tokensUsed,
             pipelineMode: 'groq_fallback'
@@ -346,10 +464,14 @@ export class QuizGenerationService {
           });
           console.log(`[QuizGenerationService] Stage 2/2 Groq audit succeeded in ${Date.now() - stage2Start}ms`);
 
-          if (QuizGenerationService.validateQuestions(stage2Result.questions)) {
+          const groundedStage2Questions = QuizGenerationService.groundQuestions(stage2Result.questions, options.handoutPages);
+          if (
+            groundedStage2Questions.length === stage1Result.questions.length &&
+            QuizGenerationService.validateQuestions(groundedStage2Questions)
+          ) {
             console.log(`[QuizGenerationService] Two-stage pipeline fully complete in ${Date.now() - pipelineStartTime}ms.`);
             return {
-              questions: stage2Result.questions,
+              questions: groundedStage2Questions,
               sourceModel: `gemini+groq/two-stage (${stage1Result.model} -> ${stage2Result.model})`,
               tokensUsed: stage1Result.tokensUsed + stage2Result.tokensUsed,
               pipelineMode: 'two_stage',
@@ -358,6 +480,7 @@ export class QuizGenerationService {
               reviewedByGroq: true
             };
           }
+          console.warn('[QuizGenerationService] Groq review changed or lost source grounding; using the grounded Gemini draft.');
         } catch (groqErr: any) {
           console.warn(`[QuizGenerationService] Stage 2/2 Groq review bypassed (${groqErr.message}). Using Stage 1 questions.`);
           options.onStageChange?.('fallback', `Groq review bypassed (${groqErr.message}). Using validated Gemini questions.`, stage1Result.model);
@@ -386,8 +509,12 @@ export class QuizGenerationService {
         subjectName: options.subjectName,
         onChunk: options.onChunk
       });
+      const groundedQuestions = QuizGenerationService.groundQuestions(result.questions, options.handoutPages);
+      if (groundedQuestions.length === 0) {
+        throw new SourceGroundingError();
+      }
       return {
-        questions: result.questions,
+        questions: groundedQuestions,
         sourceModel: `groq/${result.model}`,
         tokensUsed: result.tokensUsed,
         pipelineMode: 'groq_direct'

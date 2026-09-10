@@ -19,6 +19,7 @@ export * from './services/LocalQuizGenerator';
 export * from './services/QuizGenerationService';
 export * from './services/ai/AiModelConfig';
 export * from './services/ai/GeminiExtractor';
+export * from './services/ai/GeminiFlashcardExtractor';
 export * from './services/ai/GroqReviewer';
 export * from './services/ai/VerbatimExtractor';
 export * from './services/ai/VerbatimQuizBuilder';

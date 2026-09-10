@@ -83,6 +83,17 @@ export class PdfExtractionService {
     return await fallback.parse(uint8, fileName);
   }
 
+  /**
+   * Returns false for the synthetic placeholders used when a PDF page has no
+   * selectable text. Those placeholders must never be sent to an AI model as
+   * if they were document content.
+   */
+  static isExtractableText(text: string): boolean {
+    const normalized = text.trim();
+    if (!normalized) return false;
+    return !/^\[Page\s+\d+\s+(?:empty or image-only in|extracted from)\s+.+\]$/i.test(normalized);
+  }
+
   // --- Static Compatibility Delegates ---
 
   static extractTextFromMockOrPlain(text: string, chapterTitle?: string): HandoutPage[] {

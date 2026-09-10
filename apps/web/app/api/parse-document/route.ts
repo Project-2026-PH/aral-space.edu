@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PdfExtractionService } from '@quiz-creator/core/services';
+import { PdfExtractionService, PdfEncryptedError } from '@quiz-creator/core/services';
 import { getAnonymousUserId } from '@/lib/anonymous';
 import { assertAllowedOrigin, enforceRateLimit, withTimeout, RequestSecurityError, boundedString } from '@/lib/request-security';
 import { SECURITY_LIMITS } from '@/lib/security-config';
@@ -34,16 +34,23 @@ export async function POST(req: NextRequest) {
       SECURITY_LIMITS.documentTimeoutMs,
       'Document parsing timed out'
     );
-    if (result.pageCount > SECURITY_LIMITS.maxPages || result.pages.length > SECURITY_LIMITS.maxPages) {
+    const pages = result.pages.filter((page) => PdfExtractionService.isExtractableText(page.text));
+    if (pages.length === 0) {
+      throw new RequestSecurityError(422, 'The uploaded PDF contains no selectable text. Please upload a text-based PDF or run OCR before uploading.');
+    }
+    if (result.pageCount > SECURITY_LIMITS.maxPages || pages.length > SECURITY_LIMITS.maxPages) {
       throw new RequestSecurityError(413, `Documents are limited to ${SECURITY_LIMITS.maxPages} pages`);
     }
-    const totalText = result.pages.reduce((total, page) => total + page.text.length, 0);
-    if (result.pages.some((page) => page.text.length > SECURITY_LIMITS.maxPageTextLength) || totalText > SECURITY_LIMITS.maxTotalTextLength) {
+    const totalText = pages.reduce((total, page) => total + page.text.length, 0);
+    if (pages.some((page) => page.text.length > SECURITY_LIMITS.maxPageTextLength) || totalText > SECURITY_LIMITS.maxTotalTextLength) {
       throw new RequestSecurityError(413, 'Extracted document text is too large');
     }
-    return NextResponse.json({ pages: result.pages, pageCount: result.pageCount });
+    return NextResponse.json({ pages, pageCount: result.pageCount });
   } catch (err: any) {
     console.error('[API /parse-document ERROR]:', err);
+    if (err instanceof PdfEncryptedError || err?.name === 'PdfEncryptedError') {
+      return NextResponse.json({ error: err.message }, { status: 422 });
+    }
     const status = err instanceof RequestSecurityError ? err.status : typeof err?.status === 'number' ? err.status : 500;
     return NextResponse.json({ error: err?.message || 'Failed to parse document' }, { status });
   }

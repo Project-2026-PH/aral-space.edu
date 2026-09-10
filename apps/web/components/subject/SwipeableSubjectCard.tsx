@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import RichTooltip from '@/components/ui/RichTooltip';
 import { Subject } from '@quiz-creator/types';
 import { BookOpen, ExternalLink, Eye, Link2, Lock, Pencil, Share2, Trash2, Archive } from 'lucide-react';
 import Link from 'next/link';
@@ -364,42 +365,60 @@ export default function SwipeableSubjectCard({
           )}
 
           {canManage ? (
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex flex-1 items-center gap-1.5">
               {/* Desktop-only action buttons (Edit + Delete + Share) */}
               <div className="hidden sm:flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  aria-label={`Edit ${subject.name}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onEdit();
-                  }}
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-blue-500 hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
+                <RichTooltip
+                  id={`subject-edit-tooltip-${subject.id}`}
+                  title="Edit subject"
+                  description="Change the subject name and color."
                 >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Archive ${subject.name}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onArchive();
-                  }}
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-amber-500 hover:text-slate-900 hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
+                  <button
+                    type="button"
+                    aria-label={`Edit ${subject.name}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEdit();
+                    }}
+                    className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-blue-500 hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </RichTooltip>
+                <RichTooltip
+                  id={`subject-archive-tooltip-${subject.id}`}
+                  title="Archive subject"
+                  description="Hide it from your active library."
                 >
-                  <Archive className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Delete ${subject.name}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDelete();
-                  }}
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-destructive hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
+                  <button
+                    type="button"
+                    aria-label={`Archive ${subject.name}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onArchive();
+                    }}
+                    className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-amber-500 hover:text-slate-900 hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
+                  >
+                    <Archive className="h-3.5 w-3.5" />
+                  </button>
+                </RichTooltip>
+                <RichTooltip
+                  id={`subject-delete-tooltip-${subject.id}`}
+                  title="Delete subject"
+                  description="Permanently remove this subject and its sets."
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${subject.name}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete();
+                    }}
+                    className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-destructive hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </RichTooltip>
               </div>
 
               {/* Mobile gesture hint */}
@@ -414,7 +433,7 @@ export default function SwipeableSubjectCard({
                   event.stopPropagation();
                   onShare();
                 }}
-                className="inline-flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-2.5 py-1 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
+                className="ml-auto inline-flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-2.5 py-1 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
               >
                 <Share2 className="h-3.5 w-3.5" />
                 Share

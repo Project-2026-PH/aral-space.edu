@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import RichTooltip from '@/components/ui/RichTooltip';
 import { Quiz, Subject } from '@quiz-creator/types';
 import { Archive, Layers, Pencil, Play, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -348,39 +349,57 @@ export default function SwipeableQuizCard({
               <>
                 {/* Desktop archive, delete, edit shortcut buttons */}
                 <div className="hidden sm:flex items-center gap-0.5 shrink-0">
-                  <button
-                    type="button"
-                    aria-label={`Archive ${quiz.title}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onArchive();
-                    }}
-                    className="inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-400 transition-colors cursor-pointer shrink-0"
+                  <RichTooltip
+                    id={`quiz-archive-tooltip-${quiz.id}`}
+                    title="Archive set"
+                    description="Hide this study set from your active library."
                   >
-                    <Archive className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Delete ${quiz.title}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete();
-                    }}
-                    className="inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer shrink-0"
+                    <button
+                      type="button"
+                      aria-label={`Archive ${quiz.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onArchive();
+                      }}
+                      className="inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-400 transition-colors cursor-pointer shrink-0"
+                    >
+                      <Archive className="h-3.5 w-3.5" />
+                    </button>
+                  </RichTooltip>
+                  <RichTooltip
+                    id={`quiz-delete-tooltip-${quiz.id}`}
+                    title="Delete set"
+                    description="Permanently remove this study set and its questions."
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Edit ${quiz.title}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit();
-                    }}
-                    className="inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-blue-600/10 hover:text-blue-600 transition-colors cursor-pointer shrink-0"
+                    <button
+                      type="button"
+                      aria-label={`Delete ${quiz.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                      }}
+                      className="inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer shrink-0"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </RichTooltip>
+                  <RichTooltip
+                    id={`quiz-edit-tooltip-${quiz.id}`}
+                    title="Edit set"
+                    description="Update the title, details, and questions."
                   >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
+                    <button
+                      type="button"
+                      aria-label={`Edit ${quiz.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit();
+                      }}
+                      className="inline-flex items-center justify-center rounded-lg p-1 text-muted-foreground hover:bg-blue-600/10 hover:text-blue-600 transition-colors cursor-pointer shrink-0"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </RichTooltip>
                 </div>
 
                 {/* Mobile gesture hint */}

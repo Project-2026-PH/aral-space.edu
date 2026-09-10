@@ -32,7 +32,12 @@ export default function ShareSubjectModal({
   const [creatingCollaborator, setCreatingCollaborator] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const [origin, setOrigin] = useState('');
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
   const shareUrl = shareToken && origin ? `${origin}/subjects/share/${shareToken}` : '';
 
   useEffect(() => {

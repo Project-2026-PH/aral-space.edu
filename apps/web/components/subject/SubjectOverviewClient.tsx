@@ -60,7 +60,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
           <ArrowLeft className="h-3.5 w-3.5 stroke-[2.5]" /> Back to library
         </Link>
 
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
+        <div className="flex flex-col justify-start gap-5 sm:flex-row sm:flex-wrap sm:items-start">
           <div className="flex min-w-0 items-start gap-4">
             <span aria-hidden="true" style={{ backgroundColor: subject.color }} className="h-14 w-14 shrink-0 rounded-2xl border-2 border-slate-900 shadow-brutal-sm" />
             <div className="min-w-0">

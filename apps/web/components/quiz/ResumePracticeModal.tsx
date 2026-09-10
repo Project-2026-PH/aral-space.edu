@@ -24,19 +24,7 @@ export default function ResumePracticeModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex min-h-dvh w-screen items-center justify-center overflow-y-auto bg-background/85 p-3 backdrop-blur-sm sm:backdrop-blur-md animate-modal-backdrop sm:p-4"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 60,
-        display: 'flex',
-        width: '100vw',
-        height: '100dvh',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflowY: 'auto',
-        boxSizing: 'border-box'
-      }}
+      className="resume-practice-overlay fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-background/85 p-3 backdrop-blur-sm sm:backdrop-blur-md animate-modal-backdrop sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="resume-practice-title"
@@ -44,12 +32,11 @@ export default function ResumePracticeModal({
       onClick={onContinue}
     >
       <div
-        className="mx-auto w-full max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-border bg-card p-4 text-foreground shadow-2xl shadow-primary/10 animate-modal-pop sm:max-w-3xl sm:rounded-3xl sm:p-8"
+        className="resume-practice-dialog relative z-[61] w-full max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-border bg-card p-4 text-foreground shadow-2xl shadow-primary/10 animate-modal-pop sm:max-w-3xl sm:rounded-3xl sm:p-8"
         style={{
           width: 'min(48rem, calc(100vw - 2rem))',
           maxHeight: 'calc(100dvh - 2rem)',
-          boxSizing: 'border-box',
-          flexShrink: 0
+          boxSizing: 'border-box'
         }}
         onClick={(event) => event.stopPropagation()}
       >

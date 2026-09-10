@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 html {
+  --document-zoom: 1.28;
   scroll-behavior: smooth;
   scrollbar-width: thin;
   scrollbar-color: rgba(30, 41, 59, 0.35) transparent;
@@ -16,6 +17,7 @@ html.dark {
 @media (min-width: 1024px) {
   html {
     zoom: 1.28;
+    --document-zoom: 1.28;
   }
 }
 
@@ -1139,4 +1141,22 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   opacity: 1;
   width: 0;
   height: 0;
+}
+.resume-practice-overlay {
+  box-sizing: border-box;
+}
+
+.resume-practice-dialog {
+  position: relative;
+  top: auto;
+  left: auto;
+  margin: 0;
+}
+
+/* Cancel the desktop document zoom for this body-level portal so fixed centering
+   uses the actual visible viewport rather than the zoomed layout viewport. */
+@media (min-width: 1024px) {
+  .resume-practice-overlay {
+    zoom: calc(1 / var(--document-zoom));
+  }
 }

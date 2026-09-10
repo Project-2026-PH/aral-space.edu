@@ -48,8 +48,9 @@ export default function SwipeableQuizCard({
   const cardRef = useRef<HTMLDivElement>(null);
 
   const subjectName = subject?.name;
-  const reviewHref = subjectId
-    ? `/review/${encodeURIComponent(quiz.slug || quiz.id)}?subjectId=${encodeURIComponent(subjectId)}`
+  const subjectLocator = subject?.slug || subjectId;
+  const reviewHref = subjectLocator
+    ? `/review/${encodeURIComponent(quiz.slug || quiz.id)}?subjectSlug=${encodeURIComponent(subjectLocator)}`
     : `/review/${encodeURIComponent(quiz.slug || quiz.id)}`;
 
   // Synchronize external isOpen state

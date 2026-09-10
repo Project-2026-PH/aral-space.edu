@@ -11,7 +11,7 @@ export default async function ReviewPage({
   searchParams
 }: {
   params: Promise<{ quizId: string }>;
-  searchParams: Promise<{ shareToken?: string; subjectShareToken?: string; subjectId?: string }>;
+  searchParams: Promise<{ shareToken?: string; subjectShareToken?: string; subjectSlug?: string; subjectId?: string }>;
 }) {
   const { quizId } = await params;
   const query = await searchParams;
@@ -30,9 +30,14 @@ export default async function ReviewPage({
 
   const validShareToken = query.shareToken && query.shareToken !== 'undefined' ? query.shareToken : undefined;
   const validSubjectShareToken = query.subjectShareToken && query.subjectShareToken !== 'undefined' ? query.subjectShareToken : undefined;
+  const validSubjectSlug = query.subjectSlug && query.subjectSlug !== 'undefined' ? query.subjectSlug : undefined;
   const validSubjectId = query.subjectId && query.subjectId !== 'undefined' ? query.subjectId : undefined;
-  const subjectExitHref = validSubjectId && !validSubjectShareToken
-    ? `/subjects/${encodeURIComponent(validSubjectId)}`
+  const subjectExitHref = !validSubjectShareToken
+    ? validSubjectSlug
+      ? `/subjects/${encodeURIComponent(validSubjectSlug)}`
+      : validSubjectId
+        ? `/subjects/${encodeURIComponent(validSubjectId)}`
+        : undefined
     : undefined;
 
   if (!quiz && validShareToken) {

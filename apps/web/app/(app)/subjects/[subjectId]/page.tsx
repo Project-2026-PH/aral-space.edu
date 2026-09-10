@@ -23,7 +23,7 @@ export default async function SubjectDetailPage({
   const access = await controller.getSubjectAccess(match.id, userId);
   if (!access) notFound();
   if (access.role !== 'owner') {
-    await controller.recordSubjectView(subjectId, userId);
+    await controller.recordSubjectView(match.id, userId);
   }
   const subject = match.entity;
   if (!subject) notFound();

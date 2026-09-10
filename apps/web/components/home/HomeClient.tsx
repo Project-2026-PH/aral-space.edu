@@ -11,9 +11,10 @@ export interface HomeClientProps {
   initialSubjects?: unknown[];
   viewerId?: string;
 }
-const [started, setStarted] = useState(false);
 
 export default function HomeClient({ }: HomeClientProps) {
+  const [started, setStarted] = useState(false);
+
   return (
     <div className="home-page pb-16 overflow-x-hidden">
       {/* Neo-brutalist Editorial Hero (Full Width Edge-to-Edge) */}

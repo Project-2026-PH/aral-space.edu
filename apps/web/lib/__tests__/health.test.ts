@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { GET, HEAD } from '@/app/health/route';
+import { GET, HEAD } from '@/app/(app)/health/route';
 import * as dbModule from '@/lib/db';
 
 describe('Health endpoint', () => {

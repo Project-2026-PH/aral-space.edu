@@ -1,1 +1,1 @@
-export { GET, HEAD, dynamic, revalidate } from '@/app/health/route';
+export { GET, HEAD, dynamic, revalidate } from '@/app/(app)/health/route';

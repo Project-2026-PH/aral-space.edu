@@ -206,8 +206,7 @@ export default function SwipeableSubjectCard({
   return (
     <div
       ref={cardRef}
-      style={{ animationDelay: `${index * 70}ms` }}
-      className="subject-card-enter group relative min-h-36 sm:min-h-[148px] rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card shadow-brutal transition-all duration-200 hover:-translate-y-1 hover:shadow-[6px_6px_0px_#0f172a] dark:hover:shadow-[6px_6px_0px_rgba(255,255,255,0.4)] overflow-hidden"
+      className="subject-card-container group relative min-h-36 sm:min-h-[148px] rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card shadow-brutal transition-all duration-150 hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:scale-[0.99] overflow-hidden"
     >
       {/* Mobile-only Underlay Action Layer */}
       {canManage && (
@@ -302,7 +301,7 @@ export default function SwipeableSubjectCard({
               <span
                 aria-hidden="true"
                 style={{ backgroundColor: subject.color }}
-                className="h-9 w-9 shrink-0 rounded-xl border-2 border-slate-900 shadow-brutal-sm"
+                className="h-9 w-9 shrink-0 rounded-xl border-2 border-slate-900 shadow-brutal-sm transition-transform duration-200 group-hover:scale-105"
               />
               <div className="min-w-0">
                 <h3 className="truncate text-sm font-black text-foreground transition-colors group-hover:text-primary">
@@ -321,7 +320,7 @@ export default function SwipeableSubjectCard({
               </div>
             </div>
             <span
-              className={`inline-flex shrink-0 items-center gap-1 rounded-md border-2 border-slate-900 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm ${
+              className={`inline-flex shrink-0 items-center gap-1 rounded-md border-2 border-slate-900 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm transition-transform duration-200 group-hover:scale-105 ${
                 isPublic
                   ? 'bg-[#bfdbfe] text-slate-900'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
@@ -375,7 +374,7 @@ export default function SwipeableSubjectCard({
                     event.stopPropagation();
                     onEdit();
                   }}
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-blue-500 hover:text-white hover:border-slate-900 hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-blue-500 hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
@@ -386,7 +385,7 @@ export default function SwipeableSubjectCard({
                     event.stopPropagation();
                     onArchive();
                   }}
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-amber-500 hover:text-slate-900 hover:border-slate-900 hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-amber-500 hover:text-slate-900 hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
                 >
                   <Archive className="h-3.5 w-3.5" />
                 </button>
@@ -397,7 +396,7 @@ export default function SwipeableSubjectCard({
                     event.stopPropagation();
                     onDelete();
                   }}
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-destructive hover:text-white hover:border-slate-900 hover:-translate-y-0.5 hover:shadow-brutal active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-xl border-2 border-slate-900 bg-white dark:bg-slate-800 p-1.5 text-slate-700 dark:text-slate-300 shadow-brutal-sm hover:bg-destructive hover:text-white hover:border-slate-900 transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

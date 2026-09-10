@@ -292,7 +292,7 @@ export default function QuizLibrary({
         <button
           type="button"
           onClick={onViewAll}
-          className="inline-flex items-center gap-1.5 text-xs font-black text-primary underline-offset-2 hover:underline"
+          className="inline-flex items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white dark:bg-card px-3 py-1.5 text-xs font-black text-primary shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer"
         >
           View all {filteredQuizzes.length} reviewers
           <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />

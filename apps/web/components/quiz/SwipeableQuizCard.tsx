@@ -187,7 +187,7 @@ export default function SwipeableQuizCard({
   return (
     <div
       ref={cardRef}
-      className="quiz-card-enter group relative min-h-36 sm:min-h-[148px] rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card shadow-brutal transition-all duration-200 hover:-translate-y-1 hover:shadow-[6px_6px_0px_#0f172a] dark:hover:shadow-[6px_6px_0px_rgba(255,255,255,0.4)] overflow-hidden"
+      className="quiz-card-enter group relative min-h-36 sm:min-h-[148px] rounded-2xl border-2 border-slate-900 dark:border-white/40 bg-white dark:bg-card shadow-brutal transition-all duration-150 hover:translate-x-1 hover:translate-y-1 hover:shadow-none active:scale-[0.99] overflow-hidden"
     >
       {/* Mobile-only Underlay Action Layer */}
       {!readOnly && (
@@ -273,7 +273,7 @@ export default function SwipeableQuizCard({
           <div className="flex items-center justify-between gap-2 text-xs">
             <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
               {quiz.id === 'b0000000-0000-4000-8000-000000000001' || quiz.share_token === 'kasaysayan-pilipinas-reviewer' ? (
-                <span className="rounded-md border-2 border-slate-900 bg-[#bfdbfe] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
+                <span className="rounded-md border-2 border-slate-900 bg-[#bfdbfe] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm transition-transform duration-200 group-hover:scale-105">
                   Sample Reviewer
                 </span>
               ) : subjectName ? (
@@ -283,22 +283,22 @@ export default function SwipeableQuizCard({
                     borderColor: '#0f172a',
                     color: subject?.color || '#3b82f6'
                   }}
-                  className="max-w-[10rem] truncate rounded-md border-2 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm"
+                  className="max-w-[10rem] truncate rounded-md border-2 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm transition-transform duration-200 group-hover:scale-105"
                 >
                   {subjectName}
                 </span>
               ) : (
-                <span className="rounded-md border-2 border-slate-900 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm">
+                <span className="rounded-md border-2 border-slate-900 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black shadow-brutal-sm transition-transform duration-200 group-hover:scale-105">
                   Reviewer
                 </span>
               )}
               {quiz.term && (
-                <span className="rounded-md border-2 border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-black text-primary shadow-brutal-sm truncate max-w-[8rem]">
+                <span className="rounded-md border-2 border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-black text-primary shadow-brutal-sm truncate max-w-[8rem] transition-transform duration-200 group-hover:scale-105">
                   {quiz.term}
                 </span>
               )}
             </div>
-            <span className="shrink-0 rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black text-slate-900 dark:text-white shadow-brutal-sm">
+            <span className="shrink-0 rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[10px] font-black text-slate-900 dark:text-white shadow-brutal-sm transition-transform duration-200 group-hover:scale-105">
               {quiz.question_count} Qs
             </span>
           </div>

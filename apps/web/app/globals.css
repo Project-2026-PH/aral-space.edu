@@ -484,7 +484,7 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
 
 
 .subject-card-enter {
-  animation: subject-card-enter 360ms ease-out both;
+  animation: subject-card-enter 360ms ease-out;
 }
 
 

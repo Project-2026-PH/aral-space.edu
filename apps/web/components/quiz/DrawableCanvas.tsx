@@ -32,6 +32,7 @@ type HsvColor = {
 interface DrawableCanvasProps {
   active: boolean;
   storageKey: string;
+  onExit: () => void;
 }
 
 interface ColorPickerPopoverProps {
@@ -344,7 +345,7 @@ function ColorPickerPopover({
   );
 }
 
-export default function DrawableCanvas({ active, storageKey }: DrawableCanvasProps) {
+export default function DrawableCanvas({ active, storageKey, onExit }: DrawableCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokesRef = useRef<DrawingStroke[]>([]);
   const draftStrokeRef = useRef<DrawingStroke | null>(null);
@@ -751,6 +752,12 @@ export default function DrawableCanvas({ active, storageKey }: DrawableCanvasPro
               onChange={(event) => setSize(Number(event.target.value))}
               className="h-1.5 w-16 cursor-pointer accent-primary sm:w-20"
             />
+            <output
+              aria-label={`Brush size ${size} pixels`}
+              className="min-w-10 rounded-lg border border-border bg-card px-1.5 py-1 text-center text-[11px] font-bold tabular-nums text-foreground"
+            >
+              {size}px
+            </output>
           </label>
           <button
             type="button"
@@ -769,6 +776,13 @@ export default function DrawableCanvas({ active, storageKey }: DrawableCanvasPro
             className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Trash2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onExit}
+            className="rounded-xl bg-primary px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-primary/90"
+          >
+            Done
           </button>
         </div>
       )}

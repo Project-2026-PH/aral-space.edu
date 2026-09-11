@@ -53,6 +53,8 @@ interface CardToolbarProps {
   isRetryCard?: boolean;
   onHint?: () => void;
   onEdit: () => void;
+  onDrawMode: () => void;
+  isDrawMode: boolean;
   onSpeak: () => void;
   canEdit: boolean;
 }
@@ -105,7 +107,7 @@ function getFlashcardDrawingKey(quizId: string, userId?: string): string {
   return userId ? `quiz-creator:flashcard-drawing:${quizId}:${userId}` : `quiz-creator:flashcard-drawing:${quizId}`;
 }
 
-function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, onSpeak, canEdit }: CardToolbarProps) {
+function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, onDrawMode, isDrawMode, onSpeak, canEdit }: CardToolbarProps) {
   return (
     <div className="flex items-center justify-between gap-4 text-xs font-semibold text-muted-foreground" onClick={(event) => event.stopPropagation()}>
       <div className="flex items-center gap-2">
@@ -126,6 +128,21 @@ function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, on
         )}
       </div>
       <div className="flex items-center gap-4">
+        <button
+          type="button"
+          onClick={onDrawMode}
+          aria-label={isDrawMode ? 'Exit drawing mode' : 'Enable drawing mode'}
+          aria-pressed={isDrawMode}
+          title={isDrawMode ? 'Exit drawing mode' : 'Draw on this reviewer'}
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+            isDrawMode
+              ? 'border-primary bg-primary text-white shadow-sm'
+              : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          <PenTool className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">{isDrawMode ? 'Done' : 'Draw'}</span>
+        </button>
         {canEdit && (
           <button
             type="button"
@@ -794,21 +811,6 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                 )}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setIsDrawMode((current) => !current)}
-              aria-label={isDrawMode ? 'Exit drawing mode' : 'Enable drawing mode'}
-              aria-pressed={isDrawMode}
-              title={isDrawMode ? 'Exit drawing mode' : 'Draw on this reviewer'}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all active:scale-95 ${
-                isDrawMode
-                  ? 'border-primary bg-primary text-white shadow-sm'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
-            >
-              <PenTool className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{isDrawMode ? 'Done' : 'Draw'}</span>
-            </button>
             <WindFlameBadge
               streak={streak}
               totalQuestions={cards.length}
@@ -890,6 +892,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
               <div className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm backface-hidden transition-shadow hover:border-primary/40 hover:shadow-md sm:p-7" aria-hidden={isFlipped}>
                 <CardToolbar
                   onEdit={handleEditCurrentQuestion}
+                  onDrawMode={() => setIsDrawMode((current) => !current)}
+                  isDrawMode={isDrawMode}
                   isStarred={isStarred}
                   isHintVisible={isHintVisible}
                   isRetryCard={isRetryCard}
@@ -925,6 +929,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
               <div className="absolute inset-0 flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm backface-hidden rotate-x-180 sm:p-7" aria-hidden={!isFlipped}>
                 <CardToolbar
                   onEdit={handleEditCurrentQuestion}
+                  onDrawMode={() => setIsDrawMode((current) => !current)}
+                  isDrawMode={isDrawMode}
                   isStarred={isStarred}
                   isRetryCard={isRetryCard}
                   onSpeak={speakCard}
@@ -989,6 +995,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
         <DrawableCanvas
           active={isDrawMode}
           storageKey={getFlashcardDrawingKey(quiz.id, userId)}
+          onExit={() => setIsDrawMode(false)}
         />
       </div>
 

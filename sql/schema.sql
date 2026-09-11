@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
 CREATE TABLE IF NOT EXISTS quiz_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
-  user_id UUID,
+  user_id TEXT,
   session_type TEXT NOT NULL DEFAULT 'initial',
   status TEXT NOT NULL DEFAULT 'in_progress',
   available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -87,6 +87,10 @@ CREATE INDEX IF NOT EXISTS idx_quiz_questions_quiz_order ON quiz_questions(quiz_
 CREATE INDEX IF NOT EXISTS idx_quiz_sessions_quiz_id ON quiz_sessions(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_sessions_active_lookup ON quiz_sessions(quiz_id, user_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quiz_question_progress_session ON quiz_question_progress(session_id);
+
+-- Guest identities are opaque strings such as anon_<uuid>. Convert older UUID columns safely.
+ALTER TABLE quiz_sessions
+  ALTER COLUMN user_id TYPE TEXT USING user_id::text;
 
 -- Safe additions for databases created from an earlier schema version.
 ALTER TABLE subjects ADD COLUMN IF NOT EXISTS share_token TEXT;

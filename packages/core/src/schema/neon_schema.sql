@@ -89,6 +89,10 @@ CREATE INDEX IF NOT EXISTS idx_quiz_sessions_lookup ON quiz_sessions (quiz_id, u
     CREATE INDEX IF NOT EXISTS idx_quiz_sessions_active_lookup ON quiz_sessions (quiz_id, user_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quiz_sessions_quiz_id ON quiz_sessions (quiz_id);
 
+-- Guest identities are opaque strings such as anon_<uuid>. Convert older UUID columns safely.
+ALTER TABLE quiz_sessions
+    ALTER COLUMN user_id TYPE TEXT USING user_id::text;
+
 -- 5. Quiz Question Progress Table
 CREATE TABLE IF NOT EXISTS quiz_question_progress (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

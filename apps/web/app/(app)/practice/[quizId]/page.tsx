@@ -88,6 +88,7 @@ export default async function PracticePage({
 
   return (
     <QuizRunner
+      key={resolvedQuizId}
       quiz={quiz}
       initialQuestions={sessionData.questions}
       initialSession={sessionData.session}

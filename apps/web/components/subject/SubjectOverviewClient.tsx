@@ -8,6 +8,7 @@ import QuizLibrary from '@/components/quiz/QuizLibrary';
 import ShareSubjectModal from './ShareSubjectModal';
 import StickyActionDock from '@/components/ui/StickyActionDock';
 import FloatingBottomNav from '@/components/navigation/FloatingBottomNav';
+import { publishLibraryMutation, useSynchronizedLibraryCollections } from '@/lib/libraryMutationStore';
 
 interface SubjectOverviewClientProps {
   subject: Subject;
@@ -25,6 +26,12 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const isPublic = subject.is_public !== false;
+  const synchronizedSubjectQuizzes = useSynchronizedLibraryCollections({
+    quizzes: subjectQuizzes,
+    subjects: [],
+    sharedQuizzes: [],
+    sharedSubjects: [],
+  }).quizzes;
 
   async function saveSubject() {
     if (!name.trim()) {
@@ -41,6 +48,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to update subject.');
+      publishLibraryMutation({ type: 'subject-updated', subject: data });
       setSubject(data);
       setEditing(false);
     } catch (err: any) {
@@ -92,7 +100,7 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
               )}
               <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-slate-900 bg-white dark:bg-slate-800 px-2 py-0.5 text-[11px] font-black text-slate-900 dark:text-white shadow-brutal-sm">
-                  <Layers className="h-3.5 w-3.5" /> {subjectQuizzes.length} {subjectQuizzes.length === 1 ? 'reviewer' : 'reviewers'}
+                  <Layers className="h-3.5 w-3.5" /> {synchronizedSubjectQuizzes.length} {synchronizedSubjectQuizzes.length === 1 ? 'reviewer' : 'reviewers'}
                 </span>
                 {access.role === 'collaborator' && (
                   <span className="rounded-md border-2 border-slate-900 bg-[#fde047] px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-brutal-sm">
@@ -163,11 +171,14 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
       </div>
 
       <QuizLibrary
-        quizzes={subjectQuizzes}
+        quizzes={synchronizedSubjectQuizzes}
         loading={false}
         subjectId={subject.id}
         readOnly={!access.can_edit_reviewers}
         onQuizDeleted={(quizId) => {
+          setSubjectQuizzes((current) => current.filter((quiz) => quiz.id !== quizId));
+        }}
+        onQuizArchived={(quizId) => {
           setSubjectQuizzes((current) => current.filter((quiz) => quiz.id !== quizId));
         }}
       />

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Skeleton from '@/components/ui/Skeleton';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import SwipeableQuizCard from './SwipeableQuizCard';
+import { publishLibraryMutation } from '@/lib/libraryMutationStore';
 
 interface QuizLibraryProps {
   quizzes: Quiz[];
@@ -72,6 +73,7 @@ export default function QuizLibrary({
       const res = await fetch(`/api/quizzes/${quiz.id}/archive`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to archive reviewer');
+      publishLibraryMutation({ type: 'quiz-archived', quizId: quiz.id });
       setArchivedQuizIds((current) => new Set(current).add(quiz.id));
       onQuizArchived?.(quiz.id);
     } catch (err) {
@@ -93,6 +95,7 @@ export default function QuizLibrary({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to delete reviewer');
       }
+      publishLibraryMutation({ type: 'quiz-deleted', quizId: deleteQuiz.id });
       onQuizDeleted?.(deleteQuiz.id);
       setDeleteQuiz(null);
     } catch (err) {

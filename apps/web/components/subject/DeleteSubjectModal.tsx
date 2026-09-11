@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Check, LoaderCircle, Trash2 } from 'lucide-react';
 import { Subject } from '@quiz-creator/types';
 import Modal from '../ui/Modal';
+import { publishLibraryMutation } from '@/lib/libraryMutationStore';
 
 interface DeleteSubjectModalProps {
   open: boolean;
@@ -58,6 +59,7 @@ export default function DeleteSubjectModal({ open, onOpenChange, subject, review
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Failed to delete subject');
+      publishLibraryMutation({ type: 'subject-deleted', subjectId: subject.id });
       onDeleted(subject.id);
       onOpenChange(false);
     } catch (err: any) {

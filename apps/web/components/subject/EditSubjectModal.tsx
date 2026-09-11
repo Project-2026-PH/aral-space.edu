@@ -5,6 +5,7 @@ import { Subject } from '@quiz-creator/types';
 import Modal from '../ui/Modal';
 import { Check, Pipette } from 'lucide-react';
 import { SUBJECT_PALETTE, SubjectColor } from './NewSubjectModal';
+import { publishLibraryMutation } from '@/lib/libraryMutationStore';
 
 function getAccessibleTextColor(hex: string): string {
   const cleanHex = hex.replace('#', '');
@@ -80,6 +81,7 @@ export default function EditSubjectModal({
         throw new Error(data.error || 'Failed to update subject');
       }
 
+      publishLibraryMutation({ type: 'subject-updated', subject: data });
       onUpdated(data);
       onOpenChange(false);
     } catch (err: any) {

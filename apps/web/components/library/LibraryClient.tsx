@@ -30,6 +30,7 @@ const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizMo
   ssr: false,
 });
 import FloatingBottomNav from '@/components/navigation/FloatingBottomNav';
+import { useSynchronizedLibraryCollections, publishLibraryMutation } from '@/lib/libraryMutationStore';
 
 export interface LibraryClientProps {
   initialQuizzes: Quiz[];
@@ -85,6 +86,12 @@ export default function LibraryClient({
   const quickCreateRef = useRef<HTMLDivElement>(null);
   const quickCreateButtonRef = useRef<HTMLButtonElement>(null);
   const quickCreateMenuRef = useRef<HTMLDivElement>(null);
+  const synchronizedLibrary = useSynchronizedLibraryCollections({
+    quizzes,
+    subjects,
+    sharedQuizzes,
+    sharedSubjects,
+  });
 
   useEffect(() => {
     if (!showQuickCreate) return;
@@ -163,40 +170,37 @@ export default function LibraryClient({
   const filteredLibrary = useMemo(() => {
     const query = search.trim().toLowerCase();
     const matches = (value: string | undefined) => !query || Boolean(value?.toLowerCase().includes(query));
-    const ownedSubjectsById = new Map(subjects.map((subject) => [subject.id, subject]));
-    const sharedSubjectsById = new Map(sharedSubjects.map((subject) => [subject.id, subject]));
+    const ownedSubjectsById = new Map(synchronizedLibrary.subjects.map((subject) => [subject.id, subject]));
+    const sharedSubjectsById = new Map(synchronizedLibrary.sharedSubjects.map((subject) => [subject.id, subject]));
 
     const matchesQuiz = (quiz: Quiz, subjectMap: Map<string, Subject>) => {
       const subject = quiz.subject ?? (quiz.subject_id ? subjectMap.get(quiz.subject_id) : undefined);
       return matches(quiz.title) || matches(subject?.name);
     };
 
-    const reviewerCandidates = quizzes.filter((quiz) => {
+    const reviewerCandidates = synchronizedLibrary.quizzes.filter((quiz) => {
       const matchesSubject = !selectedSubjectId || quiz.subject_id === selectedSubjectId;
       return matchesSubject && matchesQuiz(quiz, ownedSubjectsById);
     });
 
     return {
-      subjects: subjects.filter((subject) => matches(subject.name)),
+      subjects: synchronizedLibrary.subjects.filter((subject) => matches(subject.name)),
       reviewerCandidates,
       quizzes: reviewerCandidates.filter((quiz) => (
         !selectedTerm || normalizeTerm(quiz.term) === normalizeTerm(selectedTerm)
       )),
-      sharedSubjects: sharedSubjects.filter((subject) => matches(subject.name)),
-      sharedQuizzes: sharedQuizzes.filter((quiz) => matchesQuiz(quiz, sharedSubjectsById)),
+      sharedSubjects: synchronizedLibrary.sharedSubjects.filter((subject) => matches(subject.name)),
+      sharedQuizzes: synchronizedLibrary.sharedQuizzes.filter((quiz) => matchesQuiz(quiz, sharedSubjectsById)),
     };
   }, [
-    sharedQuizzes,
-    sharedSubjects,
-    quizzes,
+    synchronizedLibrary,
     search,
     selectedSubjectId,
     selectedTerm,
-    subjects,
   ]);
 
-  const totalItemCount = subjects.length + quizzes.length + sharedSubjects.length + sharedQuizzes.length;
-  const sharedItemCount = sharedSubjects.length + sharedQuizzes.length;
+  const totalItemCount = synchronizedLibrary.subjects.length + synchronizedLibrary.quizzes.length + synchronizedLibrary.sharedSubjects.length + synchronizedLibrary.sharedQuizzes.length;
+  const sharedItemCount = synchronizedLibrary.sharedSubjects.length + synchronizedLibrary.sharedQuizzes.length;
   const searchResultCount =
     filteredLibrary.subjects.length
     + filteredLibrary.quizzes.length
@@ -206,8 +210,8 @@ export default function LibraryClient({
 
   const viewTabs: Array<{ id: LibraryView; label: string; count: number }> = [
     { id: 'overview', label: 'Overview', count: totalItemCount },
-    { id: 'subjects', label: 'Subjects', count: subjects.length },
-    { id: 'reviewers', label: 'Reviewers', count: quizzes.length },
+    { id: 'subjects', label: 'Subjects', count: synchronizedLibrary.subjects.length },
+    { id: 'reviewers', label: 'Reviewers', count: synchronizedLibrary.quizzes.length },
     { id: 'shared', label: 'Shared', count: sharedItemCount },
   ];
 
@@ -237,6 +241,7 @@ export default function LibraryClient({
       const res = await fetch(`/api/subjects/${subjectId}/archive`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to archive subject');
+      publishLibraryMutation({ type: 'subject-archived', subjectId });
       setSubjects((current) => current.filter((subject) => subject.id !== subjectId));
       setQuizzes((current) => current.filter((quiz) => quiz.subject_id !== subjectId));
       setSharedSubjects((current) => current.filter((subject) => subject.id !== subjectId));
@@ -258,7 +263,7 @@ export default function LibraryClient({
   const renderOwnedSubjects = (preview = false, heading = 'Your Subjects') => (
     <SubjectLibrary
       subjects={filteredLibrary.subjects}
-      quizzes={quizzes}
+      quizzes={synchronizedLibrary.quizzes}
       viewerId={viewerId}
       loading={loading}
       heading={heading}
@@ -274,7 +279,7 @@ export default function LibraryClient({
     <QuizLibrary
       quizzes={filteredLibrary.reviewerCandidates}
       loading={loading}
-      subjects={subjects}
+      subjects={synchronizedLibrary.subjects}
       selectedSubjectId={selectedSubjectId}
       onSubjectChange={setSelectedSubjectId}
       selectedTerm={selectedTerm}
@@ -612,7 +617,7 @@ export default function LibraryClient({
       <GenerateQuizModal
         open={showAiModal}
         onOpenChange={setShowAiModal}
-        subjects={subjects}
+        subjects={synchronizedLibrary.subjects}
       />
       <FloatingBottomNav
         onOpenAiModal={() => setShowAiModal(true)}

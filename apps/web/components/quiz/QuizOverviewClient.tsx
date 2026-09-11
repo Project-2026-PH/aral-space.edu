@@ -13,6 +13,7 @@ import FloatingBottomNav from '../navigation/FloatingBottomNav';
 import { Play, Plus, Edit, Trash2, ArrowLeft, Share2, Save, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { publishLibraryMutation } from '@/lib/libraryMutationStore';
 
 const DEFAULT_TERMS = [
   'Prelim',
@@ -83,6 +84,7 @@ export default function QuizOverviewClient({
         const data = await res.json();
         setQuiz(data);
         setQuestions(data.questions || []);
+        publishLibraryMutation({ type: 'quiz-updated', quiz: data });
       }
     } catch (err) {
       console.error('Refresh error:', err);
@@ -123,6 +125,7 @@ export default function QuizOverviewClient({
       if (res.ok) {
         const updated = await res.json();
         setQuiz(updated);
+        publishLibraryMutation({ type: 'quiz-updated', quiz: updated });
         setTitleInput(updated.title);
         setIsEditingTitle(false);
       }
@@ -145,6 +148,7 @@ export default function QuizOverviewClient({
       if (res.ok) {
         const updated = await res.json();
         setQuiz(updated);
+        publishLibraryMutation({ type: 'quiz-updated', quiz: updated });
         setDescInput(updated.description || '');
         setIsEditingDesc(false);
       }
@@ -166,6 +170,7 @@ export default function QuizOverviewClient({
       if (res.ok) {
         const updated = await res.json();
         setQuiz(updated);
+        publishLibraryMutation({ type: 'quiz-updated', quiz: updated });
         setTermInput(updated.term || '');
         setIsEditingTerm(false);
         setIsCustomTerm(false);
@@ -194,6 +199,7 @@ export default function QuizOverviewClient({
         method: 'DELETE'
       });
       if (res.ok) {
+        publishLibraryMutation({ type: 'quiz-deleted', quizId: quiz.id });
         router.push('/library');
       }
     } catch (err) {

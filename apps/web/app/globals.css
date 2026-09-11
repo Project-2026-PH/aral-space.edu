@@ -1167,7 +1167,8 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
 /* Cancel the desktop document zoom for this body-level portal so fixed centering
    uses the actual visible viewport rather than the zoomed layout viewport. */
 @media (min-width: 1024px) {
-  .resume-practice-overlay {
+  .resume-practice-overlay,
+  .library-create-menu {
     zoom: calc(1 / var(--document-zoom));
   }
 }

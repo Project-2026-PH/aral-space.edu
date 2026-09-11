@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Quiz, Subject } from '@quiz-creator/types';
 import dynamic from 'next/dynamic';
 import NewSubjectModal from '@/components/subject/NewSubjectModal';
@@ -80,13 +81,19 @@ export default function LibraryClient({
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [openingManualQuiz, setOpeningManualQuiz] = useState(false);
+  const [quickCreatePosition, setQuickCreatePosition] = useState<{ top: number; left: number } | null>(null);
   const quickCreateRef = useRef<HTMLDivElement>(null);
+  const quickCreateButtonRef = useRef<HTMLButtonElement>(null);
+  const quickCreateMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!showQuickCreate) return;
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (!quickCreateRef.current?.contains(event.target as Node)) {
+      if (
+        !quickCreateRef.current?.contains(event.target as Node)
+        && !quickCreateMenuRef.current?.contains(event.target as Node)
+      ) {
         setShowQuickCreate(false);
       }
     };
@@ -101,6 +108,39 @@ export default function LibraryClient({
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showQuickCreate]);
+
+  useEffect(() => {
+    if (!showQuickCreate) {
+      setQuickCreatePosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const trigger = quickCreateButtonRef.current;
+      if (!trigger) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const menuWidth = 220;
+      const edgePadding = 16;
+      const triggerRight = rect.right;
+      const triggerBottom = rect.bottom;
+      const left = Math.min(
+        Math.max(edgePadding, triggerRight - menuWidth),
+        Math.max(edgePadding, window.innerWidth - menuWidth - edgePadding),
+      );
+      const top = triggerBottom + 12;
+
+      setQuickCreatePosition({ top, left });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
     };
   }, [showQuickCreate]);
 
@@ -262,7 +302,7 @@ export default function LibraryClient({
     <div className="home-page mx-auto max-w-5xl space-y-7 px-4 py-6 pb-24 sm:px-6 lg:px-8 desktop-zoom-133">
       {/* Library command center */}
       <section
-        className="home-hero relative isolate space-y-4 overflow-hidden rounded-3xl border-3 border-slate-900 bg-slate-50 p-4 shadow-brutal transition-colors duration-500 dark:border-white/30 dark:bg-card sm:p-6"
+        className="home-hero relative isolate z-30 space-y-4 overflow-visible rounded-3xl border-3 border-slate-900 bg-slate-50 p-4 shadow-brutal transition-colors duration-500 dark:border-white/30 dark:bg-card sm:p-6"
         aria-labelledby="library-navigation-heading"
       >
         <div
@@ -378,8 +418,11 @@ export default function LibraryClient({
               <Sparkles className="h-3.5 w-3.5" />
               <span>Generate with AI</span>
             </button>
+
+            {/* Drop Down button for Creating sets manually and for notes. */}
             <div ref={quickCreateRef} className="relative">
               <button
+                ref={quickCreateButtonRef}
                 type="button"
                 onClick={() => setShowQuickCreate((current) => !current)}
                 aria-label="More creation options"
@@ -393,11 +436,18 @@ export default function LibraryClient({
                 />
               </button>
 
-              {showQuickCreate && (
+              {showQuickCreate && quickCreatePosition && typeof document !== 'undefined' && createPortal(
                 <div
+                  ref={quickCreateMenuRef}
                   role="menu"
                   aria-label="Creation options"
-                  className="absolute right-0 top-full z-20 mt-3 min-w-[220px] rounded-2xl border border-border/80 bg-card p-2 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150"
+                  style={{
+                    position: 'fixed',
+                    zIndex: 10000,
+                    top: quickCreatePosition.top,
+                    left: quickCreatePosition.left,
+                  }}
+                  className="library-create-menu fixed z-[10000] min-w-[220px] rounded-2xl border border-border/80 bg-card p-2 shadow-2xl backdrop-blur-xl"
                 >
                   <div className="space-y-1">
                     <Link
@@ -437,7 +487,7 @@ export default function LibraryClient({
                       href="/notes"
                       role="menuitem"
                       onClick={() => setShowQuickCreate(false)}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary active:scale-[0.98]"
+                      className="relative z-[10000] flex w-full items-center gap-2.5 rounded-xl bg-card px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-primary/10 hover:text-primary active:scale-[0.98]"
                     >
                       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
                         <FileText aria-hidden="true" className="h-4 w-4" />
@@ -466,7 +516,8 @@ export default function LibraryClient({
                       </div>
                     </button> */}
                   </div>
-                </div>
+                </div>,
+                document.body
               )}
             </div>
           </div>

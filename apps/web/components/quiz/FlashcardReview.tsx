@@ -28,6 +28,7 @@ import { triggerCelebrationConfetti } from '@/lib/confetti';
 import Modal from '@/components/ui/Modal';
 import QuizQuestionFormModal from '@/components/quiz/QuizQuestionFormModal';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
+import DrawableCanvas from '@/components/quiz/DrawableCanvas';
 import { getQuizStreakRecord, recordSessionCompletion } from '@/lib/streakTracker';
 import {
   completeQuizPerformanceSession,
@@ -98,6 +99,10 @@ function getFlashcardSettingsKey(quizId: string, userId?: string): string {
 
 function getFlashcardSessionKey(quizId: string, userId?: string): string {
   return userId ? `quiz-creator:flashcard-session:${quizId}:${userId}` : `quiz-creator:flashcard-session:${quizId}`;
+}
+
+function getFlashcardDrawingKey(quizId: string, userId?: string): string {
+  return userId ? `quiz-creator:flashcard-drawing:${quizId}:${userId}` : `quiz-creator:flashcard-drawing:${quizId}`;
 }
 
 function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, onSpeak, canEdit }: CardToolbarProps) {
@@ -173,6 +178,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const [bestStreak, setBestStreak] = useState(0);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDrawMode, setIsDrawMode] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const swipeOverlayRef = useRef<HTMLDivElement>(null);
   const swipeLeftLabelRef = useRef<HTMLSpanElement>(null);
@@ -472,6 +478,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function handleCardPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (isDrawMode) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     if ((event.target as HTMLElement).closest('button, a, input, select')) return;
 
@@ -490,6 +497,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function handleCardPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (isDrawMode) return;
     const start = swipeStartRef.current;
     if (!start) return;
 
@@ -502,6 +510,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function handleCardPointerUp(event: PointerEvent<HTMLDivElement>) {
+    if (isDrawMode) return;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       try {
         event.currentTarget.releasePointerCapture(event.pointerId);
@@ -554,6 +563,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function handleCardPointerCancel(event: PointerEvent<HTMLDivElement>) {
+    if (isDrawMode) return;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       try {
         event.currentTarget.releasePointerCapture(event.pointerId);
@@ -571,6 +581,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function toggleCard() {
+    if (isDrawMode) return;
     setIsFlipped((current) => {
       if (!current) {
         hasSeenAnswerRef.current = true;
@@ -581,6 +592,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   }
 
   function handleCardClick() {
+    if (isDrawMode) return;
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
       return;
@@ -782,6 +794,21 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                 )}
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setIsDrawMode((current) => !current)}
+              aria-label={isDrawMode ? 'Exit drawing mode' : 'Enable drawing mode'}
+              aria-pressed={isDrawMode}
+              title={isDrawMode ? 'Exit drawing mode' : 'Draw on this reviewer'}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+                isDrawMode
+                  ? 'border-primary bg-primary text-white shadow-sm'
+                  : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              <PenTool className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{isDrawMode ? 'Done' : 'Draw'}</span>
+            </button>
             <WindFlameBadge
               streak={streak}
               totalQuestions={cards.length}
@@ -818,8 +845,9 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           </Link>
         </div>
 
-        <div
-          ref={cardRef}
+        <div className="relative">
+          <div
+            ref={cardRef}
           className={`perspective-1000 relative h-[430px] cursor-pointer select-none sm:h-[500px] ${isDragging ? 'touch-none' : 'touch-pan-y'}`}
           onClick={handleCardClick}
           onPointerDown={handleCardPointerDown}
@@ -834,6 +862,10 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
           role="button"
           tabIndex={0}
           onKeyDown={(event) => {
+            if (isDrawMode) {
+              event.preventDefault();
+              return;
+            }
             if (event.key.toLowerCase() === 'h') {
               event.preventDefault();
               if (canViewAnswerKey) {
@@ -922,19 +954,21 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                 <div className="mt-3 flex items-center justify-center gap-3" onClick={(event) => event.stopPropagation()}>
                   <button
                     type="button"
+                    disabled={isDrawMode}
                     onClick={() => {
                       completeCard(false);
                     }}
-                    className="rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    className="rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Still learning
                   </button>
                   <button
                     type="button"
+                    disabled={isDrawMode}
                     onClick={() => {
                       completeCard(true);
                     }}
-                    className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors shadow-sm"
+                    className="rounded-xl bg-primary px-4 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Got it right ✓
                   </button>
@@ -952,6 +986,11 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             <span ref={swipeRightLabelRef}>GOT IT RIGHT</span>
           </div>
         </div>
+        <DrawableCanvas
+          active={isDrawMode}
+          storageKey={getFlashcardDrawingKey(quiz.id, userId)}
+        />
+      </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:gap-5">
           <button

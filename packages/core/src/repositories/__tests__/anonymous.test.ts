@@ -14,12 +14,7 @@ describe('Anonymous User Data Isolation', () => {
     sessionRepo = new MemorySessionRepository();
   });
 
-  it('allows anonymous users to see public default and created quizzes', async () => {
-    // Initial: default quiz exists
-    const initialQuizzes = await quizRepo.listQuizzes(userA);
-    expect(initialQuizzes.length).toBeGreaterThan(0);
-
-    // User A creates a public quiz by default
+  it('keeps public quizzes out of another user\'s library while allowing direct public reads', async () => {
     const createdA = await quizRepo.createQuiz({
       title: 'User A Custom Chemistry Quiz',
       questions: [
@@ -31,13 +26,42 @@ describe('Anonymous User Data Isolation', () => {
       ]
     }, userA);
 
-    // User A should see default + their created quiz
+    // User A sees their own reviewer in their private library.
     const userAQuizzes = await quizRepo.listQuizzes(userA);
     expect(userAQuizzes.some(q => q.id === createdA.id)).toBe(true);
 
-    // User B can read User A's public quiz but does not receive edit access
+    // User B does not see User A's reviewer in their private library merely
+    // because the reviewer has a public share configuration.
     const userBQuizzes = await quizRepo.listQuizzes(userB);
-    expect(userBQuizzes.some(q => q.id === createdA.id)).toBe(true);
+    expect(userBQuizzes.some(q => q.id === createdA.id)).toBe(false);
+
+    // Public direct access remains available through the quiz access path.
+    const publicQuizForB = await quizRepo.getQuizById(createdA.id, userB);
+    expect(publicQuizForB?.id).toBe(createdA.id);
+  });
+
+  it('shows a subject and its reviewers only after explicit collaborator access', async () => {
+    const subject = await quizRepo.createSubject('Private Physics', '#3b82f6', userA);
+    const quiz = await quizRepo.createQuiz({
+      title: 'Private Physics Reviewer',
+      subject_id: subject.id,
+      questions: [
+        {
+          question_text: 'What is force?',
+          options: ['Mass times acceleration', 'Velocity divided by time', 'Energy per distance', 'Mass times velocity'],
+          correct_answer: 0
+        }
+      ]
+    }, userA);
+
+    expect((await quizRepo.listSubjects(userB)).some(item => item.id === subject.id)).toBe(false);
+    expect((await quizRepo.listQuizzes(userB)).some(item => item.id === quiz.id)).toBe(false);
+
+    const link = await quizRepo.createSubjectCollaboratorLink(subject.id, null, userA, 1);
+    expect(await quizRepo.redeemSubjectCollaboratorLink(link.token, userB)).not.toBeNull();
+
+    expect((await quizRepo.listSubjects(userB)).some(item => item.id === subject.id)).toBe(true);
+    expect((await quizRepo.listQuizzes(userB)).some(item => item.id === quiz.id)).toBe(true);
   });
 
   it('allows public quiz reads while isolating writes per anonymous user', async () => {

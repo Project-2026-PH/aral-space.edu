@@ -195,7 +195,7 @@ export class LocalFirstQuizRepository implements IQuizRepository {
     return list.filter((subject) => {
       if (subject.archived_at || this.isSubjectArchivedForUser(subject.id, userId)) return false;
       if (userId && (subject.user_id === userId || this.collaborators.get(subject.id)?.has(userId))) return true;
-      return isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at);
+      return !userId && isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at);
     });
   }
 
@@ -222,8 +222,12 @@ export class LocalFirstQuizRepository implements IQuizRepository {
       if (quiz.archived_at || this.getQuizArchive(quiz.id, userId)) return false;
       const subject = quiz.subject_id ? this.inMemorySubjects.get(quiz.subject_id) : null;
       if (subject?.archived_at || (subject && this.isSubjectArchivedForUser(subject.id, userId))) return false;
-      if (userId && (quiz.user_id === userId || Boolean(quiz.subject_id && this.collaborators.get(quiz.subject_id)?.has(userId)))) return true;
-      return isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at);
+      if (userId && (
+        quiz.user_id === userId
+        || subject?.user_id === userId
+        || Boolean(quiz.subject_id && this.collaborators.get(quiz.subject_id)?.has(userId))
+      )) return true;
+      return !userId && isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at);
     });
     return filtered.map((quiz) => ({
       ...quiz,

@@ -38,7 +38,12 @@ export default function ShareSubjectModal({
     setOrigin(window.location.origin);
   }, []);
 
-  const shareUrl = shareToken && origin ? `${origin}/subjects/share/${shareToken}` : '';
+  const sharePath = subject?.slug && isPublic
+    ? `/subjects/${encodeURIComponent(subject.slug)}`
+    : shareToken
+      ? `/subjects/share/${encodeURIComponent(shareToken)}`
+      : '';
+  const shareUrl = sharePath && origin ? `${origin}${sharePath}` : '';
 
   useEffect(() => {
     if (!open || !subject) return;

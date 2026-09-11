@@ -27,6 +27,8 @@ interface SwipeableQuizCardProps {
   onDelete: () => void;
   onArchive: () => void;
   subjectId?: string;
+  subjectSlug?: string;
+  subjectShareToken?: string;
 }
 
 export default function SwipeableQuizCard({
@@ -40,6 +42,8 @@ export default function SwipeableQuizCard({
   onDelete,
   onArchive,
   subjectId,
+  subjectSlug,
+  subjectShareToken,
 }: SwipeableQuizCardProps) {
   const [offset, setOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -59,10 +63,18 @@ export default function SwipeableQuizCard({
   const cardRef = useRef<HTMLDivElement>(null);
 
   const subjectName = subject?.name;
-  const subjectLocator = subject?.slug || subjectId;
-  const reviewHref = subjectLocator
-    ? `/review/${encodeURIComponent(quiz.slug || quiz.id)}?subjectSlug=${encodeURIComponent(subjectLocator)}`
-    : `/review/${encodeURIComponent(quiz.slug || quiz.id)}`;
+  const subjectLocator = subjectSlug || subject?.slug || subjectId;
+  const reviewQuery = [
+    subjectShareToken && quiz.share_token
+      ? `shareToken=${encodeURIComponent(quiz.share_token)}`
+      : null,
+    subjectShareToken
+      ? `subjectShareToken=${encodeURIComponent(subjectShareToken)}`
+      : subjectLocator
+        ? `subjectSlug=${encodeURIComponent(subjectLocator)}`
+        : null,
+  ].filter((part): part is string => Boolean(part));
+  const reviewHref = `/review/${encodeURIComponent(quiz.slug || quiz.id)}${reviewQuery.length ? `?${reviewQuery.join('&')}` : ''}`;
 
   // Synchronize external isOpen state
   useEffect(() => {

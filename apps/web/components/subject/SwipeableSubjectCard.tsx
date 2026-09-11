@@ -340,14 +340,17 @@ export default function SwipeableSubjectCard({
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-1.5 border-t-2 border-slate-900/20 dark:border-white/20 pt-2.5">
-          {subject.share_token && isPublic ? (
+          {isPublic && (subject.slug || subject.share_token) ? (
             <Link
-              href={`/subjects/share/${subject.share_token}`}
+              href={subject.slug
+                ? `/subjects/${encodeURIComponent(subject.slug)}`
+                : `/subjects/share/${encodeURIComponent(subject.share_token!)}`}
               target="_blank"
               rel="noreferrer"
               onClick={(event) => event.stopPropagation()}
               className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
             >
+              View public page
             </Link>
           ) : isPublic ? (
             <button

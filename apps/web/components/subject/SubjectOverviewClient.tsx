@@ -174,6 +174,8 @@ export default function SubjectOverviewClient({ subject: initialSubject, quizzes
         quizzes={synchronizedSubjectQuizzes}
         loading={false}
         subjectId={subject.id}
+        subjectSlug={subject.slug ?? undefined}
+        subjectShareToken={access.role === 'public' ? subject.share_token ?? undefined : undefined}
         readOnly={!access.can_edit_reviewers}
         onQuizDeleted={(quizId) => {
           setSubjectQuizzes((current) => current.filter((quiz) => quiz.id !== quizId));

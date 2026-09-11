@@ -88,17 +88,12 @@ export class NeonQuizRepository implements IQuizRepository {
           FROM subjects s
           WHERE s.archived_at IS NULL
             AND (
-               s.user_id = ${userId}
-             OR (
-               COALESCE(s.is_public, TRUE) = TRUE
-               AND s.share_revoked_at IS NULL
-               AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
-             )
-             OR EXISTS (
-               SELECT 1 FROM subject_collaborators sc
-               WHERE sc.subject_id = s.id AND sc.user_id = ${userId}
-             )
-          )
+              s.user_id = ${userId}
+              OR EXISTS (
+                SELECT 1 FROM subject_collaborators sc
+                WHERE sc.subject_id = s.id AND sc.user_id = ${userId}
+              )
+            )
           ORDER BY s.name ASC, s.id ASC
         `
       : await this.sql`
@@ -549,11 +544,6 @@ export class NeonQuizRepository implements IQuizRepository {
             CASE
               WHEN s.id IS NOT NULL AND (
                 s.user_id = ${userId}
-                OR (
-                  COALESCE(s.is_public, TRUE) = TRUE
-                  AND s.share_revoked_at IS NULL
-                  AND (s.share_expires_at IS NULL OR s.share_expires_at > now())
-                )
                 OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = s.id AND sc.user_id = ${userId})
               ) THEN json_build_object('id', s.id, 'name', s.name, 'color', s.color, 'user_id', s.user_id)
               ELSE NULL
@@ -564,11 +554,7 @@ export class NeonQuizRepository implements IQuizRepository {
             AND (q.subject_id IS NULL OR s.archived_at IS NULL)
             AND (
               q.user_id = ${userId}
-              OR (
-                COALESCE(q.is_public, TRUE) = TRUE
-                AND q.share_revoked_at IS NULL
-                AND (q.share_expires_at IS NULL OR q.share_expires_at > now())
-              )
+              OR s.user_id = ${userId}
               OR EXISTS (
                 SELECT 1 FROM subject_collaborators sc
                 WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId}

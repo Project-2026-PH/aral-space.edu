@@ -95,14 +95,15 @@ export default function SubjectLibrary({
             const canManage = !readOnly && Boolean(viewerId && subject.user_id === viewerId);
             const canArchive = Boolean(onSubjectArchived && viewerId && (canManage || readOnly));
             const canGeneratePublicLink = !readOnly && isPublic && !subject.share_token;
-            const canOpen = readOnly || canManage || Boolean(isPublic && subject.share_token) || canGeneratePublicLink;
-            const subjectHref = readOnly
-              ? `/subjects/${encodeURIComponent(subject.slug || subject.id)}`
-              : canManage
-                ? `/subjects/${encodeURIComponent(subject.slug || subject.id)}`
-                : subject.share_token
-                  ? `/subjects/share/${subject.share_token}`
-                  : '';
+            const subjectSlugHref = subject.slug ? `/subjects/${encodeURIComponent(subject.slug)}` : '';
+            const subjectIdHref = `/subjects/${encodeURIComponent(subject.id)}`;
+            const publicSubjectHref = isPublic
+              ? subjectSlugHref || (subject.share_token ? `/subjects/share/${encodeURIComponent(subject.share_token)}` : '')
+              : '';
+            const canOpen = readOnly || canManage || Boolean(publicSubjectHref) || canGeneratePublicLink;
+            const subjectHref = canManage || readOnly
+              ? subjectSlugHref || subjectIdHref
+              : publicSubjectHref;
             const quizCount = quizCounts.get(subject.id) || 0;
 
             return (

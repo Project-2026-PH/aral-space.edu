@@ -125,9 +125,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
           && !archiveIds.subjectIds.has(subject.id)
           && (!userId
           ? isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)
-          : subject.user_id === userId
-            || memberIds.has(subject.id)
-            || isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at)))
+          : subject.user_id === userId || memberIds.has(subject.id)))
         .map((subject) => ({
           ...subject,
           viewer_count: subject.user_id === userId ? subject.viewer_count : 0
@@ -634,16 +632,15 @@ export class SupabaseQuizRepository implements IQuizRepository {
         && (!userId
           ? isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)
           : quiz.user_id === userId
-            || (quiz.subject_id ? subjectIds.has(quiz.subject_id) : false)
-            || isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at))
+            || quiz.subject?.user_id === userId
+            || (quiz.subject_id ? subjectIds.has(quiz.subject_id) : false))
       );
       return quizzes.map((quiz) => {
         const subject = quiz.subject;
         const subjectIsVisible = !subject
           || subject.archived_at == null && (!userId
           || subject.user_id === userId
-          || subjectIds.has(subject.id)
-          || isShareTokenActive(subject.is_public, subject.share_expires_at, subject.share_revoked_at));
+          || subjectIds.has(subject.id));
         return subjectIsVisible ? quiz : { ...quiz, subject: null };
       });
     } catch (e) {}

@@ -16,6 +16,16 @@ export async function resolveSubjectRoute(
   const bySlug = subjects.find((subject) => subject.slug === locator);
   if (bySlug) return { entity: bySlug, id: bySlug.id, isLegacyId: false };
 
+  // A public subject is intentionally excluded from user-scoped library lists,
+  // but its slug remains a valid public route when its share configuration is active.
+  if (userId) {
+    const publicSubjects = await repository.listSubjects();
+    const publicBySlug = publicSubjects.find((subject) => subject.slug === locator);
+    if (publicBySlug && await repository.getSubjectAccess(publicBySlug.id, userId)) {
+      return { entity: publicBySlug, id: publicBySlug.id, isLegacyId: false };
+    }
+  }
+
   const byId = subjects.find((subject) => subject.id === locator);
   if (!byId) return null;
   return { entity: byId, id: byId.id, isLegacyId: Boolean(byId.slug && byId.slug !== locator) };

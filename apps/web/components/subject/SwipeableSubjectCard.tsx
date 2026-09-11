@@ -3,8 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import RichTooltip from '@/components/ui/RichTooltip';
 import { Subject } from '@quiz-creator/types';
-import { BookOpen, ExternalLink, Eye, Link2, Lock, Pencil, Share2, Trash2, Archive } from 'lucide-react';
-import Link from 'next/link';
+import { BookOpen, Eye, Link2, Lock, Pencil, Share2, Trash2, Archive } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const REVEAL_WIDTH = 216; // 72px per action button
@@ -339,36 +338,9 @@ export default function SwipeableSubjectCard({
           )}
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-1.5 border-t-2 border-slate-900/20 dark:border-white/20 pt-2.5">
-          {isPublic && (subject.slug || subject.share_token) ? (
-            <Link
-              href={subject.slug
-                ? `/subjects/${encodeURIComponent(subject.slug)}`
-                : `/subjects/share/${encodeURIComponent(subject.share_token!)}`}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(event) => event.stopPropagation()}
-              className="text-xs font-black text-slate-700 dark:text-slate-300 transition-colors hover:text-primary underline underline-offset-4 decoration-2"
-            >
-              View public page
-            </Link>
-          ) : isPublic ? (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onShare();
-              }}
-              className="text-xs font-black text-primary transition-colors hover:text-foreground underline underline-offset-4 decoration-2 cursor-pointer shrink-0"
-            >
-              Get share link
-            </button>
-          ) : (
-            <span className="text-[11px] font-bold text-muted-foreground shrink-0">Link disabled</span>
-          )}
-
+        <div className="mt-3 flex items-center justify-start gap-1.5 border-t-2 border-slate-900/20 dark:border-white/20 pt-2.5">
           {canManage ? (
-            <div className="flex flex-1 items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
               {/* Desktop-only action buttons (Edit + Delete + Share) */}
               <div className="hidden sm:flex items-center gap-1 shrink-0">
                 <RichTooltip
@@ -436,7 +408,7 @@ export default function SwipeableSubjectCard({
                   event.stopPropagation();
                   onShare();
                 }}
-                className="ml-auto inline-flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-2.5 py-1 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1 rounded-xl border-2 border-slate-900 bg-primary hover:bg-[#1d4ed8] px-2.5 py-1 text-xs font-black text-white shadow-brutal-sm transition-all duration-150 hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none active:scale-95 cursor-pointer shrink-0"
               >
                 <Share2 className="h-3.5 w-3.5" />
                 Share

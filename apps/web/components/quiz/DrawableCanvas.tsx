@@ -742,7 +742,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30">
+    <div className="pointer-events-none absolute inset-0 z-30 backface-hidden">
       <canvas
         ref={canvasRef}
         aria-label={active ? 'Drawable review canvas' : undefined}

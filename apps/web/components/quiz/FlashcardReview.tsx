@@ -146,7 +146,7 @@ function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, on
           }`}
         >
           <PenTool className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Draw</span>
+          <span className="hidden sm:inline">{isDrawMode ? 'Drawing' : 'Draw'}</span>
         </button>
         {canEdit && (
           <button
@@ -991,13 +991,13 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                   </button>
                 </div>
               </div>
+              <DrawableCanvas
+                active={isDrawMode}
+                containerRef={cardRef}
+                storageKey={getFlashcardDrawingKey(quiz.id, currentCard?.id, userId)}
+                onExit={() => setIsDrawMode(false)}
+              />
             </div>
-            <DrawableCanvas
-              active={isDrawMode}
-              containerRef={cardRef}
-              storageKey={getFlashcardDrawingKey(quiz.id, currentCard?.id, userId)}
-              onExit={() => setIsDrawMode(false)}
-            />
           </div>
           <div
             ref={swipeOverlayRef}

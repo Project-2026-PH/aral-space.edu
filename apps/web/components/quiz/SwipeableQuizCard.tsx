@@ -472,7 +472,7 @@ export default function SwipeableQuizCard({
           </div>
         </div>
         </div>
-
+          {/* Back of the set */}
           <div
             className="absolute inset-0 flex min-h-36 sm:min-h-[148px] h-full w-full flex-col justify-between overflow-hidden bg-white dark:bg-card p-3.5 sm:p-4 [backface-visibility:hidden] [transform:rotateY(-180deg)]"
           >
@@ -489,7 +489,7 @@ export default function SwipeableQuizCard({
                   className="inline-flex items-center gap-1 rounded-lg border-2 border-slate-900 bg-white px-1.5 py-1 text-[10px] font-black text-slate-900 shadow-brutal-sm transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none dark:bg-slate-800 dark:text-white"
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
-                  <span>{selectedMode === 'multiple_choice' ? 'Multiple choice' : selectedMode === 'identification' ? 'Identification' : 'Flashcards'}</span>
+                  {/* <span>{selectedMode === 'multiple_choice' ? 'Multiple choice' : selectedMode === 'identification' ? 'Identification' : 'Flashcards'}</span> */}
                 </button>
                 {isModeMenuOpen && (
                   <div className="absolute left-0 top-9 z-20 min-w-36 rounded-xl border-2 border-slate-900 bg-white p-1.5 shadow-brutal-sm dark:bg-slate-800">
@@ -528,7 +528,7 @@ export default function SwipeableQuizCard({
                 <X className="h-4 w-4" />
               </button>
             </div>
-
+            
             <div className="flex min-h-0 items-center gap-3 py-1">
               {performance.hasData ? (
                 <>

@@ -44,6 +44,13 @@ type LibraryView = 'overview' | 'subjects' | 'reviewers' | 'shared';
 
 const PREVIEW_LIMIT = 6;
 
+const LIBRARY_TIPS = [
+  'Did you know? Paste a whole paragraph and Aral Space can automatically detect the questions and answers.',
+  'Tip: Switch a question to True or False and Quiz Creator rewrites it into a natural exam-style statement.',
+  'Tip: Use Draw mode during flashcard review to annotate cards with a pen or highlighter.',
+  'Tip: Press H during flashcard review to reveal a hint without flipping the card.',
+] as const;
+
 function normalizeTerm(value: string | null | undefined) {
   return value?.trim().toLowerCase() ?? '';
 }
@@ -74,6 +81,7 @@ export default function LibraryClient({
   const [sharedQuizzes, setSharedQuizzes] = useState<Quiz[]>(initialSharedQuizzes);
   const [sharedSubjects, setSharedSubjects] = useState<Subject[]>(initialSharedSubjects);
   const [loading] = useState(false);
+  const [activeTipIndex, setActiveTipIndex] = useState(0);
   const [search, setSearch] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
@@ -92,6 +100,14 @@ export default function LibraryClient({
     sharedQuizzes,
     sharedSubjects,
   });
+
+  useEffect(() => {
+    const tipTimer = window.setInterval(() => {
+      setActiveTipIndex((currentIndex) => (currentIndex + 1) % LIBRARY_TIPS.length);
+    }, 10_000);
+
+    return () => window.clearInterval(tipTimer);
+  }, []);
 
   useEffect(() => {
     if (!showQuickCreate) return;
@@ -326,18 +342,6 @@ export default function LibraryClient({
             className="animate-doodle-float absolute right-[18%] top-12 h-20 w-20"
             style={{ animationDelay: '-0.6s' }}
           />
-          <FlaskConical
-            className="animate-doodle-float absolute -right-5 -bottom-8 h-28 w-28"
-            style={{ animationDelay: '-2.4s' }}
-          />
-          <BookOpen
-            className="animate-doodle-float absolute left-[16%] -bottom-7 h-20 w-20"
-            style={{ animationDelay: '-4s' }}
-          />
-          <Sparkles
-            className="animate-doodle-float absolute right-6 bottom-10 h-9 w-9"
-            style={{ animationDelay: '-1.8s' }}
-          />
         </div>
 
         <div className="relative z-10 space-y-0">
@@ -347,9 +351,6 @@ export default function LibraryClient({
                 <Sparkles className="h-3.5 w-3.5" />
                 Master your handouts with us!
               </span>
-              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-                Library
-              </span>
             </div>
             <span className="shrink-0 rounded-lg border-2 border-slate-900 bg-[#fde047] px-3 py-1 text-xs font-black text-slate-900 shadow-brutal-sm">
               {totalItemCount} {totalItemCount === 1 ? 'item' : 'items'}
@@ -358,9 +359,13 @@ export default function LibraryClient({
           <h1 className="home-hero-title text-lg font-black tracking-tight text-slate-900 dark:text-white sm:text-xl">
             Reviewer Creation for Students
           </h1>
-          <div>
-            <p className="mt-0.5 text-xs font-bold text-muted-foreground">
-              Generate reviewer questions from handouts or manually build interactive multiple-choice decks.
+          <div className="min-h-[2.15rem] overflow-hidden">
+            <p
+              key={activeTipIndex}
+              aria-live="polite"
+              className="library-tip-slide-in mt-0.5 text-xs font-bold text-muted-foreground"
+            >
+              {LIBRARY_TIPS[activeTipIndex]}
             </p>
           </div>
         </div>

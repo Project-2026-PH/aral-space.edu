@@ -177,7 +177,13 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   const [cardIndex, setCardIndex] = useState(0);
   const [cloning, setCloning] = useState(false);
   const [clonedSuccess, setClonedSuccess] = useState(false);
-  const [isFlipped, setIsFlipped] = useState(false);
+  const [isFlipped, setRawIsFlipped] = useState(false);
+  const setIsFlipped = (next: Parameters<typeof setRawIsFlipped>[0]) => {
+    if (typeof window !== 'undefined') {
+      window.getSelection()?.removeAllRanges();
+    }
+    setRawIsFlipped(next);
+  };
   const [isHintVisible, setIsHintVisible] = useState(false);
   const [trackProgress, setTrackProgress] = useState(false);
   const [isStarred, setIsStarred] = useState(false);

@@ -92,13 +92,10 @@ function roundPercent(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
-export function getQuizPerformanceSnapshot(
-  quizId: string,
-  mode: QuizMode,
-  questionCount: number
-): QuizPerformanceSnapshot {
+export function createEmptyQuizPerformanceSnapshot(mode: QuizMode, questionCount: number): QuizPerformanceSnapshot {
   const safeQuestionCount = Math.max(0, questionCount);
-  const empty: QuizPerformanceSnapshot = {
+
+  return {
     mode: isPerformanceMode(mode) ? mode : 'flashcard',
     hasData: false,
     progressPercent: 0,
@@ -109,6 +106,15 @@ export function getQuizPerformanceSnapshot(
     questionStatuses: Array.from({ length: safeQuestionCount }, () => 'unanswered'),
     lastUpdated: null
   };
+}
+
+export function getQuizPerformanceSnapshot(
+  quizId: string,
+  mode: QuizMode,
+  questionCount: number
+): QuizPerformanceSnapshot {
+  const safeQuestionCount = Math.max(0, questionCount);
+  const empty = createEmptyQuizPerformanceSnapshot(mode, questionCount);
 
   if (typeof window === 'undefined' || !isPerformanceMode(mode)) return empty;
 

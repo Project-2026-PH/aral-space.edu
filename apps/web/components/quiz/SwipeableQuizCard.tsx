@@ -5,6 +5,7 @@ import RichTooltip from '@/components/ui/RichTooltip';
 import { Quiz, Subject } from '@quiz-creator/types';
 import { Archive, BarChart3, Check, Layers, MoreHorizontal, Pencil, Play, Trash2, X } from 'lucide-react';
 import {
+  createEmptyQuizPerformanceSnapshot,
   getQuizPerformanceSnapshot,
   subscribeToQuizPerformance,
   type QuizPerformanceMode,
@@ -47,7 +48,7 @@ export default function SwipeableQuizCard({
   const [selectedMode, setSelectedMode] = useState<QuizPerformanceMode>('flashcard');
   const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const [performance, setPerformance] = useState<QuizPerformanceSnapshot>(() =>
-    getQuizPerformanceSnapshot(quiz.id, 'flashcard', quiz.question_count)
+    createEmptyQuizPerformanceSnapshot('flashcard', quiz.question_count)
   );
 
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null);

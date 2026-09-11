@@ -146,7 +146,7 @@ function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, on
           }`}
         >
           <PenTool className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">{isDrawMode ? 'Done' : 'Draw'}</span>
+          <span className="hidden sm:inline">Draw</span>
         </button>
         {canEdit && (
           <button

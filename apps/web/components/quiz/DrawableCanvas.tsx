@@ -751,40 +751,80 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
             aria-label="Use pen"
             aria-pressed={tool === 'pen'}
             onClick={() => setTool('pen')}
-            className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${tool === 'pen' ? 'bg-primary px-2.5 py-1.5 text-xs font-bold text-white shadow-sm' : 'p-2 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`h-8 inline-flex items-center rounded-xl px-2 transition-all duration-300 ease-out ${
+              tool === 'pen'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+            }`}
           >
-            <PenTool className="h-4 w-4" />
-            {tool === 'pen' && <span>Pen</span>}
+            <PenTool className="h-4 w-4 shrink-0 transition-transform duration-300" />
+            <span
+              className={`overflow-hidden transition-all duration-300 ease-out whitespace-nowrap text-xs font-bold ${
+                tool === 'pen' ? 'max-w-[60px] opacity-100 ml-1.5' : 'max-w-0 opacity-0 ml-0'
+              }`}
+            >
+              Pen
+            </span>
           </button>
           <button
             type="button"
             aria-label="Use marker"
             aria-pressed={tool === 'marker'}
             onClick={() => setTool('marker')}
-            className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${tool === 'marker' ? 'bg-primary px-2.5 py-1.5 text-xs font-bold text-white shadow-sm' : 'p-2 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`h-8 inline-flex items-center rounded-xl px-2 transition-all duration-300 ease-out ${
+              tool === 'marker'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+            }`}
           >
-            <PenTool className="h-4 w-4 rotate-45" />
-            {tool === 'marker' && <span>Marker</span>}
+            <PenTool className="h-4 w-4 rotate-45 shrink-0 transition-transform duration-300" />
+            <span
+              className={`overflow-hidden transition-all duration-300 ease-out whitespace-nowrap text-xs font-bold ${
+                tool === 'marker' ? 'max-w-[70px] opacity-100 ml-1.5' : 'max-w-0 opacity-0 ml-0'
+              }`}
+            >
+              Marker
+            </span>
           </button>
           <button
             type="button"
             aria-label="Use highlighter"
             aria-pressed={tool === 'highlighter'}
             onClick={() => setTool('highlighter')}
-            className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${tool === 'highlighter' ? 'bg-primary px-2.5 py-1.5 text-xs font-bold text-white shadow-sm' : 'p-2 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`h-8 inline-flex items-center rounded-xl px-2 transition-all duration-300 ease-out ${
+              tool === 'highlighter'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+            }`}
           >
-            <Highlighter className="h-4 w-4" />
-            {tool === 'highlighter' && <span>Highlighter</span>}
+            <Highlighter className="h-4 w-4 shrink-0 transition-transform duration-300" />
+            <span
+              className={`overflow-hidden transition-all duration-300 ease-out whitespace-nowrap text-xs font-bold ${
+                tool === 'highlighter' ? 'max-w-[90px] opacity-100 ml-1.5' : 'max-w-0 opacity-0 ml-0'
+              }`}
+            >
+              Highlighter
+            </span>
           </button>
           <button
             type="button"
             aria-label="Use eraser"
             aria-pressed={tool === 'eraser'}
             onClick={() => setTool('eraser')}
-            className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${tool === 'eraser' ? 'bg-slate-700 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm' : 'p-2 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`h-8 inline-flex items-center rounded-xl px-2 transition-all duration-300 ease-out ${
+              tool === 'eraser'
+                ? 'bg-slate-700 text-white shadow-sm'
+                : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+            }`}
           >
-            <Eraser className="h-4 w-4" />
-            {tool === 'eraser' && <span>Eraser</span>}
+            <Eraser className="h-4 w-4 shrink-0 transition-transform duration-300" />
+            <span
+              className={`overflow-hidden transition-all duration-300 ease-out whitespace-nowrap text-xs font-bold ${
+                tool === 'eraser' ? 'max-w-[70px] opacity-100 ml-1.5' : 'max-w-0 opacity-0 ml-0'
+              }`}
+            >
+              Eraser
+            </span>
           </button>
           <div ref={colorPickerRef} className="relative">
             <button
@@ -819,23 +859,29 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
               />
             )}
           </div>
-          <label className="flex items-center gap-1.5 px-1.5" title={`Brush size: ${size}px`}>
-            <span className="sr-only">Brush size</span>
-            <input
-              type="range"
-              min={MIN_SIZE}
-              max={MAX_SIZE}
-              value={size}
-              onChange={(event) => setSize(Number(event.target.value))}
-              className="h-1.5 w-16 cursor-pointer accent-primary sm:w-20"
-            />
-            <output
-              aria-label={`Brush size ${size} pixels`}
-              className="min-w-10 rounded-lg border border-border bg-card px-1.5 py-1 text-center text-[11px] font-bold tabular-nums text-foreground"
-            >
-              {size}px
-            </output>
-          </label>
+          <div
+            className={`flex items-center overflow-hidden transition-all duration-300 ease-out ${
+              tool !== 'highlighter' ? 'max-w-[160px] opacity-100' : 'max-w-0 opacity-0 pointer-events-none'
+            }`}
+          >
+            <label className="flex items-center gap-1.5 px-1.5 whitespace-nowrap" title={`Brush size: ${size}px`}>
+              <span className="sr-only">Brush size</span>
+              <input
+                type="range"
+                min={MIN_SIZE}
+                max={MAX_SIZE}
+                value={size}
+                onChange={(event) => setSize(Number(event.target.value))}
+                className="h-1.5 w-16 cursor-pointer accent-primary sm:w-20"
+              />
+              <output
+                aria-label={`Brush size ${size} pixels`}
+                className="min-w-10 rounded-lg border border-border bg-card px-1.5 py-1 text-center text-[11px] font-bold tabular-nums text-foreground"
+              >
+                {size}px
+              </output>
+            </label>
+          </div>
           <button
             type="button"
             aria-label="Undo last stroke"

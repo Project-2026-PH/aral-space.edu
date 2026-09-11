@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { Sun, Moon } from 'lucide-react';
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -72,7 +73,7 @@ export default function ThemeToggle() {
         overlayRef.current = null;
         fadeTimerRef.current = null;
       }
-    }, 220);
+    }, 420);
 
     transitionFrameRef.current = requestAnimationFrame(() => {
       transitionFrameRef.current = requestAnimationFrame(() => {
@@ -105,7 +106,10 @@ export default function ThemeToggle() {
       <div className="slider">
         <span className="slider-label-dark" aria-hidden="true">Dark</span>
         <span className="slider-label-light" aria-hidden="true">Light</span>
-        <div className="circle" />
+        <div className="circle">
+          <Sun className={`h-3.5 w-3.5 text-white transition-all duration-400 absolute ${theme === 'dark' ? 'opacity-0 scale-50 rotate-90' : 'opacity-100 scale-100 rotate-0'}`} />
+          <Moon className={`h-3.5 w-3.5 text-white transition-all duration-400 absolute ${theme === 'dark' ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-50 -rotate-90'}`} />
+        </div>
       </div>
     </label>
   );

@@ -103,7 +103,12 @@ function getFlashcardSessionKey(quizId: string, userId?: string): string {
   return userId ? `quiz-creator:flashcard-session:${quizId}:${userId}` : `quiz-creator:flashcard-session:${quizId}`;
 }
 
-function getFlashcardDrawingKey(quizId: string, userId?: string): string {
+function getFlashcardDrawingKey(quizId: string, questionId?: string, userId?: string): string {
+  if (questionId) {
+    return userId
+      ? `quiz-creator:flashcard-drawing:${quizId}:${questionId}:${userId}`
+      : `quiz-creator:flashcard-drawing:${quizId}:${questionId}`;
+  }
   return userId ? `quiz-creator:flashcard-drawing:${quizId}:${userId}` : `quiz-creator:flashcard-drawing:${quizId}`;
 }
 
@@ -850,7 +855,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
         <div className="relative">
           <div
             ref={cardRef}
-          className={`perspective-1000 relative h-[430px] cursor-pointer select-none sm:h-[500px] ${isDragging ? 'touch-none' : 'touch-pan-y'}`}
+          className={`perspective-1000 relative h-[430px] sm:h-[500px] ${isDrawMode ? 'cursor-text select-text' : 'cursor-pointer select-none'} ${isDragging ? 'touch-none' : 'touch-pan-y'}`}
           onClick={handleCardClick}
           onPointerDown={handleCardPointerDown}
           onPointerMove={handleCardPointerMove}
@@ -994,7 +999,8 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
         </div>
         <DrawableCanvas
           active={isDrawMode}
-          storageKey={getFlashcardDrawingKey(quiz.id, userId)}
+          containerRef={cardRef}
+          storageKey={getFlashcardDrawingKey(quiz.id, currentCard?.id, userId)}
           onExit={() => setIsDrawMode(false)}
         />
       </div>

@@ -1,7 +1,7 @@
 'use client';
 
-import { type PointerEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Eraser, PenTool, Pipette, Plus, Trash2, Undo2 } from 'lucide-react';
+import { type PointerEvent, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, Eraser, Highlighter, PenTool, Pipette, Plus, Trash2, Undo2 } from 'lucide-react';
 
 export type DrawingTool = 'pen' | 'marker' | 'eraser';
 
@@ -32,6 +32,7 @@ type HsvColor = {
 interface DrawableCanvasProps {
   active: boolean;
   storageKey: string;
+  containerRef?: RefObject<HTMLElement | null>;
   onExit: () => void;
 }
 
@@ -184,8 +185,8 @@ function drawStroke(
   context.strokeStyle = stroke.color;
   context.fillStyle = stroke.color;
   context.lineWidth = stroke.tool === 'marker' ? stroke.size * 2.25 : stroke.size;
-  context.lineCap = 'round';
-  context.lineJoin = 'round';
+  context.lineCap = stroke.tool === 'marker' ? 'butt' : 'round';
+  context.lineJoin = stroke.tool === 'marker' ? 'miter' : 'round';
 
   if (stroke.points.length === 1) {
     context.beginPath();
@@ -345,7 +346,7 @@ function ColorPickerPopover({
   );
 }
 
-export default function DrawableCanvas({ active, storageKey, onExit }: DrawableCanvasProps) {
+export default function DrawableCanvas({ active, storageKey, containerRef, onExit }: DrawableCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokesRef = useRef<DrawingStroke[]>([]);
   const draftStrokeRef = useRef<DrawingStroke | null>(null);
@@ -485,6 +486,69 @@ export default function DrawableCanvas({ active, storageKey, onExit }: DrawableC
     return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
   }, [isColorPickerOpen]);
 
+  // Handle text selection highlighting when marker is active
+  useEffect(() => {
+    if (!active || tool !== 'marker') return;
+
+    function handleSelectionHighlight() {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) return;
+
+      const targetContainer = containerRef?.current || canvasRef.current?.parentElement;
+      const canvas = canvasRef.current;
+      if (!targetContainer || !canvas) return;
+
+      const range = selection.getRangeAt(0);
+      const commonAncestor = range.commonAncestorContainer;
+      if (!targetContainer.contains(commonAncestor)) return;
+
+      const canvasRect = canvas.getBoundingClientRect();
+      if (canvasRect.width <= 0 || canvasRect.height <= 0) return;
+
+      const clientRects = Array.from(range.getClientRects());
+      if (clientRects.length === 0) return;
+
+      const newStrokes: DrawingStroke[] = [];
+
+      for (const rect of clientRects) {
+        if (rect.width <= 1 || rect.height <= 1) continue;
+
+        const centerY = rect.top + rect.height / 2;
+        const normY = clampPoint({ x: 0, y: (centerY - canvasRect.top) / canvasRect.height }).y;
+        const startNormX = clampPoint({ x: (rect.left - canvasRect.left) / canvasRect.width, y: 0 }).x;
+        const endNormX = clampPoint({ x: (rect.right - canvasRect.left) / canvasRect.width, y: 0 }).x;
+
+        // Size stroke to neatly cover the font line height (drawStroke applies * 2.25 to stroke.size for markers)
+        const strokeSize = Math.max(MIN_SIZE, Math.round(rect.height / 2.25));
+
+        newStrokes.push({
+          points: [
+            { x: startNormX, y: normY },
+            { x: endNormX, y: normY }
+          ],
+          color,
+          size: strokeSize,
+          alpha,
+          tool: 'marker'
+        });
+      }
+
+      if (newStrokes.length > 0) {
+        const nextStrokes = [...strokesRef.current, ...newStrokes];
+        strokesRef.current = nextStrokes;
+        setStrokes(nextStrokes);
+        selection.removeAllRanges();
+      }
+    }
+
+    document.addEventListener('pointerup', handleSelectionHighlight);
+    document.addEventListener('mouseup', handleSelectionHighlight);
+    return () => {
+      document.removeEventListener('pointerup', handleSelectionHighlight);
+      document.removeEventListener('mouseup', handleSelectionHighlight);
+    };
+  }, [active, tool, color, alpha, containerRef]);
+
   function updatePickerFromHsv(nextHsv: HsvColor) {
     const nextColor = hsvToHex(nextHsv);
     setHue(nextHsv.hue);
@@ -611,8 +675,8 @@ export default function DrawableCanvas({ active, storageKey, onExit }: DrawableC
     context.globalCompositeOperation = draftStrokeRef.current.tool === 'eraser' ? 'destination-out' : 'source-over';
     context.strokeStyle = draftStrokeRef.current.color;
     context.lineWidth = draftStrokeRef.current.tool === 'marker' ? draftStrokeRef.current.size * 2.25 : draftStrokeRef.current.size;
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
+    context.lineCap = draftStrokeRef.current.tool === 'marker' ? 'butt' : 'round';
+    context.lineJoin = draftStrokeRef.current.tool === 'marker' ? 'miter' : 'round';
     context.beginPath();
     context.moveTo(previousPoint.x * rect.width, previousPoint.y * rect.height);
     context.lineTo(currentPoint.x * rect.width, currentPoint.y * rect.height);
@@ -668,7 +732,7 @@ export default function DrawableCanvas({ active, storageKey, onExit }: DrawableC
         ref={canvasRef}
         aria-label={active ? 'Drawable review canvas' : undefined}
         aria-hidden={!active}
-        className={`absolute inset-0 h-full w-full ${active ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+        className={`absolute inset-0 h-full w-full ${!active ? 'pointer-events-none' : (tool === 'marker' ? 'pointer-events-none cursor-text' : 'pointer-events-auto cursor-crosshair')}`}
         style={{ touchAction: active ? 'none' : 'auto' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -693,12 +757,13 @@ export default function DrawableCanvas({ active, storageKey, onExit }: DrawableC
           </button>
           <button
             type="button"
-            aria-label="Use marker"
+            aria-label="Use marker / highlight"
             aria-pressed={tool === 'marker'}
             onClick={() => setTool('marker')}
-            className={`rounded-xl px-2 py-1.5 text-[10px] font-bold transition-colors ${tool === 'marker' ? 'bg-amber-500 text-white' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-colors ${tool === 'marker' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           >
-            Marker
+            <Highlighter className="h-4 w-4" />
+            <span>Marker</span>
           </button>
           <button
             type="button"

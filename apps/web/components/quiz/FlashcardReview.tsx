@@ -855,7 +855,7 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
         <div className="relative">
           <div
             ref={cardRef}
-          className={`perspective-1000 relative h-[430px] sm:h-[500px] ${isDrawMode ? 'cursor-text select-text' : 'cursor-pointer select-none'} ${isDragging ? 'touch-none' : 'touch-pan-y'}`}
+          className={`perspective-1000 relative h-[430px] sm:h-[500px] ${isDrawMode ? 'cursor-text select-text' : 'cursor-pointer select-none'} ${isDrawMode ? 'touch-auto' : isDragging ? 'touch-none' : 'touch-pan-y'}`}
           onClick={handleCardClick}
           onPointerDown={handleCardPointerDown}
           onPointerMove={handleCardPointerMove}

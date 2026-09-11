@@ -3,7 +3,7 @@
 import { type PointerEvent, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Eraser, Highlighter, PenTool, Pipette, Plus, Trash2, Undo2 } from 'lucide-react';
 
-export type DrawingTool = 'pen' | 'marker' | 'highlighter' | 'eraser';
+export type DrawingTool = 'pen' | 'highlighter' | 'eraser';
 
 type DrawingPoint = {
   x: number;
@@ -162,7 +162,7 @@ function isDrawingStroke(value: unknown): value is DrawingStroke {
     && typeof stroke.size === 'number'
     && Number.isFinite(stroke.size)
     && (stroke.alpha === undefined || (typeof stroke.alpha === 'number' && Number.isFinite(stroke.alpha)))
-    && (stroke.tool === 'pen' || stroke.tool === 'marker' || stroke.tool === 'highlighter' || stroke.tool === 'eraser');
+    && (stroke.tool === 'pen' || stroke.tool === 'highlighter' || stroke.tool === 'eraser');
 }
 
 function drawStroke(
@@ -177,7 +177,7 @@ function drawStroke(
   const firstX = firstPoint.x * width;
   const firstY = firstPoint.y * height;
   const strokeAlpha = Math.min(1, Math.max(0, stroke.alpha ?? 1));
-  const isHighlightStyle = stroke.tool === 'marker' || stroke.tool === 'highlighter';
+  const isHighlightStyle = stroke.tool === 'highlighter';
   const opacity = isHighlightStyle ? strokeAlpha * 0.38 : strokeAlpha;
 
   context.save();
@@ -374,11 +374,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
   const draftStrokeRef = useRef<DrawingStroke | null>(null);
   const pointerIdRef = useRef<number | null>(null);
   const colorPickerRef = useRef<HTMLDivElement>(null);
-  const [strokes, setStrokes] = useState<DrawingStroke[]>(() => {
-    const initial = getInitialStrokes(storageKey);
-    strokesRef.current = initial;
-    return initial;
-  });
+  const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
   const [tool, setTool] = useState<DrawingTool>('pen');
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [hexInput, setHexInput] = useState(DEFAULT_COLOR.toUpperCase());
@@ -490,9 +486,11 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
     return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
   }, [isColorPickerOpen]);
 
-  // Handle text selection highlighting when highlighter tool is active
+  // Convert native text selections into persisted highlight strokes on desktop and touch devices.
   useEffect(() => {
     if (!active || tool !== 'highlighter') return;
+
+    let commitTimer: number | null = null;
 
     function handleSelectionHighlight() {
       const selection = window.getSelection();
@@ -522,7 +520,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
         const startNormX = clampPoint({ x: (rect.left - canvasRect.left) / canvasRect.width, y: 0 }).x;
         const endNormX = clampPoint({ x: (rect.right - canvasRect.left) / canvasRect.width, y: 0 }).x;
 
-        // Size stroke to neatly cover the font line height (drawStroke applies * 2.25 to stroke.size for markers/highlighters)
+        // Size stroke to neatly cover the font line height (drawStroke applies * 2.25 to highlighters).
         const strokeSize = Math.max(MIN_SIZE, Math.round(rect.height / 2.25));
 
         newStrokes.push({
@@ -544,11 +542,27 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
       }
     }
 
-    document.addEventListener('pointerup', handleSelectionHighlight);
-    document.addEventListener('mouseup', handleSelectionHighlight);
+    function scheduleSelectionHighlight(delay = 80) {
+      if (commitTimer !== null) window.clearTimeout(commitTimer);
+      commitTimer = window.setTimeout(() => {
+        commitTimer = null;
+        handleSelectionHighlight();
+      }, delay);
+    }
+
+    const handlePointerUp = () => scheduleSelectionHighlight();
+    const handleMouseUp = () => scheduleSelectionHighlight();
+    const handleTouchEnd = () => scheduleSelectionHighlight();
+
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchend', handleTouchEnd);
+
     return () => {
-      document.removeEventListener('pointerup', handleSelectionHighlight);
-      document.removeEventListener('mouseup', handleSelectionHighlight);
+      if (commitTimer !== null) window.clearTimeout(commitTimer);
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchend', handleTouchEnd);
     };
   }, [active, tool, color, alpha, containerRef, storageKey]);
 
@@ -674,12 +688,13 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
     const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 3);
     context.save();
     context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-    context.globalAlpha = (draftStrokeRef.current.tool === 'marker' ? 0.38 : 1) * (draftStrokeRef.current.alpha ?? 1);
+    const isHighlightStroke = draftStrokeRef.current.tool === 'highlighter';
+    context.globalAlpha = (isHighlightStroke ? 0.38 : 1) * (draftStrokeRef.current.alpha ?? 1);
     context.globalCompositeOperation = draftStrokeRef.current.tool === 'eraser' ? 'destination-out' : 'source-over';
     context.strokeStyle = draftStrokeRef.current.color;
-    context.lineWidth = draftStrokeRef.current.tool === 'marker' ? draftStrokeRef.current.size * 2.25 : draftStrokeRef.current.size;
-    context.lineCap = draftStrokeRef.current.tool === 'marker' ? 'butt' : 'round';
-    context.lineJoin = draftStrokeRef.current.tool === 'marker' ? 'miter' : 'round';
+    context.lineWidth = isHighlightStroke ? draftStrokeRef.current.size * 2.25 : draftStrokeRef.current.size;
+    context.lineCap = isHighlightStroke ? 'butt' : 'round';
+    context.lineJoin = isHighlightStroke ? 'miter' : 'round';
     context.beginPath();
     context.moveTo(previousPoint.x * rect.width, previousPoint.y * rect.height);
     context.lineTo(currentPoint.x * rect.width, currentPoint.y * rect.height);
@@ -733,7 +748,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
         aria-label={active ? 'Drawable review canvas' : undefined}
         aria-hidden={!active}
         className={`absolute inset-0 h-full w-full ${!active ? 'pointer-events-none' : (tool === 'highlighter' ? 'pointer-events-none cursor-text' : 'pointer-events-auto cursor-crosshair')}`}
-        style={{ touchAction: active ? 'none' : 'auto' }}
+        style={{ touchAction: active && tool !== 'highlighter' ? 'none' : 'auto' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={finishPointer}
@@ -766,7 +781,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
               Pen
             </span>
           </button>
-          <button
+          {/* <button
             type="button"
             aria-label="Use marker"
             aria-pressed={tool === 'marker'}
@@ -785,7 +800,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
             >
               Marker
             </span>
-          </button>
+          </button> */}
           <button
             type="button"
             aria-label="Use highlighter"

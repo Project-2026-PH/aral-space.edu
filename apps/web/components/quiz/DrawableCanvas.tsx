@@ -3,7 +3,7 @@
 import { type PointerEvent, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Eraser, Highlighter, PenTool, Pipette, Plus, Trash2, Undo2 } from 'lucide-react';
 
-export type DrawingTool = 'pen' | 'marker' | 'eraser';
+export type DrawingTool = 'pen' | 'marker' | 'highlighter' | 'eraser';
 
 type DrawingPoint = {
   x: number;
@@ -162,7 +162,7 @@ function isDrawingStroke(value: unknown): value is DrawingStroke {
     && typeof stroke.size === 'number'
     && Number.isFinite(stroke.size)
     && (stroke.alpha === undefined || (typeof stroke.alpha === 'number' && Number.isFinite(stroke.alpha)))
-    && (stroke.tool === 'pen' || stroke.tool === 'marker' || stroke.tool === 'eraser');
+    && (stroke.tool === 'pen' || stroke.tool === 'marker' || stroke.tool === 'highlighter' || stroke.tool === 'eraser');
 }
 
 function drawStroke(
@@ -177,16 +177,17 @@ function drawStroke(
   const firstX = firstPoint.x * width;
   const firstY = firstPoint.y * height;
   const strokeAlpha = Math.min(1, Math.max(0, stroke.alpha ?? 1));
-  const opacity = stroke.tool === 'marker' ? strokeAlpha * 0.38 : strokeAlpha;
+  const isHighlightStyle = stroke.tool === 'marker' || stroke.tool === 'highlighter';
+  const opacity = isHighlightStyle ? strokeAlpha * 0.38 : strokeAlpha;
 
   context.save();
   context.globalAlpha = opacity;
   context.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
   context.strokeStyle = stroke.color;
   context.fillStyle = stroke.color;
-  context.lineWidth = stroke.tool === 'marker' ? stroke.size * 2.25 : stroke.size;
-  context.lineCap = stroke.tool === 'marker' ? 'butt' : 'round';
-  context.lineJoin = stroke.tool === 'marker' ? 'miter' : 'round';
+  context.lineWidth = isHighlightStyle ? stroke.size * 2.25 : stroke.size;
+  context.lineCap = stroke.tool === 'highlighter' ? 'butt' : 'round';
+  context.lineJoin = stroke.tool === 'highlighter' ? 'miter' : 'round';
 
   if (stroke.points.length === 1) {
     context.beginPath();
@@ -346,14 +347,38 @@ function ColorPickerPopover({
   );
 }
 
+function getInitialStrokes(key: string): DrawingStroke[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (stored) {
+      const snapshot = JSON.parse(stored) as Partial<DrawingSnapshot>;
+      if (snapshot.version === DRAWING_STORAGE_VERSION && Array.isArray(snapshot.strokes)) {
+        return snapshot.strokes.filter(isDrawingStroke).map((stroke) => ({
+          ...stroke,
+          alpha: Math.min(1, Math.max(0, stroke.alpha ?? 1)),
+          points: stroke.points.map(clampPoint),
+          size: Math.min(MAX_SIZE, Math.max(MIN_SIZE, stroke.size))
+        }));
+      }
+    }
+  } catch {
+    // Ignore storage parse issues
+  }
+  return [];
+}
+
 export default function DrawableCanvas({ active, storageKey, containerRef, onExit }: DrawableCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokesRef = useRef<DrawingStroke[]>([]);
   const draftStrokeRef = useRef<DrawingStroke | null>(null);
   const pointerIdRef = useRef<number | null>(null);
-  const hydratedRef = useRef(false);
   const colorPickerRef = useRef<HTMLDivElement>(null);
-  const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
+  const [strokes, setStrokes] = useState<DrawingStroke[]>(() => {
+    const initial = getInitialStrokes(storageKey);
+    strokesRef.current = initial;
+    return initial;
+  });
   const [tool, setTool] = useState<DrawingTool>('pen');
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [hexInput, setHexInput] = useState(DEFAULT_COLOR.toUpperCase());
@@ -404,50 +429,29 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
   }, [redraw, strokes]);
 
   useEffect(() => {
-    hydratedRef.current = false;
-    strokesRef.current = [];
+    const nextStrokes = getInitialStrokes(storageKey);
+    strokesRef.current = nextStrokes;
     draftStrokeRef.current = null;
-    setStrokes([]);
-
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      if (stored) {
-        const snapshot = JSON.parse(stored) as Partial<DrawingSnapshot>;
-        if (snapshot.version === DRAWING_STORAGE_VERSION && Array.isArray(snapshot.strokes)) {
-          const restoredStrokes = snapshot.strokes.filter(isDrawingStroke).map((stroke) => ({
-            ...stroke,
-            alpha: Math.min(1, Math.max(0, stroke.alpha ?? 1)),
-            points: stroke.points.map(clampPoint),
-            size: Math.min(MAX_SIZE, Math.max(MIN_SIZE, stroke.size))
-          }));
-          strokesRef.current = restoredStrokes;
-          setStrokes(restoredStrokes);
-        }
-      }
-    } catch {
-      // Ignore malformed or unavailable local storage and keep the canvas usable.
-    }
-
-    hydratedRef.current = true;
+    setStrokes(nextStrokes);
   }, [storageKey]);
 
-  useEffect(() => {
-    if (!hydratedRef.current) return;
-
+  function saveStrokes(nextStrokes: DrawingStroke[]) {
+    strokesRef.current = nextStrokes;
+    setStrokes(nextStrokes);
     try {
-      if (strokes.length === 0) {
+      if (nextStrokes.length === 0) {
         window.localStorage.removeItem(storageKey);
       } else {
         const snapshot: DrawingSnapshot = {
           version: DRAWING_STORAGE_VERSION,
-          strokes
+          strokes: nextStrokes
         };
         window.localStorage.setItem(storageKey, JSON.stringify(snapshot));
       }
     } catch {
-      // Ignore storage restrictions and keep the in-memory drawing usable.
+      // Ignore storage restrictions
     }
-  }, [strokes, storageKey]);
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -486,9 +490,9 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
     return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
   }, [isColorPickerOpen]);
 
-  // Handle text selection highlighting when marker is active
+  // Handle text selection highlighting when highlighter tool is active
   useEffect(() => {
-    if (!active || tool !== 'marker') return;
+    if (!active || tool !== 'highlighter') return;
 
     function handleSelectionHighlight() {
       const selection = window.getSelection();
@@ -518,7 +522,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
         const startNormX = clampPoint({ x: (rect.left - canvasRect.left) / canvasRect.width, y: 0 }).x;
         const endNormX = clampPoint({ x: (rect.right - canvasRect.left) / canvasRect.width, y: 0 }).x;
 
-        // Size stroke to neatly cover the font line height (drawStroke applies * 2.25 to stroke.size for markers)
+        // Size stroke to neatly cover the font line height (drawStroke applies * 2.25 to stroke.size for markers/highlighters)
         const strokeSize = Math.max(MIN_SIZE, Math.round(rect.height / 2.25));
 
         newStrokes.push({
@@ -529,14 +533,13 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
           color,
           size: strokeSize,
           alpha,
-          tool: 'marker'
+          tool: 'highlighter'
         });
       }
 
       if (newStrokes.length > 0) {
         const nextStrokes = [...strokesRef.current, ...newStrokes];
-        strokesRef.current = nextStrokes;
-        setStrokes(nextStrokes);
+        saveStrokes(nextStrokes);
         selection.removeAllRanges();
       }
     }
@@ -547,7 +550,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
       document.removeEventListener('pointerup', handleSelectionHighlight);
       document.removeEventListener('mouseup', handleSelectionHighlight);
     };
-  }, [active, tool, color, alpha, containerRef]);
+  }, [active, tool, color, alpha, containerRef, storageKey]);
 
   function updatePickerFromHsv(nextHsv: HsvColor) {
     const nextColor = hsvToHex(nextHsv);
@@ -702,8 +705,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
     draftStrokeRef.current = null;
     if (completedStroke) {
       const nextStrokes = [...strokesRef.current, completedStroke];
-      strokesRef.current = nextStrokes;
-      setStrokes(nextStrokes);
+      saveStrokes(nextStrokes);
     }
     redraw();
   }
@@ -717,13 +719,11 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
 
   function undoLastStroke() {
     const nextStrokes = strokesRef.current.slice(0, -1);
-    strokesRef.current = nextStrokes;
-    setStrokes(nextStrokes);
+    saveStrokes(nextStrokes);
   }
 
   function clearCanvas() {
-    strokesRef.current = [];
-    setStrokes([]);
+    saveStrokes([]);
   }
 
   return (
@@ -732,7 +732,7 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
         ref={canvasRef}
         aria-label={active ? 'Drawable review canvas' : undefined}
         aria-hidden={!active}
-        className={`absolute inset-0 h-full w-full ${!active ? 'pointer-events-none' : (tool === 'marker' ? 'pointer-events-none cursor-text' : 'pointer-events-auto cursor-crosshair')}`}
+        className={`absolute inset-0 h-full w-full ${!active ? 'pointer-events-none' : (tool === 'highlighter' ? 'pointer-events-none cursor-text' : 'pointer-events-auto cursor-crosshair')}`}
         style={{ touchAction: active ? 'none' : 'auto' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -751,28 +751,40 @@ export default function DrawableCanvas({ active, storageKey, containerRef, onExi
             aria-label="Use pen"
             aria-pressed={tool === 'pen'}
             onClick={() => setTool('pen')}
-            className={`rounded-xl p-2 transition-colors ${tool === 'pen' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${tool === 'pen' ? 'bg-primary px-2.5 py-1.5 text-xs font-bold text-white shadow-sm' : 'p-2 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           >
             <PenTool className="h-4 w-4" />
+            {tool === 'pen' && <span>Pen</span>}
           </button>
           <button
             type="button"
-            aria-label="Use marker / highlight"
+            aria-label="Use marker"
             aria-pressed={tool === 'marker'}
             onClick={() => setTool('marker')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-colors ${tool === 'marker' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${tool === 'marker' ? 'bg-primary px-2.5 py-1.5 text-xs font-bold text-white shadow-sm' : 'p-2 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+          >
+            <PenTool className="h-4 w-4 rotate-45" />
+            {tool === 'marker' && <span>Marker</span>}
+          </button>
+          <button
+            type="button"
+            aria-label="Use highlighter"
+            aria-pressed={tool === 'highlighter'}
+            onClick={() => setTool('highlighter')}
+            className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${tool === 'highlighter' ? 'bg-primary px-2.5 py-1.5 text-xs font-bold text-white shadow-sm' : 'p-2 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           >
             <Highlighter className="h-4 w-4" />
-            <span>Marker</span>
+            {tool === 'highlighter' && <span>Highlighter</span>}
           </button>
           <button
             type="button"
             aria-label="Use eraser"
             aria-pressed={tool === 'eraser'}
             onClick={() => setTool('eraser')}
-            className={`rounded-xl p-2 transition-colors ${tool === 'eraser' ? 'bg-slate-700 text-white' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            className={`inline-flex items-center gap-1.5 rounded-xl transition-colors ${tool === 'eraser' ? 'bg-slate-700 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm' : 'p-2 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           >
             <Eraser className="h-4 w-4" />
+            {tool === 'eraser' && <span>Eraser</span>}
           </button>
           <div ref={colorPickerRef} className="relative">
             <button

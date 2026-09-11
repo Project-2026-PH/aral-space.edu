@@ -986,6 +986,12 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                 </div>
               </div>
             </div>
+            <DrawableCanvas
+              active={isDrawMode}
+              containerRef={cardRef}
+              storageKey={getFlashcardDrawingKey(quiz.id, currentCard?.id, userId)}
+              onExit={() => setIsDrawMode(false)}
+            />
           </div>
           <div
             ref={swipeOverlayRef}
@@ -997,12 +1003,6 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
             <span ref={swipeRightLabelRef}>GOT IT RIGHT</span>
           </div>
         </div>
-        <DrawableCanvas
-          active={isDrawMode}
-          containerRef={cardRef}
-          storageKey={getFlashcardDrawingKey(quiz.id, currentCard?.id, userId)}
-          onExit={() => setIsDrawMode(false)}
-        />
       </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:gap-5">

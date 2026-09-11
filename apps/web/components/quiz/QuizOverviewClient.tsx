@@ -77,40 +77,37 @@ export default function QuizOverviewClient({
     setTermInput(initialQuiz.term || '');
   }, [initialQuiz, initialQuestions]);
 
-  async function refreshQuestions() {
-    try {
-      const res = await fetch(`/api/quizzes/${quiz.id}`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setQuiz(data);
-        setQuestions(data.questions || []);
-        publishLibraryMutation({ type: 'quiz-updated', quiz: data });
-      }
-    } catch (err) {
-      console.error('Refresh error:', err);
-    }
-  }
-
   function handleQuestionSaved(savedQuestion?: QuizQuestion) {
-    if (savedQuestion && savedQuestion.id) {
-      setQuestions((prev) => {
-        const exists = prev.some((q) => q.id === savedQuestion.id);
-        if (exists) {
-          return prev.map((q) => (q.id === savedQuestion.id ? savedQuestion : q));
-        }
-        return [...prev, savedQuestion];
+    if (!savedQuestion?.id) return;
+
+    const alreadyExists = questions.some((q) => q.id === savedQuestion.id);
+    setQuestions((prev) => {
+      if (prev.some((q) => q.id === savedQuestion.id)) {
+        return prev.map((q) => (q.id === savedQuestion.id ? savedQuestion : q));
+      }
+      return [...prev, savedQuestion];
+    });
+
+    if (!alreadyExists) {
+      const nextQuestionCount = questions.length + 1;
+      setQuiz((prev) => ({ ...prev, question_count: nextQuestionCount }));
+      publishLibraryMutation({
+        type: 'quiz-updated',
+        quiz: { id: quiz.id, question_count: nextQuestionCount }
       });
-      refreshQuestions();
-    } else {
-      refreshQuestions();
     }
   }
 
   function handleQuestionDeleted(deletedId?: string) {
-    if (deletedId) {
-      setQuestions((prev) => prev.filter((q) => q.id !== deletedId));
-    }
-    refreshQuestions();
+    if (!deletedId || !questions.some((q) => q.id === deletedId)) return;
+
+    setQuestions((prev) => prev.filter((q) => q.id !== deletedId));
+    const nextQuestionCount = Math.max(questions.length - 1, 0);
+    setQuiz((prev) => ({ ...prev, question_count: nextQuestionCount }));
+    publishLibraryMutation({
+      type: 'quiz-updated',
+      quiz: { id: quiz.id, question_count: nextQuestionCount }
+    });
   }
 
   async function handleSaveTitle() {

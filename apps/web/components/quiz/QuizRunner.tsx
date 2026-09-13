@@ -97,6 +97,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
     submitTypedAnswer,
     advance,
     resetProgress,
+    recoverStaleSession,
     startStruggleReview,
     complete,
     shuffleRemainingQueue,
@@ -326,8 +327,29 @@ export default function QuizRunner(props: QuizRunnerProps) {
     );
   }
 
+  if (questions.length === 0) {
+    return (
+      <div className="mx-auto max-w-md py-12 text-center">
+        <p className="text-sm font-semibold text-foreground">This reviewer has no questions available.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Refresh the reviewer after its questions have been published.</p>
+      </div>
+    );
+  }
+
   if (!activeQuestion) {
-    return <div className="max-w-md mx-auto py-12 text-center text-xs text-muted-foreground">Loading mastery session...</div>;
+    return (
+      <div className="mx-auto max-w-md py-12 text-center">
+        <p className="text-sm font-semibold text-foreground">Your practice session needs to be restored.</p>
+        <p className="mt-2 text-xs text-muted-foreground">We found an incomplete local session state without an active question.</p>
+        <button
+          type="button"
+          onClick={recoverStaleSession}
+          className="mt-4 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          Restore session
+        </button>
+      </div>
+    );
   }
 
   return (

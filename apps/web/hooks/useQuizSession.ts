@@ -239,8 +239,17 @@ export function useQuizSession({
         ...(snapshot.pendingAdvance?.nextQueue.unservedQueue || [])
       ];
       const isCompatible = snapshotQuestionIds.every((questionId) => knownQuestionIds.has(questionId));
+      const isStaleEmptySnapshot =
+        !snapshot.isCompleted &&
+        snapshot.queueState.activeQueue.length === 0 &&
+        !snapshot.pendingAdvance;
 
-      if (isCompatible) {
+      if (isStaleEmptySnapshot) {
+        // An interrupted transition can persist an empty non-terminal queue.
+        // Keep the server-provided progress and rebuild from it instead of
+        // trapping the runner in the loading fallback.
+        removeQuizProgressSnapshot(quiz.id, session.id);
+      } else if (isCompatible) {
         restoredProgress = true;
         restoringSnapshotRef.current = snapshot;
         setProgressMap(new Map(snapshot.progressEntries));
@@ -775,6 +784,11 @@ export function useQuizSession({
     }
   }
 
+  function recoverStaleSession(): void {
+    removeQuizProgressSnapshot(quiz.id, session.id);
+    window.location.reload();
+  }
+
   function resetProgress() {
     resetQuizPerformanceSession({
       quizId: quiz.id,
@@ -889,6 +903,7 @@ export function useQuizSession({
     startStruggleReview,
     complete,
     resetProgress,
+    recoverStaleSession,
     shuffleRemainingQueue,
     handleSurfaceClick,
     handleSurfaceKeyDown,

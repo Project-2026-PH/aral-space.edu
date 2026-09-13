@@ -36,6 +36,12 @@ function isInvalidUuidRepositoryError(error: unknown): boolean {
   return /invalid input syntax for type uuid|invalid uuid/i.test(message);
 }
 
+function isSessionAvailable(session: QuizSession | null): session is QuizSession {
+  if (!session) return false;
+  const availableAt = Date.parse(session.available_at);
+  return Number.isFinite(availableAt) && availableAt <= Date.now();
+}
+
 export class MasterySessionController {
   private static sampleSessionRepo: ISessionRepository = new MemorySessionRepository();
 
@@ -84,15 +90,25 @@ export class MasterySessionController {
         ? this.sessionRepo
         : MasterySessionController.sampleSessionRepo;
       const sessionPromise = repository.getActiveSession(quizId, userId);
+      const scheduledSessionPromise = repository.getScheduledSession
+        ? repository.getScheduledSession(quizId, userId)
+        : Promise.resolve(null);
       const questionsPromise = providedQuestions
         ? Promise.resolve(providedQuestions)
         : quizId === SAMPLE_QUIZ_ID
           ? Promise.resolve(SAMPLE_QUIZ_QUESTIONS)
           : this.quizRepo?.getQuestionsByQuizId(quizId, userId);
       if (!questionsPromise) throw new Error('Quiz repository is required to start this session');
-      const [existingSession, questions] = await Promise.all([sessionPromise, questionsPromise]);
+      const [existingSession, scheduledSession, questions] = await Promise.all([
+        sessionPromise,
+        scheduledSessionPromise,
+        questionsPromise
+      ]);
       let session = existingSession;
       let progressList: QuestionProgress[] = [];
+      if (!session && isSessionAvailable(scheduledSession)) {
+        session = await repository.updateSessionStatus(scheduledSession.id, 'in_progress', undefined, userId);
+      }
       if (!session) session = await repository.createSession(quizId, sessionType, new Date().toISOString(), userId);
       else progressList = await repository.getProgressForSession(session.id, userId);
       const existingMap = new Map(progressList.map(p => [p.question_id, p]));
@@ -110,10 +126,20 @@ export class MasterySessionController {
       if (!accessibleQuiz) throw new Error('Quiz not found or access is restricted');
     }
     const sessionPromise = this.sessionRepo.getActiveSession(quizId, userId);
+    const scheduledSessionPromise = this.sessionRepo.getScheduledSession
+      ? this.sessionRepo.getScheduledSession(quizId, userId)
+      : Promise.resolve(null);
     const questionsPromise = providedQuestions ? Promise.resolve(providedQuestions) : this.quizRepo!.getQuestionsByQuizId(quizId, userId);
-    const [existingSession, questions] = await Promise.all([sessionPromise, questionsPromise]);
+    const [existingSession, scheduledSession, questions] = await Promise.all([
+      sessionPromise,
+      scheduledSessionPromise,
+      questionsPromise
+    ]);
     let session = existingSession;
     let progressList: QuestionProgress[] = [];
+    if (!session && isSessionAvailable(scheduledSession)) {
+      session = await this.sessionRepo.updateSessionStatus(scheduledSession.id, 'in_progress', undefined, userId);
+    }
     if (!session) session = await this.sessionRepo.createSession(quizId, sessionType, new Date().toISOString(), userId);
     else progressList = await this.sessionRepo.getProgressForSession(session.id, userId);
     const existingMap = new Map(progressList.map(p => [p.question_id, p]));

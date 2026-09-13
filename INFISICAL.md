@@ -78,6 +78,9 @@ The monorepo expects the following secret keys managed within Infisical environm
 | `GEMINI_API_KEY` | `@quiz-creator/core`, `@quiz-creator/web` | Google Gemini API key for question generation | `AIzaSy...` |
 | `GROQ_API_KEY` | `@quiz-creator/core`, `@quiz-creator/web` | Groq API key (Llama-3.3-70b reviewer & generator) | `gsk_...` |
 | `DATABASE_URL` | `@quiz-creator/core`, `@quiz-creator/web` | Neon / PostgreSQL connection pooling string | `postgresql://user:pass@ep-xyz.neon.tech/neondb?sslmode=require` |
+| `CRON_SECRET` | External reviewer scheduler, `@quiz-creator/web` | Shared secret sent in the Authorization header when invoking the reviewer worker | Random string of at least 16 characters |
+| `REVIEWER_WORKER_SECRET` | External reviewer scheduler, `@quiz-creator/web` | Optional alternate name for the reviewer worker shared secret | Random string of at least 16 characters |
+| `OPENROUTER_API_KEY` | `@quiz-creator/core`, `@quiz-creator/web` | OpenRouter key for scanned-PDF parsing and AI reviewer generation | `sk-or-...` |
 | `NEXT_PUBLIC_SUPABASE_URL` | `@quiz-creator/web` | Supabase project URL (optional fallback storage) | `https://xyz.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `@quiz-creator/web` | Supabase public anon key | `eyJhbGciOi...` |
 

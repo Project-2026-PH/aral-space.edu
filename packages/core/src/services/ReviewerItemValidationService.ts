@@ -10,7 +10,16 @@ export interface ValidatedReviewerItem extends GeneratedReviewerItem {
 }
 
 function normalize(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, ' ').trim();
+  return value
+    .normalize('NFKC')
+    .replace(/\u00ad/g, '')
+    .replace(/([a-z])-\s+(?=[a-z])/gi, '$1')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .trim();
 }
 
 function tokens(value: string): string[] {
@@ -26,27 +35,79 @@ function answerMatchesOption(answer: string, option: string): boolean {
 function meaningfulTokens(value: string): string[] {
   return tokens(value).filter((token) => ![
     'true', 'false', 'what', 'which', 'when', 'where', 'why', 'how',
-    'does', 'did', 'the', 'are', 'was', 'were', 'this', 'that', 'and'
+    'does', 'did', 'the', 'are', 'was', 'were', 'this', 'that', 'and',
+    'according', 'following', 'statement', 'statements', 'best', 'describe',
+    'describes', 'identify', 'identifies', 'identified', 'based', 'provided',
+    'information', 'concept', 'concepts', 'term', 'terms', 'characteristic',
+    'characteristics', 'example', 'examples', 'correct', 'answer', 'option',
+    'options', 'source', 'excerpt', 'document', 'material', 'principle',
+    'definition', 'refers', 'refer', 'means', 'meant', 'called', 'known',
+    'likely', 'primarily', 'main', 'primary', 'purpose', 'role', 'feature',
+    'features', 'following', 'statement'
   ].includes(token));
 }
 
+function cleanEvidenceExcerpt(value: string): string {
+  return value
+    .trim()
+    .replace(/^```(?:text|quote)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .replace(/^\s*(?:evidence(?:\s+excerpt)?|quote)\s*:\s*/i, '')
+    .replace(/^\s*[>\-*]\s*/, '')
+    .replace(/^["'“`]+/, '')
+    .replace(/["'”`]+$/, '')
+    .trim();
+}
+
+function tokenVariants(token: string): string[] {
+  const variants = new Set([token, `${token}s`, `${token}es`]);
+  if (token.endsWith('y')) variants.add(`${token.slice(0, -1)}ies`);
+  if (token.endsWith('x')) variants.add(`${token.slice(0, -1)}ces`);
+  return Array.from(variants);
+}
+
+function containsSourceToken(source: string, token: string): boolean {
+  const words = new Set(source.match(/[a-z0-9]{3,}/g) || []);
+  return tokenVariants(token).some((variant) => words.has(variant));
+}
+
+function answerIsSupported(answer: string, evidence: string): boolean {
+  const normalizedAnswer = normalize(answer);
+  if (normalizedAnswer.length < 3) return false;
+  if (evidence.includes(normalizedAnswer)) return true;
+
+  // Some valid answers include punctuation or a small amount of wording that
+  // differs from the citation. Require every meaningful answer term instead
+  // of accepting an unrelated partial match.
+  const answerTokens = meaningfulTokens(answer);
+  return answerTokens.length > 0 && answerTokens.every((token) => containsSourceToken(evidence, token));
+}
+
 function hasSourceSupport(item: GeneratedReviewerItem, pageTexts: string[]): boolean {
-  const evidence = normalize(item.evidenceExcerpt);
+  const evidence = normalize(cleanEvidenceExcerpt(item.evidenceExcerpt));
   if (!evidence) return false;
 
-  // Evidence must be an exact contiguous excerpt from one cited page. Checking
-  // the complete page range would allow an excerpt to be assembled across page
-  // boundaries and would make the citation misleading.
+  // Evidence must be an exact contiguous excerpt from one cited page. Matching
+  // is whitespace/Unicode tolerant because PDF extraction can insert line
+  // breaks, soft hyphens, curly quotes, or typographic dashes.
   const evidencePage = pageTexts.find((pageText) => normalize(pageText).includes(evidence));
   if (!evidencePage) return false;
 
-  const answer = normalize(item.answer);
+  const sourceText = normalize(evidencePage);
   const questionTokens = meaningfulTokens(item.question);
-  const answerSupported = item.questionType === 'true_false'
-    ? questionTokens.length > 0 && questionTokens.every((token) => evidence.includes(token))
-    : answer.length >= 3 && evidence.includes(answer);
+  const questionTokensInSource = questionTokens.filter((token) => containsSourceToken(sourceText, token));
+  const minimumQuestionOverlap = Math.max(1, Math.ceil(questionTokens.length * 0.6));
   const questionSupported = questionTokens.length > 0
-    && questionTokens.every((token) => evidence.includes(token));
+    && questionTokensInSource.length >= minimumQuestionOverlap;
+
+  // The citation, rather than the question's generic wording, is the
+  // authoritative support for the answer. True/false answers are handled by
+  // the source terms in the question because "True"/"False" are not source
+  // facts themselves.
+  const answerSupported = item.questionType === 'true_false'
+    ? questionSupported
+    : answerIsSupported(item.answer, evidence);
+
   return answerSupported && questionSupported;
 }
 
@@ -82,14 +143,16 @@ export class ReviewerItemValidationService {
       if (!raw || typeof raw.answer !== 'string' || raw.answer.trim().length === 0) continue;
       if (!Number.isInteger(raw.sourcePageStart) || !Number.isInteger(raw.sourcePageEnd)) continue;
       if (raw.sourcePageStart > raw.sourcePageEnd || !pageNumbers.has(raw.sourcePageStart) || !pageNumbers.has(raw.sourcePageEnd)) continue;
-      if (typeof raw.evidenceExcerpt !== 'string' || raw.evidenceExcerpt.trim().length < 12) continue;
+      if (typeof raw.evidenceExcerpt !== 'string') continue;
+      const evidenceExcerpt = cleanEvidenceExcerpt(raw.evidenceExcerpt);
+      if (evidenceExcerpt.length < 12) continue;
       if (options.difficulty !== 'mixed' && raw.difficulty !== options.difficulty) continue;
       if (isDuplicateQuestion(raw.question, seenQuestions)) continue;
-      const evidenceKey = normalize(raw.evidenceExcerpt);
+      const evidenceKey = normalize(evidenceExcerpt);
       if (seenEvidence.has(evidenceKey)) continue;
 
       const citedPages = pages.filter((page) => page.pageNumber >= raw.sourcePageStart && page.pageNumber <= raw.sourcePageEnd);
-      if (!hasSourceSupport(raw, citedPages.map((page) => page.text))) continue;
+      if (!hasSourceSupport({ ...raw, evidenceExcerpt }, citedPages.map((page) => page.text))) continue;
 
       const normalized: ValidatedReviewerItem = {
         questionType: raw.questionType,
@@ -100,7 +163,7 @@ export class ReviewerItemValidationService {
         difficulty: raw.difficulty,
         sourcePageStart: raw.sourcePageStart,
         sourcePageEnd: raw.sourcePageEnd,
-        evidenceExcerpt: raw.evidenceExcerpt.trim()
+        evidenceExcerpt
       };
 
       if (normalized.questionType === 'multiple_choice') {

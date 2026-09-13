@@ -5,7 +5,7 @@ import type {
   SourceChunk
 } from '@quiz-creator/types';
 import { LocalQuizGenerator } from './LocalQuizGenerator';
-import { OpenRouterClient } from './ai/OpenRouterClient';
+import { OpenRouterClient, REVIEWER_OPENROUTER_MODEL } from './ai/OpenRouterClient';
 
 export interface ReviewerItemGenerationProgress {
   completedChunks: number;
@@ -97,22 +97,8 @@ export class ReviewerItemGeneratorService {
       const remainingQuestions = input.options.questionCount - generated.length;
       const remainingChunks = chunks.length - index;
       const targetForChunk = Math.max(1, Math.ceil(remainingQuestions / remainingChunks));
-      const pages = input.pages.filter((page) => page.pageNumber >= chunk.pageStart && page.pageNumber <= chunk.pageEnd);
-      const visual = pages.some((page) => page.extractionMethod !== 'text' || (page.tables?.length || 0) > 0 || (page.imageReferences?.length || 0) > 0);
-      const primaryModel = visual
-        ? (process.env.OPENROUTER_VISION_MODEL || 'nex-agi/nex-n2.5-mini:free')
-        : (process.env.OPENROUTER_TEXT_MODEL || 'openai/gpt-oss-120b');
-      const fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL || 'openai/gpt-4o-mini';
-      let model = primaryModel;
-      let result: { items: GeneratedReviewerItem[] } | null = null;
-
-      try {
-        result = await this.requestChunk(model, input, chunk, targetForChunk);
-      } catch (error) {
-        if (!fallbackModel || fallbackModel === primaryModel) throw error;
-        model = fallbackModel;
-        result = await this.requestChunk(model, input, chunk, targetForChunk);
-      }
+      const model = REVIEWER_OPENROUTER_MODEL;
+      const result = await this.requestChunk(model, input, chunk, targetForChunk);
 
       generated.push(...(result.items || []).slice(0, targetForChunk));
       await input.onProgress?.({ completedChunks: index + 1, totalChunks: chunks.length, model });
@@ -141,9 +127,8 @@ export class ReviewerItemGeneratorService {
         `Difficulty requirement: ${input.options.difficulty}. When a specific difficulty is requested, every item must use exactly that difficulty.`,
         `Source document: ${input.documentFilename}.`,
         `Source pages: ${chunk.pageStart}-${chunk.pageEnd}.`,
-        'The evidenceExcerpt must be copied from the source excerpt, not invented.',
-        'For multiple_choice, answer must exactly match one option. For true_false, answer must be True or False and options must be ["True", "False"].',
-        'For short_answer, provide a concise answer and an empty options array.',
+        'The evidenceExcerpt must be one contiguous copy from the source excerpt, with no quotation marks, labels, markdown, ellipses, or paraphrasing.',
+        'Write each question using the source terminology that it tests; do not add unsupported technical terms. For multiple_choice, answer must exactly match one option. For true_false, answer must be True or False and options must be ["True", "False"].',
         `--- UNTRUSTED SOURCE EXCERPT START ---\n${chunk.content}\n--- UNTRUSTED SOURCE EXCERPT END ---`
       ].join('\n'),
       schemaName: 'reviewer_items',

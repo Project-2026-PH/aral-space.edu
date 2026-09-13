@@ -64,11 +64,18 @@ interface AiQuizDraft {
 }
 
 export const EMPTY_SUBJECTS: Array<{ id: string; name: string; color?: string }> = [];
-const AI_DRAFT_STORAGE_KEY = 'quiz-creator:ai-draft:v1';
+const AI_DRAFT_STORAGE_KEY = 'quiz-creator:ai-draft:v2';
 const AI_DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 function createGenerationIdempotencyKey(documentId: string, contentHash?: string): string {
   return globalThis.crypto?.randomUUID?.() || `${documentId}-${contentHash || Date.now()}`;
+}
+
+function formatGenerationError(message: string): string {
+  if (/OpenRouter request failed with status 402\b/i.test(message)) {
+    return 'OpenRouter returned HTTP 402 (payment required). Add credits or configure a model/provider available to your OpenRouter account, then try Generate with AI again.';
+  }
+  return message;
 }
 
 function parseAiQuizDraft(raw: string | null): AiQuizDraft | null {
@@ -243,6 +250,7 @@ export default function AiQuizGenerator({
 
   const totalPagesCount = files.reduce((acc, f) => acc + (f.status === 'ready' ? f.pageCount : 0), 0);
   const totalFlashcardCount = files.reduce((acc, f) => acc + (f.pairs?.length || 0), 0);
+  const failedFileCount = files.filter((file) => file.status === 'error').length;
   const hasResumableReviewerJob = files.some((file) => Boolean(file.generationJobId));
 
   // Format file size for clean UI presentation
@@ -339,10 +347,10 @@ export default function AiQuizGenerator({
         id: fileId,
         name: file.name,
         size: file.size,
-        pageCount: 1,
-        pages: [{ pageNumber: 1, text: `[Error parsing ${file.name}]`, chapterTitle: file.name }],
+        pageCount: 0,
+        pages: [],
         status: 'error',
-        error: err.message || 'Parsing failed'
+        error: err?.message || 'Parsing failed'
       };
     }
   }
@@ -354,12 +362,14 @@ export default function AiQuizGenerator({
     setIsProcessingFiles(true);
 
     // Filter to PDF, text, markdown
-    const supported = newFiles.filter((f) =>
-      f.name.endsWith('.pdf') ||
-      f.type === 'application/pdf' ||
-      f.name.endsWith('.txt') ||
-      f.name.endsWith('.md')
-    );
+    const supported = newFiles.filter((f) => {
+      const lowerName = f.name.toLowerCase();
+      const mimeType = f.type.toLowerCase();
+      return lowerName.endsWith('.pdf') ||
+        mimeType === 'application/pdf' ||
+        lowerName.endsWith('.txt') ||
+        lowerName.endsWith('.md');
+    });
 
     if (supported.length === 0) {
       setError('Please select PDF handouts or text (.txt, .md) files.');
@@ -367,7 +377,7 @@ export default function AiQuizGenerator({
       return;
     }
 
-    if (supported.some((file) => file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') && supported.length > 1) {
+    if (supported.some((file) => file.name.toLowerCase().endsWith('.pdf') || file.type.toLowerCase() === 'application/pdf') && supported.length > 1) {
       setError('Select one PDF at a time. Each PDF is stored independently and can be generated or retried later.');
       setIsProcessingFiles(false);
       return;
@@ -408,11 +418,13 @@ export default function AiQuizGenerator({
       if (!entry) return;
       if (entry.isFile) {
         const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject));
+        const lowerName = file.name.toLowerCase();
+        const mimeType = file.type.toLowerCase();
         if (
-          file.name.endsWith('.pdf') ||
-          file.type === 'application/pdf' ||
-          file.name.endsWith('.txt') ||
-          file.name.endsWith('.md')
+          lowerName.endsWith('.pdf') ||
+          mimeType === 'application/pdf' ||
+          lowerName.endsWith('.txt') ||
+          lowerName.endsWith('.md')
         ) {
           fileList.push(file);
         }
@@ -486,7 +498,11 @@ export default function AiQuizGenerator({
     const hasText = inputMode === 'text' && text.trim().length > 0;
 
     if (inputMode === 'upload' && files.some((file) => file.status !== 'ready')) {
-      setError('One or more files could not be read. Please remove them and upload a text-based PDF or run OCR before trying again.');
+      const failedFiles = files.filter((file) => file.status !== 'ready');
+      const details = failedFiles
+        .map((file) => file.error ? `"${file.name}": ${file.error}` : `"${file.name}" could not be read.`)
+        .join(' ');
+      setError(details || 'One or more files could not be read. Remove them and try again.');
       return;
     }
 
@@ -692,7 +708,7 @@ export default function AiQuizGenerator({
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Quiz generation failed.');
+      setError(formatGenerationError(err.message || 'Quiz generation failed.'));
     } finally {
       setGenerating(false);
     }
@@ -975,13 +991,19 @@ export default function AiQuizGenerator({
                       <span>{files.length} {files.length === 1 ? 'Chapter' : 'Chapters'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted font-bold text-xs text-foreground font-mono">
-                      <span>{files.some((file) => file.documentId)
-                        ? 'PDF stored'
-                        : outputMode === 'flashcard' ? `${totalFlashcardCount} Flashcards` : `${totalPagesCount} Total Pages`}</span>
+                      <span>{failedFileCount > 0
+                        ? `${failedFileCount} Upload ${failedFileCount === 1 ? 'Error' : 'Errors'}`
+                        : files.some((file) => file.documentId)
+                          ? 'PDF stored'
+                          : outputMode === 'flashcard' ? `${totalFlashcardCount} Flashcards` : `${totalPagesCount} Total Pages`}</span>
                     </div>
-                    <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold">
-                      <CheckCircle2 className="h-3 w-3" />
-                      <span>{files.some((file) => file.documentId) ? (files.some((file) => file.generationJobId) ? 'Generation saved' : 'Ready to generate') : outputMode === 'flashcard' ? 'Verbatim Source Preserved' : 'Proportionally Balanced'}</span>
+                    <div className={failedFileCount > 0
+                      ? 'hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-destructive/10 text-destructive border border-destructive/20 text-[10px] font-bold'
+                      : 'hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold'}>
+                      {failedFileCount > 0 ? <AlertCircle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                      <span>{failedFileCount > 0
+                        ? 'Review upload error'
+                        : files.some((file) => file.documentId) ? (files.some((file) => file.generationJobId) ? 'Generation saved' : 'Ready to generate') : outputMode === 'flashcard' ? 'Verbatim Source Preserved' : 'Proportionally Balanced'}</span>
                     </div>
                   </div>
 
@@ -1021,9 +1043,11 @@ export default function AiQuizGenerator({
                           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                             <span className="text-primary font-semibold">Ch. {idx + 1}</span>
                             <span>•</span>
-                            <span>{file.documentId
-                              ? (file.pageCount > 0 ? `${file.pageCount} ${file.pageCount === 1 ? 'page' : 'pages'}` : 'Page count after generation')
-                              : `${file.pageCount} ${file.pageCount === 1 ? 'page' : 'pages'}`}</span>
+                            <span>{file.status === 'error'
+                              ? 'Page count unavailable'
+                              : file.documentId
+                                ? (file.pageCount > 0 ? `${file.pageCount} ${file.pageCount === 1 ? 'page' : 'pages'}` : 'Page count after generation')
+                                : `${file.pageCount} ${file.pageCount === 1 ? 'page' : 'pages'}`}</span>
                             {file.documentId && (
                               <>
                                 <span>•</span>
@@ -1031,6 +1055,11 @@ export default function AiQuizGenerator({
                               </>
                             )}
                           </div>
+                          {file.status === 'error' && file.error && (
+                            <div className="mt-1 max-w-[28rem] truncate text-[10px] font-medium text-destructive" title={file.error}>
+                              {file.error}
+                            </div>
+                          )}
                         </div>
                       </div>
 

@@ -13,6 +13,21 @@ export interface OpenRouterJsonRequest {
   temperature?: number;
 }
 
+export const REVIEWER_OPENROUTER_MODEL = 'nex-agi/nex-n2.5-mini:free';
+
+export class OpenRouterRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly model: string,
+    providerMessage?: string
+  ) {
+    const detail = providerMessage?.trim();
+    super(`OpenRouter request failed with status ${status} for model "${model}"${detail ? `: ${detail}` : ''}`);
+    this.name = 'OpenRouterRequestError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export class OpenRouterClient {
   private readonly apiKey = process.env.OPENROUTER_API_KEY;
   private readonly endpoint = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions';
@@ -24,6 +39,11 @@ export class OpenRouterClient {
   async completeJson<T>(request: OpenRouterJsonRequest): Promise<T> {
     if (!this.apiKey) throw new Error('OpenRouter is not configured');
 
+    const structuredPrompt = [
+      request.userPrompt,
+      'Return only one valid JSON object matching this shape:',
+      JSON.stringify(request.schema)
+    ].join('\n\n');
     const messages: OpenRouterTextMessage[] = [
       { role: 'system', content: request.systemPrompt }
     ];
@@ -31,7 +51,7 @@ export class OpenRouterClient {
       messages.push({
         role: 'user',
         content: [
-          { type: 'text', text: request.userPrompt },
+          { type: 'text', text: structuredPrompt },
           {
             type: 'file',
             file: {
@@ -42,7 +62,7 @@ export class OpenRouterClient {
         ]
       });
     } else {
-      messages.push({ role: 'user', content: request.userPrompt });
+      messages.push({ role: 'user', content: structuredPrompt });
     }
 
     const controller = new AbortController();
@@ -59,21 +79,23 @@ export class OpenRouterClient {
         body: JSON.stringify({
           model: request.model,
           messages,
-          temperature: request.temperature ?? 0.2,
-          response_format: {
-            type: 'json_schema',
-            json_schema: {
-              name: request.schemaName,
-              strict: true,
-              schema: request.schema
-            }
-          }
+          temperature: request.temperature ?? 0.2
         }),
         signal: controller.signal
       });
 
       if (!response.ok) {
-        throw new Error(`OpenRouter request failed with status ${response.status}`);
+        let providerMessage: string | undefined;
+        try {
+          const payload = await response.json() as any;
+          const message = payload?.error?.message || payload?.message;
+          if (typeof message === 'string') {
+            providerMessage = message.replace(/\s+/g, ' ').slice(0, 300);
+          }
+        } catch {
+          // Some provider failures return an empty or non-JSON body.
+        }
+        throw new OpenRouterRequestError(response.status, request.model, providerMessage);
       }
       const payload = await response.json() as any;
       const rawContent = payload?.choices?.[0]?.message?.content;

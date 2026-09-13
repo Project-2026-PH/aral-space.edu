@@ -48,12 +48,11 @@ export async function POST(
       difficulty: parsed.difficulty,
       questionCount: parsed.questionCount
     });
-    const idempotencyKey = `reviewer-${createHash('sha256').update(requestIdentity).digest('hex')}`;
-    const options: ReviewerGenerationOptions = { ...parsed, idempotencyKey };
-    const existingByKey = await repository.findJobByIdempotencyKey(requestedBy, idempotencyKey);
-    const existingActive = existingByKey || (!parsed.idempotencyKey
-      ? await repository.findActiveJob(documentId, requestedBy)
-      : null);
+    const baseIdempotencyKey = `reviewer-${createHash('sha256').update(requestIdentity).digest('hex')}`;
+    const existingByKey = await repository.findJobByIdempotencyKey(requestedBy, baseIdempotencyKey);
+    const existingActive = existingByKey && existingByKey.status !== 'failed'
+      ? existingByKey
+      : (!parsed.idempotencyKey ? await repository.findActiveJob(documentId, requestedBy) : null);
     if (existingActive) {
       return NextResponse.json({
         jobId: existingActive.id,
@@ -62,6 +61,13 @@ export async function POST(
       }, { status: 202 });
     }
 
+    // A failed job is terminal and must not permanently consume the client's
+    // deterministic key. Keep the original key for active/published idempotency,
+    // but create a fresh key for an explicit retry of the same document.
+    const idempotencyKey = existingByKey?.status === 'failed'
+      ? `${baseIdempotencyKey}-retry-${randomUUID()}`
+      : baseIdempotencyKey;
+    const options: ReviewerGenerationOptions = { ...parsed, idempotencyKey };
     const job = await repository.createGenerationJob({ documentId, requestedBy, options });
 
     // `after` gives the response a fast 202 path while the job row, lease, and

@@ -20,13 +20,21 @@ export class SourceDocumentService {
     if (!filename || filename.length > 500 || !/\.pdf$/i.test(filename)) {
       throw new Error('Only PDF documents with a valid filename are accepted');
     }
-    if (input.mimeType && input.mimeType !== SourceDocumentService.PDF_MIME_TYPE) {
-      throw new Error('Only application/pdf documents are accepted');
+    const mimeType = input.mimeType.trim().toLowerCase();
+    const acceptedMimeTypes = new Set([
+      SourceDocumentService.PDF_MIME_TYPE,
+      'application/octet-stream',
+      'application/x-pdf'
+    ]);
+    if (mimeType && !acceptedMimeTypes.has(mimeType)) {
+      throw new Error('Only PDF documents are accepted');
     }
     if (input.bytes.length <= 0 || input.bytes.length > SourceDocumentService.MAX_BYTES) {
       throw new Error('PDF files must be between 1 byte and 25 MB');
     }
 
+    // MIME metadata is browser-provided and can be generic; the PDF signature
+    // is the authoritative content check.
     const header = new TextDecoder('latin1').decode(input.bytes.subarray(0, 5));
     if (header !== '%PDF-') {
       throw new Error('The uploaded file is not a valid PDF');

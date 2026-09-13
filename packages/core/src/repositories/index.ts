@@ -10,3 +10,6 @@ export * from './CachedQuizRepository';
 export * from './LocalFirstQuizRepository';
 export * from './LocalFirstSessionRepository';
 export * from './RepositoryFactory';
+export * from './IReviewerGenerationRepository';
+export * from './NeonReviewerGenerationRepository';
+export * from './MemoryReviewerGenerationRepository';

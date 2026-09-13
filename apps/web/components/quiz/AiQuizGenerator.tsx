@@ -34,6 +34,10 @@ export interface IngestedFileState {
   name: string;
   size: number;
   pageCount: number;
+  documentId?: string;
+  contentHash?: string;
+  generationJobId?: string;
+  generationIdempotencyKey?: string;
   pages: HandoutPage[];
   pairs?: IngestedFlashcardPair[];
   model?: string;
@@ -62,6 +66,10 @@ interface AiQuizDraft {
 export const EMPTY_SUBJECTS: Array<{ id: string; name: string; color?: string }> = [];
 const AI_DRAFT_STORAGE_KEY = 'quiz-creator:ai-draft:v1';
 const AI_DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function createGenerationIdempotencyKey(documentId: string, contentHash?: string): string {
+  return globalThis.crypto?.randomUUID?.() || `${documentId}-${contentHash || Date.now()}`;
+}
 
 function parseAiQuizDraft(raw: string | null): AiQuizDraft | null {
   if (!raw) return null;
@@ -235,6 +243,7 @@ export default function AiQuizGenerator({
 
   const totalPagesCount = files.reduce((acc, f) => acc + (f.status === 'ready' ? f.pageCount : 0), 0);
   const totalFlashcardCount = files.reduce((acc, f) => acc + (f.pairs?.length || 0), 0);
+  const hasResumableReviewerJob = files.some((file) => Boolean(file.generationJobId));
 
   // Format file size for clean UI presentation
   function formatBytes(bytes: number): string {
@@ -258,13 +267,9 @@ export default function AiQuizGenerator({
           );
         }
 
-        const endpoint = outputMode === 'flashcard'
-          ? '/api/parse-document-flashcard'
-          : '/api/parse-document';
-        console.log(`[Frontend] Parsing PDF "${file.name}" (${file.size} bytes) via ${endpoint}...`);
         const formData = new FormData();
         formData.append('file', file);
-        const res = await fetch(endpoint, {
+        const res = await fetch('/api/source-documents', {
           method: 'POST',
           body: formData,
         });
@@ -274,34 +279,17 @@ export default function AiQuizGenerator({
         }
         const data = await res.json();
 
-        if (outputMode === 'flashcard') {
-          const pairs: IngestedFlashcardPair[] = Array.isArray(data.pairs) ? data.pairs : [];
-          if (pairs.length === 0) {
-            throw new Error(`No verbatim term/definition pairs were found in "${file.name}".`);
-          }
-          const pageCount: number = data.pageCount || 1;
-          console.log(`[Frontend] PDF "${file.name}" extracted ${pairs.length} verbatim flashcards.`);
-          return {
-            id: fileId,
-            name: file.name,
-            size: file.size,
-            pageCount,
-            pages: [],
-            pairs,
-            model: typeof data.model === 'string' ? data.model : undefined,
-            status: 'ready'
-          };
-        }
-
-        const pages: HandoutPage[] = data.pages || [];
-        const pageCount: number = data.pageCount || pages.length || 1;
-        console.log(`[Frontend] PDF "${file.name}" parsed: detected ${pageCount} pages, extracted ${pages.length} chunks.`);
         return {
           id: fileId,
           name: file.name,
           size: file.size,
-          pageCount,
-          pages,
+          pageCount: typeof data.pageCount === 'number' ? data.pageCount : 0,
+          documentId: typeof data.documentId === 'string' ? data.documentId : undefined,
+          contentHash: typeof data.contentHash === 'string' ? data.contentHash : undefined,
+          generationIdempotencyKey: typeof data.documentId === 'string'
+            ? createGenerationIdempotencyKey(data.documentId, data.contentHash)
+            : undefined,
+          pages: [],
           status: 'ready'
         };
       } else {
@@ -375,6 +363,12 @@ export default function AiQuizGenerator({
 
     if (supported.length === 0) {
       setError('Please select PDF handouts or text (.txt, .md) files.');
+      setIsProcessingFiles(false);
+      return;
+    }
+
+    if (supported.some((file) => file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') && supported.length > 1) {
+      setError('Select one PDF at a time. Each PDF is stored independently and can be generated or retried later.');
       setIsProcessingFiles(false);
       return;
     }
@@ -507,11 +501,11 @@ export default function AiQuizGenerator({
 
     setGenerating(true);
     setProgress(5);
-    setProgressMessage(outputMode === 'flashcard' ? 'Preparing verbatim flashcards...' : 'Analyzing study material...');
+    setProgressMessage('Preparing generation job...');
     setProgressDetail(
       outputMode === 'flashcard'
-        ? 'Preserving source wording and building identification cards...'
-        : 'Configuring optimal pedagogy strategy & authoring style...'
+        ? 'The stored PDF will produce source-grounded short-answer cards after you start generation.'
+        : 'The stored PDF will be parsed and source-grounded reviewer items will be generated on the server.'
     );
     setError(null);
 
@@ -522,54 +516,84 @@ export default function AiQuizGenerator({
           : 'AI Generated Exam Reviewer'
       );
 
+      const uploadedDocuments = files.filter((file) => file.documentId);
+      if (uploadedDocuments.length > 0) {
+        if (uploadedDocuments.length !== 1) {
+          throw new Error('Generate one PDF at a time. Each uploaded PDF is stored independently so it can be parsed and retried on demand.');
+        }
+
+        const sourceDocument = uploadedDocuments[0];
+        const questionTypes = outputMode === 'flashcard' ? ['short_answer'] : ['multiple_choice'];
+        const generationIdempotencyKey = sourceDocument.generationIdempotencyKey
+          || createGenerationIdempotencyKey(sourceDocument.documentId!, sourceDocument.contentHash);
+        let jobId = sourceDocument.generationJobId;
+
+        setProgress(8);
+        setProgressMessage(jobId ? 'Resuming generation job...' : 'Creating generation job...');
+        setProgressDetail(jobId
+          ? 'The stored PDF already has a durable generation job. Checking its current status.'
+          : 'The PDF is stored. Server-side parsing begins now, only because you clicked Generate with AI.');
+
+        if (!jobId) {
+          const response = await fetch(`/api/source-documents/${encodeURIComponent(sourceDocument.documentId!)}/reviewer-sets/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: generatedTitle,
+              subjectId: selectedSubject || undefined,
+              questionTypes,
+              difficulty: 'mixed',
+              questionCount: 30,
+              idempotencyKey: generationIdempotencyKey
+            })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.error || `Server returned ${response.status}`);
+          if (!data.jobId) throw new Error('The generation job was created without an id.');
+          jobId = data.jobId;
+          setFiles((previous) => previous.map((file) => file.id === sourceDocument.id
+            ? { ...file, generationJobId: jobId, generationIdempotencyKey }
+            : file));
+        }
+
+        if (!jobId) throw new Error('The generation job was not available for polling.');
+        const activeJobId = jobId;
+
+        for (let attempt = 0; attempt < 180; attempt++) {
+          const statusResponse = await fetch(`/api/reviewer-generation/jobs/${encodeURIComponent(activeJobId)}`, {
+            cache: 'no-store'
+          });
+          const status = await statusResponse.json().catch(() => ({}));
+          if (!statusResponse.ok) throw new Error(status.error || `Status request returned ${statusResponse.status}`);
+          if (typeof status.progressPercent === 'number') setProgress(status.progressPercent);
+          if (status.message) setProgressMessage(status.message);
+          if (status.stage) setProgressDetail(`Stage: ${status.stage}`);
+
+          if (status.status === 'published' && status.quizId) {
+            setProgress(100);
+            setProgressMessage('Reviewer ready');
+            if (typeof window !== 'undefined') window.localStorage.removeItem(AI_DRAFT_STORAGE_KEY);
+            if (onGenerated) onGenerated(status.quizId);
+            else router.push(`/quizzes/${encodeURIComponent(status.quizId)}`);
+            return;
+          }
+          if (status.status === 'failed') {
+            setFiles((previous) => previous.map((file) => file.id === sourceDocument.id
+              ? {
+                ...file,
+                generationJobId: undefined,
+                generationIdempotencyKey: createGenerationIdempotencyKey(sourceDocument.documentId!, sourceDocument.contentHash)
+              }
+              : file));
+            throw new Error(status.errorMessage || 'Reviewer generation failed. Click Generate with AI to retry.');
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, attempt < 5 ? 1000 : 2500));
+        }
+        throw new Error('Reviewer generation is taking longer than expected. The job is saved locally; click Generate with AI again to resume it.');
+      }
+
       if (outputMode === 'flashcard') {
-        if (inputMode !== 'upload') {
-          throw new Error('Flashcard / Identification mode requires one or more PDF uploads.');
-        }
-
-        const pairs = files.flatMap((file) => file.pairs || []);
-        if (pairs.length === 0) {
-          throw new Error('No verbatim term/definition pairs were extracted. Upload a searchable PDF with explicit definitions.');
-        }
-
-        setProgress(60);
-        setProgressMessage('Creating identification cards...');
-        const models = Array.from(new Set(files.map((file) => file.model).filter(Boolean)));
-        const response = await fetch('/api/quizzes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: generatedTitle,
-            subject_id: selectedSubject || null,
-            source_model: models.length > 0 ? `gemini/${models.join(',')}` : 'gemini/flashcard-extractor',
-            questions: pairs.map((pair) => ({
-              // Deliberately do not phrase or paraphrase this definition. This is
-              // the same identification contract used by clipboard ingestion.
-              question_text: pair.definition,
-              answer_text: pair.term,
-              question_type: 'typed_answer',
-              options: [pair.term],
-              correct_answer: 0,
-              explanation: null,
-              source_pages: pair.source_pages
-            }))
-          })
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || `Server returned ${response.status}`);
-        if (!data.id) throw new Error('The flashcard quiz was created without an id.');
-
-        setProgress(100);
-        setProgressMessage('Flashcards ready');
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(AI_DRAFT_STORAGE_KEY);
-        }
-        if (onGenerated) {
-          onGenerated(data.id);
-        } else {
-          router.push(`/quizzes/${encodeURIComponent(data.slug || data.id)}`);
-        }
-        return;
+        throw new Error('Identification generation requires a stored PDF. Select a PDF and try again.');
       }
 
       let aggregatedPages: HandoutPage[] = [];
@@ -737,7 +761,7 @@ export default function AiQuizGenerator({
             <button
               type="button"
               onClick={() => handleOutputModeChange('multiple_choice')}
-              disabled={generating}
+              disabled={generating || hasResumableReviewerJob}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${outputMode === 'multiple_choice'
                 ? 'bg-card text-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
@@ -748,7 +772,7 @@ export default function AiQuizGenerator({
             <button
               type="button"
               onClick={() => handleOutputModeChange('flashcard')}
-              disabled={generating}
+              disabled={generating || hasResumableReviewerJob}
               className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${outputMode === 'flashcard'
                 ? 'bg-card text-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
@@ -775,7 +799,7 @@ export default function AiQuizGenerator({
           placeholder="e.g. Midterm Review: Cell Biology & Genetics (Auto-filled on upload)"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          disabled={generating}
+          disabled={generating || hasResumableReviewerJob}
           className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
         />
       </div>
@@ -798,7 +822,7 @@ export default function AiQuizGenerator({
         <select
           value={selectedSubject}
           onChange={(e) => setSelectedSubject(e.target.value)}
-          disabled={generating}
+          disabled={generating || hasResumableReviewerJob}
           className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs"
         >
           <option value="">General (No subject)</option>
@@ -904,8 +928,8 @@ export default function AiQuizGenerator({
                   </h3>
                   <p className="text-[11px] text-muted-foreground max-w-sm mx-auto leading-relaxed">
                     {outputMode === 'flashcard'
-                      ? 'Upload searchable PDFs up to 25 MB. Gemini preserves each extracted term and definition verbatim for identification practice.'
-                      : 'Supports multiple chapter PDFs, handouts, or course directories. Multi-chapter reviewer automatically balances questions across every file.'}
+                      ? 'Upload one PDF up to 25 MB. It is stored securely now; server-side extraction starts only when you generate.'
+                      : 'Upload one PDF up to 25 MB. The original file is stored now and parsing, OCR, and AI generation wait until Generate with AI.'}
                   </p>
                 </div>
 
@@ -936,7 +960,7 @@ export default function AiQuizGenerator({
             {isProcessingFiles && (
               <div className="flex items-center gap-2.5 p-3 rounded-2xl border border-primary/20 bg-primary/5 text-xs text-primary font-semibold animate-pulse">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Starting...</span>
+                <span>Uploading PDF securely. Parsing starts only after you click Generate with AI...</span>
               </div>
             )}
 
@@ -951,11 +975,13 @@ export default function AiQuizGenerator({
                       <span>{files.length} {files.length === 1 ? 'Chapter' : 'Chapters'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted font-bold text-xs text-foreground font-mono">
-                      <span>{outputMode === 'flashcard' ? `${totalFlashcardCount} Flashcards` : `${totalPagesCount} Total Pages`}</span>
+                      <span>{files.some((file) => file.documentId)
+                        ? 'PDF stored'
+                        : outputMode === 'flashcard' ? `${totalFlashcardCount} Flashcards` : `${totalPagesCount} Total Pages`}</span>
                     </div>
                     <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold">
                       <CheckCircle2 className="h-3 w-3" />
-                      <span>{outputMode === 'flashcard' ? 'Verbatim Source Preserved' : 'Proportionally Balanced'}</span>
+                      <span>{files.some((file) => file.documentId) ? (files.some((file) => file.generationJobId) ? 'Generation saved' : 'Ready to generate') : outputMode === 'flashcard' ? 'Verbatim Source Preserved' : 'Proportionally Balanced'}</span>
                     </div>
                   </div>
 
@@ -995,13 +1021,13 @@ export default function AiQuizGenerator({
                           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                             <span className="text-primary font-semibold">Ch. {idx + 1}</span>
                             <span>•</span>
-                            <span>{outputMode === 'flashcard'
-                              ? `${file.pairs?.length || 0} ${file.pairs?.length === 1 ? 'pair' : 'pairs'}`
+                            <span>{file.documentId
+                              ? (file.pageCount > 0 ? `${file.pageCount} ${file.pageCount === 1 ? 'page' : 'pages'}` : 'Page count after generation')
                               : `${file.pageCount} ${file.pageCount === 1 ? 'page' : 'pages'}`}</span>
-                            {outputMode === 'multiple_choice' && totalPagesCount > 0 && (
+                            {file.documentId && (
                               <>
                                 <span>•</span>
-                                <span>~{Math.round((file.pageCount / totalPagesCount) * 100)}% weight</span>
+                                <span>{file.generationJobId ? 'Generation saved — click Generate to resume' : 'Ready to generate'}</span>
                               </>
                             )}
                           </div>
@@ -1011,7 +1037,7 @@ export default function AiQuizGenerator({
                       <div className="flex items-center gap-2 shrink-0">
                         {file.status === 'ready' ? (
                           <span className="inline-flex items-center rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 border border-emerald-500/20">
-                            {outputMode === 'flashcard' ? `${file.pairs?.length || 0} pairs ready` : `${file.pageCount}p ready`}
+                            {file.documentId ? (file.generationJobId ? 'Resume generation' : 'Ready to generate') : `${file.pageCount}p ready`}
                           </span>
                         ) : (
                           <span className="inline-flex items-center rounded-lg bg-destructive/10 px-2 py-0.5 text-[10px] font-bold text-destructive">
@@ -1115,7 +1141,7 @@ export default function AiQuizGenerator({
                 {outputMode === 'flashcard'
                   ? `Create Flashcards${files.length > 0 ? ` (${totalFlashcardCount} cards)` : ''}`
                   : inputMode === 'upload' && files.length > 0
-                    ? `Generate Reviewer(${files.length} ${files.length === 1 ? 'file' : 'chapters'}, ${totalPagesCount}p)`
+                    ? `${files.some((file) => file.generationJobId) ? 'Resume' : 'Generate'} Reviewer(${files.length} ${files.length === 1 ? 'file' : 'chapters'}, ${totalPagesCount}p)`
                     : 'Generate Reviewer'}
               </span>
               <ArrowRight className="h-3.5 w-3.5" />

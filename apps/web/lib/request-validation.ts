@@ -305,3 +305,38 @@ export function parseGenerateQuizRequest(value: unknown) {
     authoringSignals: parseAuthoringSignals(object.authoringSignals)
   };
 }
+
+
+export function parseReviewerGenerationRequest(value: unknown) {
+  const object = assertPlainObject(value);
+  const title = boundedString(object.title, 'title', 200);
+  const subjectId = boundedString(object.subjectId, 'subjectId', 128);
+  const rawTypes = boundedArray<unknown>(object.questionTypes, 'questionTypes', 3);
+  const questionTypes = (rawTypes || ['multiple_choice']).map((rawType, index) =>
+    boundedString(rawType, `questionTypes[${index}]`, 32, true)!
+  );
+  const allowedTypes = new Set(['multiple_choice', 'short_answer', 'true_false']);
+  if (questionTypes.some((type) => !allowedTypes.has(type))) {
+    throw new RequestSecurityError(400, 'questionTypes contains an invalid question type');
+  }
+  const uniqueQuestionTypes = Array.from(new Set(questionTypes));
+  if (uniqueQuestionTypes.length === 0) {
+    throw new RequestSecurityError(400, 'At least one question type is required');
+  }
+
+  const difficulty = boundedString(object.difficulty, 'difficulty', 16) || 'mixed';
+  if (!['easy', 'medium', 'hard', 'mixed'].includes(difficulty)) {
+    throw new RequestSecurityError(400, 'difficulty is invalid');
+  }
+  const questionCount = boundedInteger(object.questionCount, 'questionCount', 1, 100) || 10;
+  const idempotencyKey = boundedString(object.idempotencyKey, 'idempotencyKey', 128);
+
+  return {
+    title,
+    subjectId,
+    questionTypes: uniqueQuestionTypes,
+    difficulty,
+    questionCount,
+    idempotencyKey
+  };
+}

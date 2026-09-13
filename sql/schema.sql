@@ -444,3 +444,109 @@ CREATE TABLE IF NOT EXISTS user_quiz_archives (
 CREATE INDEX IF NOT EXISTS idx_user_subject_archives_subject ON user_subject_archives(subject_id);
 CREATE INDEX IF NOT EXISTS idx_user_quiz_archives_quiz ON user_quiz_archives(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_user_quiz_archives_subject_cascade ON user_quiz_archives(user_id, archived_by_subject, archived_at DESC);
+
+-- Deferred PDF-to-reviewer generation pipeline.
+CREATE TABLE IF NOT EXISTS source_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id TEXT NOT NULL,
+  original_filename TEXT NOT NULL,
+  storage_path TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  file_size_bytes BIGINT NOT NULL,
+  content_hash TEXT NOT NULL,
+  page_count INTEGER,
+  parse_status TEXT NOT NULL DEFAULT 'pending',
+  pdf_data_base64 TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  parsed_at TIMESTAMPTZ,
+  UNIQUE (owner_id, content_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_source_documents_owner ON source_documents(owner_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_source_documents_hash ON source_documents(owner_id, content_hash);
+
+CREATE TABLE IF NOT EXISTS source_document_pages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id UUID NOT NULL REFERENCES source_documents(id) ON DELETE CASCADE,
+  page_number INTEGER NOT NULL,
+  content TEXT NOT NULL,
+  headings JSONB NOT NULL DEFAULT '[]'::jsonb,
+  tables JSONB NOT NULL DEFAULT '[]'::jsonb,
+  image_references JSONB NOT NULL DEFAULT '[]'::jsonb,
+  extraction_method TEXT NOT NULL,
+  parser_version TEXT NOT NULL,
+  source_document_hash TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (document_id, page_number)
+);
+CREATE INDEX IF NOT EXISTS idx_source_document_pages_document ON source_document_pages(document_id, page_number);
+
+CREATE TABLE IF NOT EXISTS source_document_chunks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id UUID NOT NULL REFERENCES source_documents(id) ON DELETE CASCADE,
+  page_start INTEGER NOT NULL,
+  page_end INTEGER NOT NULL,
+  section_title TEXT,
+  content TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  token_count INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_source_document_chunks_document ON source_document_chunks(document_id, page_start);
+
+CREATE TABLE IF NOT EXISTS reviewer_sets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id TEXT NOT NULL,
+  source_document_id UUID NOT NULL REFERENCES source_documents(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  generation_options_json JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'generating',
+  quiz_id UUID REFERENCES quizzes(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  published_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_reviewer_sets_owner ON reviewer_sets(owner_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reviewer_sets_document ON reviewer_sets(source_document_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS reviewer_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reviewer_set_id UUID NOT NULL REFERENCES reviewer_sets(id) ON DELETE CASCADE,
+  question_type TEXT NOT NULL,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  explanation TEXT,
+  options_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+  difficulty TEXT NOT NULL,
+  source_page_start INTEGER NOT NULL,
+  source_page_end INTEGER NOT NULL,
+  evidence_excerpt TEXT NOT NULL,
+  display_order INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_reviewer_items_set ON reviewer_items(reviewer_set_id, display_order);
+
+CREATE TABLE IF NOT EXISTS reviewer_generation_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id UUID NOT NULL REFERENCES source_documents(id) ON DELETE CASCADE,
+  reviewer_set_id UUID NOT NULL REFERENCES reviewer_sets(id) ON DELETE CASCADE,
+  requested_by TEXT NOT NULL,
+  generation_options_json JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',
+  stage TEXT,
+  progress_percent INTEGER NOT NULL DEFAULT 0,
+  message TEXT,
+  error_code TEXT,
+  error_message TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  idempotency_key TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  lease_expires_at TIMESTAMPTZ,
+  next_attempt_at TIMESTAMPTZ,
+  quiz_id UUID REFERENCES quizzes(id) ON DELETE SET NULL,
+  UNIQUE (requested_by, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_reviewer_generation_jobs_owner ON reviewer_generation_jobs(requested_by, created_at DESC);
+ALTER TABLE reviewer_generation_jobs ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_reviewer_generation_jobs_claim ON reviewer_generation_jobs(status, lease_expires_at, created_at);

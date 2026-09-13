@@ -97,11 +97,11 @@ export default function GenerateQuizModal({
        * For a production release where AI is not enabled, comment out this
        * entire Modal block and uncomment the production block below.
        */}
-      {/* <Modal
+      <Modal
         open={open}
         onOpenChange={onOpenChange}
         title="Generate with AI"
-        description="Upload a PDF handout or paste study notes to create a reviewer."
+        description="Upload a PDF, wait for Ready to generate, then create a source-grounded reviewer."
         maxWidth="max-w-4xl"
       >
         <AiQuizGenerator
@@ -110,13 +110,13 @@ export default function GenerateQuizModal({
           onCancel={() => onOpenChange(false)}
           isModal
         />
-      </Modal> */}
+      </Modal>
 
       {/*       
         PRODUCTION: Uncomment this Modal after commenting out the development
         block above to show the coming-soon experience instead of the uploader.
        */}
-      <Modal
+      {/* <Modal
         open={open}
         onOpenChange={onOpenChange}
         title="Generate with AI is coming soon..."
@@ -124,7 +124,7 @@ export default function GenerateQuizModal({
         maxWidth="max-w-lg"
       >
         <ComingSoonContent onClose={() => onOpenChange(false)} />
-      </Modal>
+      </Modal> */}
     </>
   );
 }

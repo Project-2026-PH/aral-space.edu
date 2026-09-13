@@ -8,3 +8,4 @@ export * from './enums/QuizMode';
 export * from './dtos/GenerateQuizDto';
 export * from './dtos/QuizDto';
 export * from './dtos/SessionDto';
+export * from './dtos/ReviewerGenerationDto';

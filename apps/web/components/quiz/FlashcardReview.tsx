@@ -169,7 +169,14 @@ function CardToolbar({ isStarred, isHintVisible, isRetryCard, onHint, onEdit, on
 export default function FlashcardReview({ quiz, questions, shareToken, subjectShareToken, exitHref, userId }: FlashcardReviewProps) {
   const router = useRouter();
   const sharedQuery = shareToken ? `&shareToken=${encodeURIComponent(shareToken)}` : '';
-  const resolvedExitHref = exitHref ?? (subjectShareToken ? `/subjects/share/${encodeURIComponent(subjectShareToken)}` : (shareToken ? '/library' : '/review'));
+  const subjectLocator = quiz.subject?.slug || quiz.subject?.id;
+  const resolvedExitHref = exitHref ?? (
+    subjectLocator
+      ? `/subjects/${encodeURIComponent(subjectLocator)}`
+      : subjectShareToken
+        ? `/subjects/share/${encodeURIComponent(subjectShareToken)}`
+        : (shareToken ? '/library' : '/review')
+  );
   const isOwner = Boolean(userId && quiz.user_id && quiz.user_id === userId);
   const isPublicView = Boolean(shareToken || subjectShareToken);
   const canEdit = !isPublicView || isOwner;

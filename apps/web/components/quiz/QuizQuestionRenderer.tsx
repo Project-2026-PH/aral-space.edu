@@ -68,6 +68,15 @@ interface SharedQuestionProps {
   isAiExplaining?: boolean;
   onRateAiExplanation?: (rating: 'up' | 'down') => void;
   aiRating?: 'up' | 'down' | null;
+  onAnimate?: () => void;
+}
+
+function AnimateButton({ onAnimate }: { onAnimate?: () => void }) {
+  if (!onAnimate) return null;
+  return <button type="button" onClick={onAnimate} className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-bold text-primary transition-colors hover:bg-primary/10" aria-label="Animate this card">
+    <Sparkles className="h-3.5 w-3.5" />
+    <span>Animate this</span>
+  </button>;
 }
 
 export interface QuizQuestionRendererProps extends SharedQuestionProps {
@@ -208,6 +217,7 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
     onInputChange,
     onSubmitTyped,
     onShowHint,
+    onAnimate,
     onAdvance,
     onDontKnow,
     desktopViewport,
@@ -235,6 +245,7 @@ export function LearnQuestion(props: SharedQuestionProps & { mode: QuizMode }): 
       <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
         <span>{mode === 'learn' ? 'Learn Mode · Type the answer' : 'Not enough choices · Type the answer'}</span>
         <div className="flex items-center gap-2.5">
+          <AnimateButton onAnimate={onAnimate} />
           <button
             type="button"
             onClick={onShowHint}
@@ -376,6 +387,7 @@ export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElemen
     onFlip,
     onAnswer,
     onShowHint,
+    onAnimate,
     onDontKnow
   } = props;
 
@@ -409,6 +421,7 @@ export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElemen
               )}
             </div>
             <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+              <AnimateButton onAnimate={onAnimate} />
               <button
                 type="button"
                 onClick={onShowHint}
@@ -491,6 +504,7 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
     onInputChange,
     onSubmitTyped,
     onShowHint,
+    onAnimate,
     onAdvance,
     onDontKnow,
     desktopViewport,
@@ -517,7 +531,9 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
       {/* Top Section */}
       <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
         <span>Question Prompt</span>
-        <button
+        <div className="flex items-center gap-2.5">
+          <AnimateButton onAnimate={onAnimate} />
+          <button
           type="button"
           onClick={onShowHint}
           disabled={isHintVisible || isEvaluating || identificationSubmitted}
@@ -526,6 +542,7 @@ export function IdentificationQuestion(props: SharedQuestionProps): React.ReactE
           <Lightbulb className={`h-3.5 w-3.5 ${isHintVisible ? 'text-amber-500 fill-amber-500/20' : 'text-primary'}`} />
           <span>{isHintVisible ? 'Hint active' : 'Need a hint?'}</span>
         </button>
+        </div>
       </div>
 
       {/* Centered Question & Input Body */}
@@ -652,6 +669,7 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
     isRetryQuestion,
     onAnswer,
     onShowHint,
+    onAnimate,
     onDontKnow,
     desktopViewport,
     aiExplanation,

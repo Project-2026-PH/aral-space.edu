@@ -1478,18 +1478,12 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   animation: kole-avatar-idle-float 4.8s ease-in-out infinite;
 }
 
-.kole-avatar--emotion-idle .kole-avatar-face {
+.kole-avatar--emotion-idle .kole-avatar-face,
+.kole-avatar--emotion-thinking .kole-avatar-face {
   animation: kole-idle-face 7.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
-/* Chat avatars use the neutral default face; only the floating launcher opts into motion. */
-.kole-avatar--static,
-.kole-avatar--static .kole-avatar-face,
-.kole-avatar--static .kole-avatar-idle-eye,
-.kole-avatar--static .kole-avatar-idle-eye-shape,
-.kole-avatar--static .kole-avatar-idle-mouth {
-  animation: none;
-}
+/* All face states share the synchronized eye, blink, mouth, and gaze timeline. */
 
 .kole-avatar-idle-eye {
   display: flex;
@@ -1529,38 +1523,7 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   animation: kole-idle-mouth 7.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
-/* The attached reference uses a sleepy, three-dot thinking face while the AI is working. */
-.kole-avatar--emotion-thinking .kole-avatar-face {
-  width: 58%;
-  height: 45%;
-  gap: 20%;
-  transform: translateY(-7%);
-}
-
-.kole-avatar--emotion-thinking .kole-avatar-eye {
-  width: 37%;
-  height: 38%;
-  border-radius: 52% 52% 48% 48%;
-  background: linear-gradient(180deg, #ffffff 0%, #e6efff 100%);
-  box-shadow: 0 0.05rem 0.2rem rgba(255, 255, 255, 0.55);
-  clip-path: polygon(0 18%, 100% 0, 100% 72%, 0 100%);
-}
-
-.kole-avatar--emotion-thinking .kole-avatar-eye:nth-child(2) {
-  transform: scaleX(-1);
-}
-
-.kole-avatar-thought {
-  position: absolute;
-  top: 75%;
-  left: 50%;
-  width: 42%;
-  height: 13%;
-  transform: translateX(-50%);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.92) 0 30%, transparent 34%) 0 50% / 33.333% 100% repeat-x;
-  opacity: 0.78;
-}
-
+/* Thinking uses the same synchronized face timeline; the emotion class remains available for timing hooks. */
 @keyframes kole-hat-cord-sway {
   0%,
   100% {
@@ -1750,11 +1713,13 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .kole-avatar--emotion-idle {
+  .kole-avatar--emotion-idle,
+  .kole-avatar--emotion-thinking {
     animation: none;
   }
 
   .kole-avatar--emotion-idle .kole-avatar-face,
+  .kole-avatar--emotion-thinking .kole-avatar-face,
   .kole-avatar-hat-cord,
   .kole-avatar-hat-tassel,
   .kole-avatar-idle-eye,
@@ -1768,4 +1733,20 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     animation-iteration-count: 1;
     transition-duration: 1ms;
   }
+}
+
+/* Kole animated scene player */
+.kole-scene-stage { @apply rounded-3xl border border-primary/20 bg-primary/5 p-4; }
+.kole-scene-nodes { @apply grid grid-cols-2 gap-3 sm:grid-cols-4; }
+.kole-scene-node { @apply flex min-h-20 items-center justify-center rounded-2xl border border-border bg-card p-2 text-center text-xs font-black text-foreground opacity-45 transition-all duration-500; }
+.kole-scene-node--active { @apply border-primary bg-primary/15 opacity-100 shadow-lg shadow-primary/10; transform: translateY(-0.2rem) scale(1.03); }
+.kole-scene-node--warning { @apply border-amber-500/40 bg-amber-500/10; }
+.kole-scene-node--output { @apply border-emerald-500/40 bg-emerald-500/10; }
+.kole-scene-caption { @apply mt-4 flex items-start gap-2 rounded-2xl bg-card p-3 text-sm font-semibold leading-relaxed text-foreground shadow-sm; }
+.kole-scene-stage--layers .kole-scene-nodes { @apply grid-cols-1 sm:grid-cols-2; }
+.kole-scene-stage--compare .kole-scene-nodes { @apply grid-cols-2; }
+.kole-scene-stage--cycle .kole-scene-node--active { border-radius: 999px; }
+.kole-scene-control { @apply inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40; }
+@media (prefers-reduced-motion: reduce) {
+  .kole-scene-node, .kole-scene-node--active { transition: none; transform: none; }
 }

@@ -155,6 +155,10 @@ function fallbackReply(message: string, profile: SessionProfile, setCount: numbe
     ? ` I can see ${setCount === 1 ? 'your selected set' : `${setCount} visible sets`} too.`
     : '';
 
+  if (normalized.includes('animat') || normalized.includes('visualiz') || normalized.includes('show me how it works')) {
+    return `Yes! I can turn a specific reviewer card into a short step-by-step animation.${contextHint} Open the card you want to understand and tap “Animate this.” I’ll use its question, answer, and explanation only, so the scene stays grounded instead of guessing.`;
+  }
+
   if (normalized.includes('cram')) {
     return `Okay, we can make cramming less scary.${contextHint} Do a 10-minute topic map, then run two focused recall rounds: answer from memory, check the card, and mark only the wobbly ones. Finish with a short timed sprint on those misses. We’re going for ${profile.encouragement}, not perfect panic!`;
   }
@@ -187,6 +191,7 @@ Private personalization instructions:
 
 Study-help rules:
 - Answer the student's question directly, then give a small actionable next step.
+- If they ask to animate, visualize, or show how something works, explain that they should open the specific reviewer card and tap “Animate this.” Do not answer with a generic cram plan or claim an animation was created without a specific card.
 - If they ask how to review a whole set, give a clear sequence: topic map, active recall rounds, fuzzy-card pile, and a short final check.
 - If they are cramming, prioritize high-yield triage, timed blocks, retrieval practice, and sleep or break reminders without sounding preachy.
 - If they ask for a topic overview, summarize only the supplied reviewer context. If context is missing, say so and ask them to select a set.
@@ -215,6 +220,7 @@ export const POST = createApiRoute(async ({ req, userId }) => {
   const message = boundedString(body.message, 'message', 2_000, true)!;
   const quizIds = parseQuizIds(body.quizIds);
   const history = parseHistory(body.history);
+  const isAnimationRequest = /animat|visualiz|show me how it works/i.test(message);
   const profile = getSessionProfile(userId);
   const repository = await getQuizRepository();
   const studyContext = await withTimeout(
@@ -228,7 +234,7 @@ export const POST = createApiRoute(async ({ req, userId }) => {
   let model: string | undefined;
   let source: 'gemini' | 'local' = 'local';
 
-  if (apiKey) {
+  if (apiKey && !isAnimationRequest) {
     try {
       const ai = new GoogleGenAI({ apiKey });
       const result = await withTimeout(

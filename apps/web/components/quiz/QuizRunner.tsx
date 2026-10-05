@@ -28,6 +28,8 @@ import Modal from '@/components/ui/Modal';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { recordExplanationFeedback } from '@/lib/ai/explanationPreferences';
 import { getClientUserId } from '@/lib/authoringPreferences';
+import KoleSceneModal from '@/components/quiz/KoleSceneModal';
+import type { SceneReaction } from '@/lib/ai/sceneTypes';
 
 interface QuizRunnerProps {
   quiz: Quiz;
@@ -55,6 +57,9 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const [isAiExplaining, setIsAiExplaining] = useState(false);
   const [aiRatings, setAiRatings] = useState<Record<string, 'up' | 'down'>>({});
   const explanationRequestVersionRef = useRef(0);
+  const [showSceneModal, setShowSceneModal] = useState(false);
+  const [sceneReaction, setSceneReaction] = useState<SceneReaction>('idle');
+  const [sceneQuestion, setSceneQuestion] = useState<QuizQuestion | null>(null);
 
   const session = useQuizSession({ ...props, mode: currentMode });
   const {
@@ -198,6 +203,13 @@ export default function QuizRunner(props: QuizRunnerProps) {
       questionId,
       rating,
     });
+  };
+
+  const handleAnimateQuestion = () => {
+    if (!activeQuestion) return;
+    setSceneQuestion(activeQuestion);
+    setSceneReaction('idle');
+    setShowSceneModal(true);
   };
 
   const activeProgressMap = pendingAdvance?.progressMap || progressMap;
@@ -451,6 +463,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
             isAiExplaining={isAiExplaining}
             onRateAiExplanation={handleRateAiExplanation}
             aiRating={activeQuestion ? aiRatings[activeQuestion.id] : null}
+            onAnimate={handleAnimateQuestion}
           />
         </div>
       </div>
@@ -475,6 +488,18 @@ export default function QuizRunner(props: QuizRunnerProps) {
       )}
 
       {resumePrompt}
+
+      {sceneQuestion && (
+        <KoleSceneModal
+          open={showSceneModal}
+          onOpenChange={setShowSceneModal}
+          quizId={quiz.id}
+          questionId={sceneQuestion.id}
+          question={sceneQuestion.question_text}
+          reaction={sceneReaction}
+          onReaction={setSceneReaction}
+        />
+      )}
 
       {/* Session Settings & Mode Switcher Modal */}
       <Modal

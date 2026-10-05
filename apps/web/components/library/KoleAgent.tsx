@@ -33,6 +33,7 @@ const SUGGESTED_PROMPTS = [
   "I can't understand a set",
   "I'm cramming",
   'Topic overview',
+  'Show me how it works',
   'How do I review the whole set?',
 ] as const;
 
@@ -73,23 +74,13 @@ function KoleAvatar({
         </span>
       </span>
       <span className="kole-avatar-face" aria-hidden="true">
-        {emotion === 'thinking' ? (
-          <>
-            <span className="kole-avatar-eye" />
-            <span className="kole-avatar-eye" />
-            <span className="kole-avatar-thought" />
-          </>
-        ) : (
-          <>
-            <span className="kole-avatar-idle-eye">
-              <span className="kole-avatar-idle-eye-shape" />
-            </span>
-            <span className="kole-avatar-idle-eye">
-              <span className="kole-avatar-idle-eye-shape" />
-            </span>
-            <span className="kole-avatar-idle-mouth" />
-          </>
-        )}
+        <span className="kole-avatar-idle-eye">
+          <span className="kole-avatar-idle-eye-shape" />
+        </span>
+        <span className="kole-avatar-idle-eye">
+          <span className="kole-avatar-idle-eye-shape" />
+        </span>
+        <span className="kole-avatar-idle-mouth" />
       </span>
     </span>
   );

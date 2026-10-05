@@ -20,6 +20,7 @@ type KoleAgentProps = {
 };
 
 type KoleAvatarSize = 'sm' | 'md' | 'lg';
+type KoleAvatarEmotion = 'idle' | 'thinking';
 
 type QuizOption = {
   id: string;
@@ -43,20 +44,42 @@ function createMessageId() {
   return `kole-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function KoleAvatar({ size = 'md', decorative = false }: { size?: KoleAvatarSize; decorative?: boolean }) {
+function KoleAvatar({
+  size = 'md',
+  emotion = 'idle',
+  animated = false,
+  decorative = false,
+}: {
+  size?: KoleAvatarSize;
+  emotion?: KoleAvatarEmotion;
+  animated?: boolean;
+  decorative?: boolean;
+}) {
   return (
     <span
-      className={`kole-avatar kole-avatar--${size}`}
+      className={`kole-avatar kole-avatar--${size} kole-avatar--emotion-${emotion} ${animated ? 'kole-avatar--animated' : 'kole-avatar--static'}`}
       role={decorative ? undefined : 'img'}
       aria-label={decorative ? undefined : 'Kole, your study buddy'}
       aria-hidden={decorative || undefined}
     >
-      <span className="kole-avatar-tail" aria-hidden="true" />
-      <span className="kole-avatar-eye" aria-hidden="true">
-        <span className="kole-avatar-pupil" />
-      </span>
-      <span className="kole-avatar-eye" aria-hidden="true">
-        <span className="kole-avatar-pupil kole-avatar-pupil--delayed" />
+      <span className="kole-avatar-face" aria-hidden="true">
+        {emotion === 'thinking' ? (
+          <>
+            <span className="kole-avatar-eye" />
+            <span className="kole-avatar-eye" />
+            <span className="kole-avatar-thought" />
+          </>
+        ) : (
+          <>
+            <span className="kole-avatar-idle-eye">
+              <span className="kole-avatar-idle-eye-shape" />
+            </span>
+            <span className="kole-avatar-idle-eye">
+              <span className="kole-avatar-idle-eye-shape" />
+            </span>
+            <span className="kole-avatar-idle-mouth" />
+          </>
+        )}
       </span>
     </span>
   );
@@ -189,7 +212,7 @@ export default function KoleAgent({
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">AI Chat</p>
                 <h2 id="kole-agent-heading" className="truncate text-base font-black text-slate-900 dark:text-white">
-                  Ask Kole
+                  Ask Ko-le
                 </h2>
               </div>
             </div>
@@ -207,7 +230,7 @@ export default function KoleAgent({
             {isFresh ? (
               <div className="flex min-h-44 flex-col items-center justify-center text-center">
                 <KoleAvatar size="lg" decorative />
-                <p className="mt-4 text-lg font-black tracking-tight text-slate-900 dark:text-white">Ask Kole anything</p>
+                <p className="mt-4 text-lg font-black tracking-tight text-slate-900 dark:text-white">Ask Ko-le anything</p>
                 <p className="mt-1 max-w-xs text-xs font-semibold leading-relaxed text-slate-400">
                   I can turn a giant reviewer into a friendly little game plan.
                 </p>
@@ -232,7 +255,7 @@ export default function KoleAgent({
                 ))}
                 {isSending && (
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-                    <KoleAvatar size="sm" decorative />
+                    <KoleAvatar size="sm" emotion="thinking" decorative />
                     <span className="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-slate-100 px-3.5 py-2.5 dark:bg-white/10">
                       <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Kole is thinking...
                     </span>
@@ -268,7 +291,7 @@ export default function KoleAgent({
                   onChange={(event) => setSelectedQuizId(event.target.value)}
                   className="w-full appearance-none truncate rounded-lg border border-transparent bg-transparent py-1 pr-6 text-[10px] font-black text-slate-400 outline-none transition hover:border-slate-200 focus:border-primary dark:hover:border-white/15"
                 >
-                  <option value="">Use my visible sets ({quizOptions.length})</option>
+                  <option value="">My Sets ({quizOptions.length})</option>
                   {quizOptions.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.title} · {option.scope} · {option.subjectName}
@@ -310,12 +333,12 @@ export default function KoleAgent({
           onClick={() => setIsOpen(true)}
           aria-label="Open Kole study buddy"
           aria-expanded={isOpen}
-          className="group relative flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-sky-400 to-primary p-0.5 shadow-xl ring-2 ring-primary/10 transition duration-200 hover:-translate-y-1 hover:scale-105 hover:ring-primary/25 focus:outline-none focus:ring-4 focus:ring-primary/40"
+          className="group relative flex h-12 w-12 items-center justify-center rounded-full border-0 bg-transparent p-0 shadow-none ring-0 transition duration-200 hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-primary/40"
         >
-          <KoleAvatar size="sm" decorative />
+          <KoleAvatar size="sm" animated decorative />
           <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400" aria-hidden="true" />
           <span className="pointer-events-none absolute bottom-full right-0 mb-3 translate-y-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] font-black text-white opacity-0 shadow-lg transition group-hover:translate-y-0 group-hover:opacity-100">
-            Ask Kole
+            Ask Ko-le
           </span>
         </button>
       )}

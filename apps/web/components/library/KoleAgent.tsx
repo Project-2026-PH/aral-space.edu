@@ -100,6 +100,10 @@ export default function KoleAgent({
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
+  const [typedContent, setTypedContent] = useState<Record<string, string>>({});
+  const typedMessageIdsRef = useRef(new Set<string>());
+  const typingTimerRef = useRef<number | null>(null);
 
   const quizOptions = useMemo(() => {
     const subjectNames = new Map<string, string>([
@@ -145,8 +149,66 @@ export default function KoleAgent({
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) {
+      if (typingMessageId) {
+        const message = messages.find((item) => item.id === typingMessageId);
+        if (message) {
+          typedMessageIdsRef.current.add(message.id);
+          setTypedContent((current) => ({ ...current, [message.id]: message.content }));
+        }
+        setTypingMessageId(null);
+      }
+      return;
+    }
+
+    if (typingMessageId) return;
+
+    const nextMessage = messages.find(
+      (message) => message.role === 'assistant' && !typedMessageIdsRef.current.has(message.id),
+    );
+    if (!nextMessage) return;
+
+    setTypingMessageId(nextMessage.id);
+    setTypedContent((current) => ({ ...current, [nextMessage.id]: '' }));
+  }, [isOpen, messages, typingMessageId]);
+
+  useEffect(() => {
+    if (!isOpen || !typingMessageId) return;
+
+    const message = messages.find((item) => item.id === typingMessageId);
+    if (!message) return;
+
+    let characterIndex = 0;
+    typingTimerRef.current = window.setInterval(() => {
+      characterIndex += 1;
+      setTypedContent((current) => ({
+        ...current,
+        [message.id]: message.content.slice(0, characterIndex),
+      }));
+
+      if (characterIndex >= message.content.length) {
+        if (typingTimerRef.current !== null) window.clearInterval(typingTimerRef.current);
+        typingTimerRef.current = null;
+        typedMessageIdsRef.current.add(message.id);
+        setTypingMessageId(null);
+      }
+    }, 22);
+
+    return () => {
+      if (typingTimerRef.current !== null) {
+        window.clearInterval(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+    };
+  }, [isOpen, typingMessageId]);
+
+  useEffect(() => () => {
+    if (typingTimerRef.current !== null) window.clearInterval(typingTimerRef.current);
+  }, []);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [messages, isSending]);
+  }, [messages, isSending, typedContent]);
 
   const sendMessage = async (rawMessage: string) => {
     const message = rawMessage.trim();
@@ -195,7 +257,7 @@ export default function KoleAgent({
     void sendMessage(input);
   };
 
-  const isFresh = messages.length === 1;
+  const isFresh = messages.length === 0;
 
   return (
     <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-[90] sm:bottom-[calc(5.5rem+env(safe-area-inset-bottom))] sm:right-5 lg:bottom-5">
@@ -250,7 +312,7 @@ export default function KoleAgent({
                             : 'rounded-bl-md bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-100'
                         }`}
                       >
-                        {message.content}
+                        {message.id === typingMessageId ? typedContent[message.id] : message.content}
                       </p>
                     </div>
                   </div>

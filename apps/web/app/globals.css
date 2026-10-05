@@ -1185,3 +1185,107 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     zoom: calc(1 / var(--document-zoom));
   }
 }
+
+
+/* Kole study buddy */
+.kole-avatar {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 18%;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 45% 45% 42% 42%;
+  background: linear-gradient(145deg, #60a5fa 0%, #3b82f6 54%, #2563eb 100%);
+  box-shadow: 0 0 22px rgba(59, 130, 246, 0.36), inset 0 1px 10px rgba(255, 255, 255, 0.22);
+  vertical-align: middle;
+}
+
+.kole-avatar::before {
+  position: absolute;
+  inset: 10% 14% auto;
+  height: 30%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  content: '';
+  filter: blur(5px);
+}
+
+.kole-avatar-tail {
+  position: absolute;
+  right: 12%;
+  bottom: -24%;
+  width: 36%;
+  height: 38%;
+  background: #2563eb;
+  clip-path: polygon(0 0, 100% 100%, 100% 0);
+  filter: drop-shadow(0 2px 2px rgba(37, 99, 235, 0.18));
+}
+
+.kole-avatar-eye {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20%;
+  height: 47%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.kole-avatar-pupil {
+  width: 31%;
+  height: 31%;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.55);
+  animation: kole-eye-scan 2.8s ease-in-out infinite;
+}
+
+.kole-avatar-pupil--delayed {
+  animation-delay: -1.35s;
+}
+
+.kole-avatar--sm {
+  width: 2.25rem;
+  height: 2rem;
+}
+
+.kole-avatar--md {
+  width: 4.6rem;
+  height: 3.8rem;
+}
+
+.kole-avatar--lg {
+  width: 5.8rem;
+  height: 4.8rem;
+}
+
+@keyframes kole-eye-scan {
+  0%,
+  100% {
+    transform: translateX(-35%);
+  }
+
+  48%,
+  58% {
+    transform: translateX(35%);
+  }
+}
+
+.kole-chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.35) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kole-avatar-pupil,
+  .kole-suggestion {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+    transition-duration: 1ms;
+  }
+}

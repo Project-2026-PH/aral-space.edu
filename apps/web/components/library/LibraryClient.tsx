@@ -30,6 +30,7 @@ const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizMo
   ssr: false,
 });
 import FloatingBottomNav from '@/components/navigation/FloatingBottomNav';
+import KoleAgent from '@/components/library/KoleAgent';
 import { useSynchronizedLibraryCollections, publishLibraryMutation } from '@/lib/libraryMutationStore';
 
 export interface LibraryClientProps {
@@ -533,6 +534,13 @@ export default function LibraryClient({
           </div>
         </div>
       </section>
+
+      <KoleAgent
+        quizzes={synchronizedLibrary.quizzes}
+        sharedQuizzes={synchronizedLibrary.sharedQuizzes}
+        subjects={synchronizedLibrary.subjects}
+        sharedSubjects={synchronizedLibrary.sharedSubjects}
+      />
 
       {activeView === 'overview' && hasSearch && (
         <section className="space-y-4" aria-labelledby="library-search-results-heading">

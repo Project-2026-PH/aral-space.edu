@@ -62,6 +62,16 @@ function KoleAvatar({
       aria-label={decorative ? undefined : 'Kole, your study buddy'}
       aria-hidden={decorative || undefined}
     >
+      <span className="kole-avatar-hat" aria-hidden="true">
+        <span className="kole-avatar-hat-board" />
+        <span className="kole-avatar-hat-band" />
+        <span className="kole-avatar-hat-cord" />
+        <span className="kole-avatar-hat-button" />
+        <span className="kole-avatar-hat-tassel">
+          <span className="kole-avatar-hat-tassel-cap" />
+          <span className="kole-avatar-hat-tassel-fringe" />
+        </span>
+      </span>
       <span className="kole-avatar-face" aria-hidden="true">
         {emotion === 'thinking' ? (
           <>

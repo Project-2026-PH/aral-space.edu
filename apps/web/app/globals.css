@@ -1198,6 +1198,7 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   aspect-ratio: 1;
   border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 50%;
+  overflow: visible;
   background:
     radial-gradient(circle at 34% 17%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 25%),
     radial-gradient(circle at 50% 22%, #c8baff 0%, #917cf4 27%, #6d56ed 56%, #6379ee 79%, #6bd8f1 100%);
@@ -1229,6 +1230,236 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(113, 224, 247, 0.48);
   content: '';
   filter: blur(7px);
+}
+
+/* ==========================================================================
+   Kole graduation cap — same class names / markup, CSS only.
+   Structure assumed:
+   .kole-avatar-hat
+     ├ .kole-avatar-hat-band
+     ├ .kole-avatar-hat-board
+     ├ .kole-avatar-hat-button
+     ├ .kole-avatar-hat-cord
+     └ .kole-avatar-hat-tassel
+         ├ .kole-avatar-hat-tassel-cap     (knot)
+         └ .kole-avatar-hat-tassel-fringe  (skirt)
+   ========================================================================== */
+
+.kole-avatar-hat {
+  /* Indigo-tinted instead of pure black so it doesn't vanish on a dark UI */
+  --hat-top-a: #4b5190;
+  --hat-top-b: #272b57;
+  --hat-edge: #0d0f26;
+  --hat-gold-light: #ffe08a;
+  --hat-gold: #e0a830;
+  --hat-gold-dark: #a8741a;
+
+  position: absolute;
+  z-index: 4;
+  top: -14%;
+  left: 50%;
+  width: 94%;
+  height: 48%;
+  transform: translateX(-50%) rotate(-4deg) translateY(-30%);
+  transition: transform 0.3s ease;
+  pointer-events: none;
+  /* drop-shadow on the parent so it follows the clipped (diamond) shapes */
+  filter: drop-shadow(0 0.12rem 0.12rem rgba(0, 0, 0, 0.45));
+}
+
+/* Lighter tones in dark mode (adjust selector if you use data-theme) */
+.dark .kole-avatar-hat {
+  --hat-top-a: #5d65b5;
+  --hat-top-b: #343a73;
+  --hat-edge: #1a1d4a;
+}
+
+/* ---------- Board: diamond top face + visible thickness ---------- */
+.kole-avatar-hat-board {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 56%;
+  background: var(--hat-edge); /* this is the board's thickness */
+  clip-path: polygon(50% 0, 100% 52%, 50% 100%, 0 52%);
+}
+
+.kole-avatar-hat-board::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 9% 0;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, transparent 38%),
+    linear-gradient(160deg, var(--hat-top-a), var(--hat-top-b));
+  clip-path: polygon(50% 0, 100% 52%, 50% 100%, 0 52%);
+}
+
+/* ---------- Band: the part that sits on the head ---------- */
+.kole-avatar-hat-band {
+  position: absolute;
+  z-index: 1;
+  top: 34%;
+  left: 25%;
+  width: 50%;
+  height: 52%;
+  border-radius: 8% 8% 50% 50% / 8% 8% 70% 70%;
+  background: linear-gradient(180deg, var(--hat-top-b), var(--hat-edge));
+}
+
+/* ---------- Button: gold, at the centre of the board ---------- */
+.kole-avatar-hat-button {
+  position: absolute;
+  z-index: 4;
+  top: 16%;
+  left: 50%;
+  width: 10%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    var(--hat-gold-light),
+    var(--hat-gold) 60%,
+    var(--hat-gold-dark)
+  );
+}
+
+/* ---------- Cord: lies on the board, so it stays still ---------- */
+.kole-avatar-hat-cord {
+  position: absolute;
+  z-index: 3;
+  top: 25.5%;
+  left: 50%;
+  width: 49%;
+  height: 1.5px;
+  transform: rotate(2deg);
+  transform-origin: left center;
+  border-radius: 1px;
+  background: linear-gradient(90deg, var(--hat-gold-dark), var(--hat-gold-light));
+}
+
+/* ---------- Tassel: cord → knot → fringe, hanging from the corner ---------- */
+.kole-avatar-hat-tassel {
+  position: absolute;
+  z-index: 3;
+  top: 28%;
+  left: 100%;
+  width: 17%;
+  height: 66%;
+  margin-left: -8.5%;
+  transform-origin: 50% 0; /* pivot where it attaches */
+  animation: kole-hat-tassel-sway 3.2s ease-in-out infinite;
+}
+
+/* the thin drop cord above the knot */
+.kole-avatar-hat-tassel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1.5px;
+  height: 36%;
+  transform: translateX(-50%);
+  background: var(--hat-gold);
+}
+
+.kole-avatar-hat-tassel-cap {
+  position: absolute;
+  z-index: 2;
+  top: 28%;
+  left: 50%;
+  width: 56%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    var(--hat-gold-light),
+    var(--hat-gold) 60%,
+    var(--hat-gold-dark)
+  );
+}
+
+.kole-avatar-hat-tassel-fringe {
+  position: absolute;
+  z-index: 1;
+  top: 44%;
+  left: 0;
+  width: 100%;
+  height: 56%;
+  transform-origin: 50% 0;
+  clip-path: polygon(28% 0, 72% 0, 100% 100%, 0 100%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(120, 70, 0, 0.25)),
+    repeating-linear-gradient(90deg, var(--hat-gold-light) 0 1px, var(--hat-gold) 1px 2px);
+  /* skirt lags slightly behind the tassel = more natural swing */
+  animation: kole-hat-fringe-sway 3.2s ease-in-out -0.35s infinite;
+}
+
+/* Small avatar: 1px strands turn to noise, use a smooth gradient instead */
+.kole-avatar--sm .kole-avatar-hat-tassel {
+  width: 20%;
+  margin-left: -10%;
+}
+.kole-avatar--sm .kole-avatar-hat-tassel-fringe {
+  background: linear-gradient(180deg, var(--hat-gold-light), var(--hat-gold-dark));
+}
+
+/* ---------- Idle motion ---------- */
+@keyframes kole-hat-tassel-sway {
+  0%, 100% { transform: rotate(-7deg); }
+  50%      { transform: rotate(9deg); }
+}
+
+@keyframes kole-hat-fringe-sway {
+  0%, 100% { transform: rotate(5deg); }
+  50%      { transform: rotate(-6deg); }
+}
+
+/* ---------- Emotion states ---------- */
+
+/* Thinking: head-tilt + the tassel fidgets faster */
+.kole-avatar--emotion-thinking .kole-avatar-hat {
+  transform: translateX(-50%) rotate(-9deg) translateY(-30%);
+}
+.kole-avatar--emotion-thinking .kole-avatar-hat-tassel,
+.kole-avatar--emotion-thinking .kole-avatar-hat-tassel-fringe {
+  animation-duration: 1.4s;
+}
+
+/* Happy (new emotion): small hop when a card is marked "Got it" */
+.kole-avatar--emotion-happy .kole-avatar-hat {
+  animation: kole-hat-hop 0.7s ease-out 1;
+}
+@keyframes kole-hat-hop {
+  0%, 100% { transform: translateX(-50%) rotate(-4deg) translateY(-30%); }
+  35%      { transform: translateX(-50%) rotate(-10deg) translateY(-62%); }
+  60%      { transform: translateX(-50%) rotate(2deg) translateY(-48%); }
+  80%      { transform: translateX(-50%) rotate(-4deg) translateY(-26%); }
+}
+
+/* Cheering (new emotion): graduation toss for a cleared round / streak.
+   Best on the launcher or large avatar — the modal header clips overflow. */
+.kole-avatar--emotion-cheering .kole-avatar-hat {
+  animation: kole-hat-toss 1.2s cubic-bezier(0.3, 0.7, 0.4, 1) 1;
+}
+@keyframes kole-hat-toss {
+  0%   { transform: translateX(-50%) rotate(-4deg) translateY(-30%); }
+  15%  { transform: translateX(-50%) rotate(-4deg) translateY(-18%) scaleY(0.92); }
+  55%  { transform: translateX(-50%) rotate(300deg) translateY(-210%); }
+  100% { transform: translateX(-50%) rotate(356deg) translateY(-30%); }
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .kole-avatar-hat,
+  .kole-avatar-hat-tassel,
+  .kole-avatar-hat-tassel-fringe {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 .kole-avatar-face {
@@ -1328,6 +1559,28 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   transform: translateX(-50%);
   background: radial-gradient(circle, rgba(255, 255, 255, 0.92) 0 30%, transparent 34%) 0 50% / 33.333% 100% repeat-x;
   opacity: 0.78;
+}
+
+@keyframes kole-hat-cord-sway {
+  0%,
+  100% {
+    transform: rotate(-24deg);
+  }
+
+  50% {
+    transform: rotate(-18deg);
+  }
+}
+
+@keyframes kole-hat-tassel-sway {
+  0%,
+  100% {
+    transform: rotate(-5deg) translateY(0);
+  }
+
+  50% {
+    transform: rotate(7deg) translateY(2%);
+  }
 }
 
 @keyframes kole-idle-face {
@@ -1502,6 +1755,8 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   }
 
   .kole-avatar--emotion-idle .kole-avatar-face,
+  .kole-avatar-hat-cord,
+  .kole-avatar-hat-tassel,
   .kole-avatar-idle-eye,
   .kole-avatar-idle-eye-shape,
   .kole-avatar-idle-mouth {

@@ -19,10 +19,10 @@ export function convertToQuestion(text: string, term: string): string {
   let result = text.replace(leadingPattern, 'Here, ');
 
   const predicatePattern = new RegExp(
-    `(\\b(?:is|are|was|were)\\s+)${escapedTerm}\\b`,
+    `(\\b(?:is|are|was|were)\\s+)${escapedTerm}\\b\\.?`,
     'i'
   );
-  result = result.replace(predicatePattern, '$1known as what');
+  result = result.replace(predicatePattern, '$1known as what?');
 
   const repeatedOpenerPattern = new RegExp(
     `\\b(In|With|During|For)\\s+${escapedTerm}\\b\\s*,?\\s*(?:we\\s+)?`,

@@ -26,7 +26,7 @@ describe('convertToQuestion', () => {
 
   it('transforms predicate and repeated mentions', () => {
     expect(convertToQuestion('This is photosynthesis. Photosynthesis needs light.', 'photosynthesis')).toBe(
-      'This is known as what. this process needs light. What is this operation called?'
+      'This is known as what? this process needs light. What is this operation called?'
     );
   });
 

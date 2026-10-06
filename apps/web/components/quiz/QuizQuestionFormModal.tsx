@@ -11,6 +11,7 @@ import { hasRichTextContent } from '@/lib/richText';
 import { parseSmartClipboard } from '@/lib/clipboardParser';
 import { parseWithSmolLM2 } from '@/lib/ai/localClipboardParser';
 import { createClipboardAuthoringCard, type ClipboardAuthoringCard } from '@/lib/clipboardAuthoring';
+import { createAuthoringUndoHistory } from '@/lib/authoringUndo';
 
 export type QuestionType = 'multiple_choice' | 'typed_answer' | 'identification' | 'true_false' | 'enumeration';
 
@@ -46,6 +47,18 @@ function detectQuestionType(question: QuizQuestion): QuestionType {
     return 'typed_answer';
   }
   return 'multiple_choice';
+}
+
+interface ModalAuthoringSnapshot {
+  type: QuestionType;
+  questionText: string;
+  options: string[];
+  correctAnswer: number;
+  answerText: string;
+  answerTerms: string[];
+  enumerationTotal: string;
+  enumerationDistractors: string[];
+  explanation: string;
 }
 
 interface QuizQuestionFormModalProps {
@@ -85,20 +98,77 @@ export default function QuizQuestionFormModal({
   const [error, setError] = useState<string | null>(null);
   const pasteRequestRef = useRef(0);
   const mountedRef = useRef(true);
+  const undoHistoryRef = useRef(createAuthoringUndoHistory<ModalAuthoringSnapshot>());
+
+  function recordModalSnapshot() {
+    undoHistoryRef.current.recordBeforeProgrammaticChange({
+      type,
+      questionText,
+      options,
+      correctAnswer,
+      answerText,
+      answerTerms,
+      enumerationTotal,
+      enumerationDistractors,
+      explanation
+    });
+  }
+
+  function clearModalSnapshots() {
+    undoHistoryRef.current.clear();
+  }
+
+  function handleModalUndo(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.defaultPrevented || (!event.ctrlKey && !event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (
+      !(
+        (target?.closest('input, textarea, [contenteditable="true"]') ||
+          target?.closest('[data-authoring-undo-target="true"]'))
+      ) ||
+      !undoHistoryRef.current.hasPendingSnapshot()
+    ) {
+      return;
+    }
+
+    const snapshot = undoHistoryRef.current.undoProgrammaticChange();
+    if (!snapshot) return;
+
+    event.preventDefault();
+    pasteRequestRef.current += 1;
+    setType(snapshot.type);
+    setQuestionText(snapshot.questionText);
+    setOptions(snapshot.options);
+    setCorrectAnswer(snapshot.correctAnswer);
+    setAnswerText(snapshot.answerText);
+    setAnswerTerms(snapshot.answerTerms);
+    setEnumerationTotal(snapshot.enumerationTotal);
+    setEnumerationDistractors(snapshot.enumerationDistractors);
+    setExplanation(snapshot.explanation);
+    undoHistoryRef.current.clear();
+  }
 
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen) pasteRequestRef.current += 1;
+    if (!nextOpen) {
+      pasteRequestRef.current += 1;
+      undoHistoryRef.current.clear();
+    }
     onOpenChange(nextOpen);
   }
 
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      undoHistoryRef.current.invalidate();
     };
   }, []);
 
   useEffect(() => {
     pasteRequestRef.current += 1;
+    undoHistoryRef.current.clear();
     if (question) {
       const detected = detectQuestionType(question);
       setType(detected);
@@ -145,6 +215,8 @@ export default function QuizQuestionFormModal({
   }, [question, open]);
 
   function handleTypeChange(newType: QuestionType) {
+    if (newType === type) return;
+    recordModalSnapshot();
     pasteRequestRef.current += 1;
     let newOptions = options;
     let newCorrect = correctAnswer;
@@ -185,6 +257,8 @@ export default function QuizQuestionFormModal({
   }
 
   function applyClipboardCard(card: ClipboardAuthoringCard) {
+    recordModalSnapshot();
+    pasteRequestRef.current += 1;
     setType('identification');
     setQuestionText(card.question);
     setOptions([card.answer]);
@@ -381,7 +455,7 @@ export default function QuizQuestionFormModal({
       title={isEditing ? 'Edit Question' : 'Add Question'}
       description="Configure question prompt, category mode, and correct answers."
     >
-      <div className="space-y-4">
+      <div className="space-y-4" onKeyDownCapture={handleModalUndo}>
         {error && (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-xs font-semibold text-destructive">
             {error}
@@ -401,7 +475,8 @@ export default function QuizQuestionFormModal({
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => handleTypeChange(t.id)}
+                  data-authoring-undo-target="true"
+              onClick={() => handleTypeChange(t.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                     isActive
                       ? 'bg-primary text-white shadow-sm shadow-primary/30 ring-2 ring-primary/20 scale-100'
@@ -423,6 +498,7 @@ export default function QuizQuestionFormModal({
             <RichTextEditor
               value={questionText}
               onChange={(value) => {
+                clearModalSnapshots();
                 pasteRequestRef.current += 1;
                 setQuestionText(value);
               }}
@@ -480,6 +556,7 @@ export default function QuizQuestionFormModal({
                       value={opt}
                       onChange={(e) => {
                         e.stopPropagation();
+                        clearModalSnapshots();
                         pasteRequestRef.current += 1;
                         const next = [...options];
                         next[idx] = e.target.value;
@@ -550,6 +627,7 @@ export default function QuizQuestionFormModal({
               placeholder="e.g. Photosynthesis"
               value={answerText}
               onChange={(e) => {
+                clearModalSnapshots();
                 pasteRequestRef.current += 1;
                 setAnswerText(e.target.value);
               }}
@@ -572,6 +650,7 @@ export default function QuizQuestionFormModal({
               placeholder="e.g. Photosynthesis"
               value={options[0] || ''}
               onChange={(e) => {
+                clearModalSnapshots();
                 pasteRequestRef.current += 1;
                 setOptions([e.target.value]);
                 setAnswerText(e.target.value);
@@ -587,28 +666,28 @@ export default function QuizQuestionFormModal({
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">Total terms</label>
-                <input type="number" min="1" step="1" value={enumerationTotal} onChange={(event) => { pasteRequestRef.current += 1; setEnumerationTotal(event.target.value); }} className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-none" />
+                <input type="number" min="1" step="1" value={enumerationTotal} onChange={(event) => { clearModalSnapshots(); pasteRequestRef.current += 1; setEnumerationTotal(event.target.value); }} className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-none" />
               </div>
               <div className="flex items-end pb-1 text-[11px] text-muted-foreground">Options are stored empty; terms are the canonical answer key.</div>
             </div>
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Answer terms</label>
-              <button type="button" onClick={() => setAnswerTerms([...answerTerms, ''])} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Plus className="h-3.5 w-3.5" />Add term</button>
+              <button type="button" onClick={() => { clearModalSnapshots(); setAnswerTerms([...answerTerms, '']); }} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Plus className="h-3.5 w-3.5" />Add term</button>
             </div>
             <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
               {answerTerms.map((term, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-muted text-[11px] font-bold text-muted-foreground">{index + 1}</span>
-                  <input type="text" placeholder={`Term #${index + 1}`} value={term} onChange={(event) => { pasteRequestRef.current += 1; const next = [...answerTerms]; next[index] = event.target.value; setAnswerTerms(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none" />
-                  {answerTerms.length > 1 && <button type="button" onClick={() => setAnswerTerms(answerTerms.filter((_, itemIndex) => itemIndex !== index))} className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>}
+                  <input type="text" placeholder={`Term #${index + 1}`} value={term} onChange={(event) => { clearModalSnapshots(); pasteRequestRef.current += 1; const next = [...answerTerms]; next[index] = event.target.value; setAnswerTerms(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none" />
+                  {answerTerms.length > 1 && <button type="button" onClick={() => { clearModalSnapshots(); setAnswerTerms(answerTerms.filter((_, itemIndex) => itemIndex !== index)); }} className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>}
                 </div>
               ))}
             </div>
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Distractors (optional)</label>
-              <button type="button" onClick={() => setEnumerationDistractors([...enumerationDistractors, ''])} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Plus className="h-3.5 w-3.5" />Add distractor</button>
+              <button type="button" onClick={() => { clearModalSnapshots(); setEnumerationDistractors([...enumerationDistractors, '']); }} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Plus className="h-3.5 w-3.5" />Add distractor</button>
             </div>
-            {enumerationDistractors.map((term, index) => <div key={index} className="flex items-center gap-2"><input type="text" placeholder="Wrong choice" value={term} onChange={(event) => { pasteRequestRef.current += 1; const next = [...enumerationDistractors]; next[index] = event.target.value; setEnumerationDistractors(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none" /><button type="button" onClick={() => setEnumerationDistractors(enumerationDistractors.filter((_, itemIndex) => itemIndex !== index))} className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button></div>)}
+            {enumerationDistractors.map((term, index) => <div key={index} className="flex items-center gap-2"><input type="text" placeholder="Wrong choice" value={term} onChange={(event) => { clearModalSnapshots(); pasteRequestRef.current += 1; const next = [...enumerationDistractors]; next[index] = event.target.value; setEnumerationDistractors(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none" /><button type="button" onClick={() => setEnumerationDistractors(enumerationDistractors.filter((_, itemIndex) => itemIndex !== index))} className="rounded-lg p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button></div>)}
           </div>
         )}
 
@@ -619,6 +698,7 @@ export default function QuizQuestionFormModal({
           <RichTextEditor
             value={explanation}
             onChange={(value) => {
+              clearModalSnapshots();
               pasteRequestRef.current += 1;
               setExplanation(value);
             }}

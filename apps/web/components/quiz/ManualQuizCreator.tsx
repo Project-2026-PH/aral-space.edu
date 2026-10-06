@@ -13,6 +13,7 @@ import { QuizTransformService } from '@quiz-creator/core';
 import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { hasRichTextContent, richTextToPlainText, normalizeRichTextHtml } from '@/lib/richText';
+import { createAuthoringUndoHistory } from '@/lib/authoringUndo';
 
 export type QuestionType = 'multiple_choice' | 'identification' | 'true_false' | 'enumeration';
 
@@ -39,6 +40,11 @@ interface ManualQuizDraft {
   description: string;
   term?: string;
   subjectId: string;
+  questions: QuestionDraft[];
+}
+
+interface ManualAuthoringSnapshot {
+  term: string;
   questions: QuestionDraft[];
 }
 
@@ -142,11 +148,47 @@ export default function ManualQuizCreator({
   const [draftStatus, setDraftStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const pasteRequestRef = useRef(0);
   const mountedRef = useRef(true);
+  const undoHistoryRef = useRef(createAuthoringUndoHistory<ManualAuthoringSnapshot>());
+
+  function recordManualSnapshot() {
+    undoHistoryRef.current.recordBeforeProgrammaticChange({ term, questions });
+  }
+
+  function clearManualSnapshots() {
+    undoHistoryRef.current.clear();
+  }
+
+  function handleManualUndo(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.defaultPrevented || (!event.ctrlKey && !event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (
+      !(
+        ((target?.closest('[data-question-index]') && target.closest('input, textarea, [contenteditable="true"]')) ||
+          target?.closest('[data-authoring-undo-target="true"]'))
+      ) ||
+      !undoHistoryRef.current.hasPendingSnapshot()
+    ) {
+      return;
+    }
+
+    const snapshot = undoHistoryRef.current.undoProgrammaticChange();
+    if (!snapshot) return;
+
+    event.preventDefault();
+    pasteRequestRef.current += 1;
+    setTerm(snapshot.term);
+    setQuestions(snapshot.questions);
+    undoHistoryRef.current.clear();
+  }
 
   useEffect(() => {
     return () => {
       mountedRef.current = false;
       pasteRequestRef.current += 1;
+      undoHistoryRef.current.invalidate();
     };
   }, []);
 
@@ -211,6 +253,7 @@ export default function ManualQuizCreator({
       }
     }
     setTerm(trimmed);
+    clearManualSnapshots();
     setCustomTermInput('');
     setShowCustomTermInput(false);
   }
@@ -270,9 +313,10 @@ export default function ManualQuizCreator({
 
   function restoreDraft() {
     if (!draftRecovery) return;
+    recordManualSnapshot();
     setTitle(draftRecovery.title);
     setDescription(draftRecovery.description);
-    if (draftRecovery.term) setTerm(draftRecovery.term);
+    setTerm(draftRecovery.term || '');
     setSubjectId(draftRecovery.subjectId);
     setQuestions(draftRecovery.questions);
     setDraftRecovery(null);
@@ -284,12 +328,14 @@ export default function ManualQuizCreator({
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(MANUAL_DRAFT_STORAGE_KEY);
     }
+    undoHistoryRef.current.clear();
     setDraftRecovery(null);
     setDraftHydrated(true);
     setDraftStatus('idle');
   }
   function moveQuestion(fromIndex: number, toIndex: number) {
     if (toIndex < 0 || toIndex >= questions.length || fromIndex === toIndex) return;
+    undoHistoryRef.current.clear();
     pasteRequestRef.current += 1;
     const next = [...questions];
     const [moved] = next.splice(fromIndex, 1);
@@ -298,6 +344,7 @@ export default function ManualQuizCreator({
   }
 
   function addQuestion() {
+    undoHistoryRef.current.clear();
     pasteRequestRef.current += 1;
     setQuestions((current) => [
       ...current,
@@ -313,14 +360,17 @@ export default function ManualQuizCreator({
 
   function removeQuestion(index: number) {
     if (questions.length <= 1) return;
+    undoHistoryRef.current.clear();
     pasteRequestRef.current += 1;
     setQuestions((current) => current.filter((_, i) => i !== index));
   }
 
   function setQuestionType(index: number, type: QuestionType) {
+    const current = questions[index];
+    if (!current || current.type === type) return;
+    recordManualSnapshot();
     pasteRequestRef.current += 1;
     const next = [...questions];
-    const current = next[index];
     let newOptions = current.options;
     let newCorrect = current.correct_answer;
     let newQuestionText = current.question_text;
@@ -376,6 +426,7 @@ export default function ManualQuizCreator({
   }
 
   function updateQuestionText(index: number, text: string) {
+    clearManualSnapshots();
     pasteRequestRef.current += 1;
     const next = [...questions];
     next[index].question_text = text;
@@ -383,12 +434,14 @@ export default function ManualQuizCreator({
   }
 
   function updateExplanation(index: number, text: string) {
+    clearManualSnapshots();
     const next = [...questions];
     next[index].explanation = text;
     setQuestions(next);
   }
 
   function updateOptionText(qIdx: number, optIdx: number, val: string) {
+    clearManualSnapshots();
     pasteRequestRef.current += 1;
     const next = [...questions];
     next[qIdx].options[optIdx] = val;
@@ -396,6 +449,7 @@ export default function ManualQuizCreator({
   }
 
   function addEnumerationItem(qIdx: number) {
+    clearManualSnapshots();
     const next = [...questions];
     next[qIdx].answer_terms = [...(next[qIdx].answer_terms || []), ''];
     setQuestions(next);
@@ -405,11 +459,13 @@ export default function ManualQuizCreator({
     const next = [...questions];
     const terms = next[qIdx].answer_terms || [];
     if (terms.length <= 1) return;
+    clearManualSnapshots();
     next[qIdx].answer_terms = terms.filter((_, i) => i !== optIdx);
     setQuestions(next);
   }
 
   function setCorrectOption(qIdx: number, optIdx: number) {
+    clearManualSnapshots();
     const next = [...questions];
     next[qIdx].correct_answer = optIdx;
     setQuestions(next);
@@ -417,6 +473,8 @@ export default function ManualQuizCreator({
 
   function applyClipboardCard(qIdx: number, card: ClipboardAuthoringCard, target?: HTMLElement) {
     if (!questions[qIdx]) return;
+    recordManualSnapshot();
+    pasteRequestRef.current += 1;
     if (card.question && target?.closest('[contenteditable="true"]')) {
       target.closest<HTMLElement>('[contenteditable="true"]')!.innerHTML = normalizeRichTextHtml(card.question);
     }
@@ -442,6 +500,7 @@ export default function ManualQuizCreator({
   function cancelPendingImport() {
     if (!pendingImport) return;
 
+    recordManualSnapshot();
     const { rawText, questionIndex } = pendingImport;
     setQuestions((prev) => {
       if (!prev[questionIndex] || !rawText) return prev;
@@ -542,6 +601,7 @@ export default function ManualQuizCreator({
   function applyPendingImport() {
     if (!pendingImport) return;
 
+    recordManualSnapshot();
     const targetIndex = pendingImport.questionIndex;
     const appendOrReplaceEmptyTarget = (newCards: QuestionDraft[]) => {
       setQuestions((prev) => {
@@ -726,6 +786,7 @@ export default function ManualQuizCreator({
 
   return (
     <div
+      onKeyDownCapture={handleManualUndo}
       onPaste={handleContainerPaste}
       className="max-w-4xl mx-auto space-y-6 pb-32 sm:pb-36 relative"
     >
@@ -780,6 +841,7 @@ export default function ManualQuizCreator({
             </button>
             <button
               type="button"
+              data-authoring-undo-target="true"
               onClick={applyPendingImport}
               className="px-5 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-md shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
             >
@@ -834,6 +896,7 @@ export default function ManualQuizCreator({
             </button>
             <button
               type="button"
+              data-authoring-undo-target="true"
               onClick={restoreDraft}
               className="rounded-xl bg-primary px-3 py-1.5 font-bold text-white transition-colors hover:bg-primary/90"
             >
@@ -869,7 +932,10 @@ export default function ManualQuizCreator({
                 type="text"
                 placeholder="e.g. Molecular Biology Core Concepts"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  clearManualSnapshots();
+                  setTitle(e.target.value);
+                }}
                 className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
               />
             </div>
@@ -881,7 +947,10 @@ export default function ManualQuizCreator({
                 type="text"
                 placeholder="Brief summary of what this reviewer covers"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  clearManualSnapshots();
+                  setDescription(e.target.value);
+                }}
                 className="w-full rounded-2xl border border-border bg-background px-4 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
               />
             </div>
@@ -904,7 +973,10 @@ export default function ManualQuizCreator({
             <div className="relative flex items-center">
               <select
                 value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
+                onChange={(e) => {
+                  clearManualSnapshots();
+                  setSubjectId(e.target.value);
+                }}
                 aria-busy={subjectsLoading}
                 className="w-full rounded-2xl border border-border bg-background pl-4 pr-8 py-2.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none cursor-pointer"
               >
@@ -980,7 +1052,10 @@ export default function ManualQuizCreator({
                       type="text"
                       placeholder="e.g. Prelim, 1st Grading..."
                       value={customTermInput}
-                      onChange={(e) => setCustomTermInput(e.target.value)}
+                      onChange={(e) => {
+                        clearManualSnapshots();
+                        setCustomTermInput(e.target.value);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
@@ -1010,6 +1085,7 @@ export default function ManualQuizCreator({
                   <select
                     value={term}
                     onChange={(e) => {
+                      clearManualSnapshots();
                       if (e.target.value === '__custom__') {
                         setShowCustomTermInput(true);
                       } else {
@@ -1140,6 +1216,7 @@ export default function ManualQuizCreator({
                       <button
                         key={t.id}
                         type="button"
+                        data-authoring-undo-target="true"
                         onClick={() => setQuestionType(qIdx, t.id)}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${isActive
                           ? 'bg-primary text-white shadow-sm shadow-primary/30 ring-2 ring-primary/20 scale-100'
@@ -1289,17 +1366,17 @@ export default function ManualQuizCreator({
               {q.type === 'enumeration' && (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <label className="space-y-1 text-[11px] font-semibold text-muted-foreground"><span className="block">Total terms</span><input type="number" min="1" step="1" value={q.enumeration_total || ''} onChange={(event) => { const next = [...questions]; next[qIdx].enumeration_total = Number(event.target.value); setQuestions(next); }} className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-none" /></label>
+                    <label className="space-y-1 text-[11px] font-semibold text-muted-foreground"><span className="block">Total terms</span><input type="number" min="1" step="1" value={q.enumeration_total || ''} onChange={(event) => { clearManualSnapshots(); const next = [...questions]; next[qIdx].enumeration_total = Number(event.target.value); setQuestions(next); }} className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-none" /></label>
                     <p className="self-end pb-2 text-[11px] text-muted-foreground">Options are saved as [] and answer terms are stored independently.</p>
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground"><span>Answer terms</span><button type="button" onClick={() => addEnumerationItem(qIdx)} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Plus className="h-3.5 w-3.5" />Add term</button></div>
                   <div className="space-y-2">
                     {(q.answer_terms || []).map((term, optIdx) => (
-                      <div key={optIdx} className="flex items-center gap-2"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-muted text-[11px] font-bold text-muted-foreground">{optIdx + 1}</span><input type="text" placeholder={`Term #${optIdx + 1}`} value={term} onChange={(event) => { const next = [...questions]; const terms = [...(next[qIdx].answer_terms || [])]; terms[optIdx] = event.target.value; next[qIdx].answer_terms = terms; setQuestions(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none" />{(q.answer_terms || []).length > 1 && <button type="button" onClick={() => removeEnumerationItem(qIdx, optIdx)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>}</div>
+                      <div key={optIdx} className="flex items-center gap-2"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-muted text-[11px] font-bold text-muted-foreground">{optIdx + 1}</span><input type="text" placeholder={`Term #${optIdx + 1}`} value={term} onChange={(event) => { clearManualSnapshots(); const next = [...questions]; const terms = [...(next[qIdx].answer_terms || [])]; terms[optIdx] = event.target.value; next[qIdx].answer_terms = terms; setQuestions(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none" />{(q.answer_terms || []).length > 1 && <button type="button" onClick={() => removeEnumerationItem(qIdx, optIdx)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>}</div>
                     ))}
                   </div>
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground"><span>Distractors (optional)</span><button type="button" onClick={() => { const next = [...questions]; next[qIdx].enumeration_distractors = [...(next[qIdx].enumeration_distractors || []), '']; setQuestions(next); }} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Plus className="h-3.5 w-3.5" />Add distractor</button></div>
-                  {(q.enumeration_distractors || []).map((term, index) => <div key={index} className="flex items-center gap-2"><input type="text" placeholder="Wrong choice" value={term} onChange={(event) => { const next = [...questions]; const distractors = [...(next[qIdx].enumeration_distractors || [])]; distractors[index] = event.target.value; next[qIdx].enumeration_distractors = distractors; setQuestions(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none" /><button type="button" onClick={() => { const next = [...questions]; next[qIdx].enumeration_distractors = (next[qIdx].enumeration_distractors || []).filter((_, itemIndex) => itemIndex !== index); setQuestions(next); }} className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button></div>)}
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground"><span>Distractors (optional)</span><button type="button" onClick={() => { clearManualSnapshots(); const next = [...questions]; next[qIdx].enumeration_distractors = [...(next[qIdx].enumeration_distractors || []), '']; setQuestions(next); }} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Plus className="h-3.5 w-3.5" />Add distractor</button></div>
+                  {(q.enumeration_distractors || []).map((term, index) => <div key={index} className="flex items-center gap-2"><input type="text" placeholder="Wrong choice" value={term} onChange={(event) => { clearManualSnapshots(); const next = [...questions]; const distractors = [...(next[qIdx].enumeration_distractors || [])]; distractors[index] = event.target.value; next[qIdx].enumeration_distractors = distractors; setQuestions(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none" /><button type="button" onClick={() => { clearManualSnapshots(); const next = [...questions]; next[qIdx].enumeration_distractors = (next[qIdx].enumeration_distractors || []).filter((_, itemIndex) => itemIndex !== index); setQuestions(next); }} className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button></div>)}
                 </div>
               )}
             </div>

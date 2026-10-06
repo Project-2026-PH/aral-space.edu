@@ -1,0 +1,39 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Add scoped programmatic snapshots and Ctrl+Z restoration for manual creation and add/edit question forms while preserving native input and contentEditable undo.",
+  "status": "completed",
+  "steps": [
+    "Create a bounded typed undo snapshot utility with record-before-change, restore, and clear/invalidate operations; add pure tests for complete card/manual state restoration and empty/bounded behavior.",
+    "Record snapshots before parser/converter applications, bulk replacements, text-rewriting type changes, accepted local-AI fallbacks, and manual draft state replacements in ManualQuizCreator.tsx and QuizQuestionFormModal.tsx.",
+    "Handle Ctrl+Z/Cmd+Z at the active form boundary only when a programmatic snapshot is pending and the event was not already default-prevented; otherwise allow native input or existing RichTextEditor document.execCommand undo.",
+    "Clear stale history on modal close, question load/change, draft reset, and restored state, then run focused tests, typecheck, build, and browser checks."
+  ],
+  "acceptance_criteria": [
+    "After a parser/converter change in manual creation, Ctrl+Z restores the previous question text, target term/options, and relevant quiz term state.",
+    "After a parser/converter change in add or edit modal, Ctrl+Z restores the previous question text and answer/options/explanation as one card unit.",
+    "Native Ctrl+Z in ordinary inputs and RichTextEditor remains available, and unrelated controls are not intercepted by a document-wide listener.",
+    "Stale async SmolLM2 output cannot overwrite a user edit or an undo-restored state.",
+    "Undo helper tests, web typecheck, web build, and full Vitest pass."
+  ],
+  "verification": [
+    "pnpm vitest run apps/web/lib/__tests__/authoringUndo.test.ts",
+    "pnpm --filter @quiz-creator/web typecheck",
+    "pnpm --filter @quiz-creator/web build",
+    "pnpm vitest run",
+    "Browser Ctrl+Z checks in manual creation, add-question, and edit-question flows"
+  ],
+  "blocked_reason": null,
+  "findings": "Implemented scoped programmatic undo without replacing native input/contentEditable undo. The manual history restores the quiz-level term and complete questions array; modal history restores the complete card including type, prompt, options, answer, enumeration fields, and explanation. Capture-phase form boundaries handle pending programmatic snapshots before RichTextEditor, while ordinary edits clear pending snapshots and retain native undo. No document-wide listener was added, and stale async local-AI results are invalidated by edits, paste applications, undo restoration, close, unmount, and question/open changes. The existing apps/web/hooks/useQuizSession.ts change was preserved untouched. Browser runtime checks were unavailable and remain needs verification during implementation/follow-up.",
+  "implementation_details": [
+    "Added apps/web/lib/authoringUndo.ts with typed bounded snapshot history, deep snapshot cloning, recordBeforeProgrammaticChange, undoProgrammaticChange, clear, invalidate, and hasPendingSnapshot operations.",
+    "Added apps/web/lib/__tests__/authoringUndo.test.ts covering complete manual/card restoration, clone isolation, empty behavior, bounded history, clear, and invalidate.",
+    "ManualQuizCreator now records before clipboard card conversion, bulk import/cancel replacement, type transformations, accepted local-AI cards, and draft restoration; structural question changes and ordinary edits invalidate stale snapshots.",
+    "QuizQuestionFormModal now records before clipboard card conversion and type transformations, restores all card fields as one unit, clears on close/load and ordinary edits, and invalidates pending local-AI results on undo.",
+    "Added narrow data-marked undo targets for relevant bulk/draft/type controls while metadata and unrelated buttons remain outside the interception boundary."
+  ],
+  "test_results": "PASS — focused command: pnpm vitest run apps/web/lib/__tests__/convertToQuestion.test.ts apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts apps/web/lib/__tests__/clipboardParser.test.ts apps/web/lib/__tests__/clipboardAuthoring.test.ts apps/web/lib/__tests__/authoringUndo.test.ts (5 files, 66 tests). PASS — pnpm --filter @quiz-creator/web typecheck. PASS — pnpm --filter @quiz-creator/web build. FULL SUITE ATTEMPTED — pnpm vitest run reached 44/45 files and 396/401 tests, then failed in unrelated packages/core/src/repositories/__tests__/NeonRepositories.test.ts with worker ERR_IPC_CHANNEL_CLOSED; this matches the prior FEAT-002 environment failure pattern.",
+  "runtime_verification": "NEEDS VERIFICATION — No browser runtime/harness was available. Verify manual creation, add-question, and edit-question paste conversion followed by Ctrl+Z; ordinary input/contentEditable native undo; type/bulk/draft restoration; close/load invalidation; stale SmolLM2 cancellation; and non-interception of metadata Term / Grading Period and unrelated controls.",
+  "source_discrepancies": "The actual prompt integration remains apps/web/lib/clipboardQuestionPrompt.ts, not the absent apps/web/lib/ai/clipboardQuestionPrompt.ts. QuizOverviewClient.tsx remains the modal state owner and was not changed by FEAT-003.",
+  "later_features": "Preserve the scoped form-boundary approach and native RichTextEditor handler. Browser verification remains the only FEAT-003 follow-up; do not broaden interception to document-level handlers or modify apps/web/hooks/useQuizSession.ts."
+}

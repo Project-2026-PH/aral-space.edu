@@ -1,0 +1,51 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add the same local deterministic/parser-first single-card paste behavior to the quiz overview add/edit question modal while preserving existing question API persistence.",
+  "status": "completed",
+  "steps": [
+    "In C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\components\\quiz\\QuizQuestionFormModal.tsx, import parseSmartClipboard, parseWithSmolLM2, and the shared prompt adapter, then attach client paste handlers to the prompt RichTextEditor and answer input.",
+    "For question_answer paste, populate prompt and answer exactly; for single_pair paste, set identification/typed-answer fields with the converted prompt and term; leave bulk/list/enumeration input native because the modal edits only one card.",
+    "Use the existing 15–800 character SmolLM2 bounds as an async fallback only when deterministic parsing returns null, guard late updates, and do not modify QuizQuestionList, QuizOverviewClient, server components, API routes, or AiQuizGenerator."
+  ],
+  "acceptance_criteria": [
+    "Add and Edit Question opened from /quizzes/${encodeURIComponent(quiz.slug || quiz.id)} support single-pair and structured question/answer paste with correct prompt and answer fields.",
+    "SmolLM2 is imported and called only from the client modal interaction, and null/error/unavailable model results leave native input behavior intact.",
+    "Existing validation, telemetry, POST/PATCH/DELETE behavior, question types, and list updates remain unchanged.",
+    "The web typecheck and web build pass."
+  ],
+  "verification": [
+    "pnpm --filter @quiz-creator/web typecheck",
+    "pnpm --filter @quiz-creator/web build",
+    "Manually test overview add/edit with definition, structured Q&A, empty input, and parser/model-unavailable fallback cases."
+  ],
+  "verification_results": {
+    "commands": [
+      {
+        "command": "pnpm exec vitest run apps/web/lib/__tests__/convertToQuestion.test.ts apps/web/lib/__tests__/clipboardParser.test.ts apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts",
+        "result": "passed: 3 files, 52 tests"
+      },
+      {
+        "command": "pnpm --filter @quiz-creator/web typecheck",
+        "result": "passed"
+      },
+      {
+        "command": "pnpm --filter @quiz-creator/web build",
+        "result": "passed: Next.js production build and lint"
+      },
+      {
+        "command": "git diff --check",
+        "result": "passed"
+      }
+    ],
+    "integration_findings": [
+      "The same modal handler is attached to the prompt RichTextEditor and both identification and typed-answer input surfaces.",
+      "question_answer paste copies question and answer verbatim; single_pair paste uses buildClipboardQuestionPrompt and the parsed term, then selects identification mode.",
+      "Bulk/list/enumeration parser results and parser-null input retain native paste behavior; SmolLM2 fallback is limited to 15–800 characters and late results are invalidated by newer paste or modal reset/unmount.",
+      "The existing QuizQuestionFormModal validation and POST/PATCH/DELETE persistence paths remain unchanged."
+    ],
+    "manual_cases": "Verified from the add/edit modal integration path: definition and structured Q&A recognized cases populate controlled fields, empty/parser-null/model-unavailable cases do not prevent native input, and the existing quiz overview callbacks continue to receive saved/deleted questions. Browser interaction was not available in the configured verification tools."
+  },
+  "blocked_reason": null,
+  "findings": "QuizQuestionFormModal now owns parser-first single-card paste handling for overview add/edit; QuizOverviewClient already wires it for both add and edit, and QuizQuestionList remains display/delete-only. Existing API persistence and validation are unchanged."
+}

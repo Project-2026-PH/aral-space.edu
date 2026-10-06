@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Modal from '../ui/Modal';
 import ConfirmModal from '../ui/ConfirmModal';
 import { QuizQuestion } from '@quiz-creator/types';
@@ -8,6 +8,9 @@ import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/
 import { Plus, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, Trash2 } from 'lucide-react';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import { hasRichTextContent } from '@/lib/richText';
+import { parseSmartClipboard, type ParsedClipboard } from '@/lib/clipboardParser';
+import { parseWithSmolLM2 } from '@/lib/ai/localClipboardParser';
+import { buildClipboardQuestionPrompt } from '@/lib/clipboardQuestionPrompt';
 
 export type QuestionType = 'multiple_choice' | 'typed_answer' | 'identification' | 'true_false' | 'enumeration';
 
@@ -78,8 +81,17 @@ export default function QuizQuestionFormModal({
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pasteRequestRef = useRef(0);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    pasteRequestRef.current += 1;
     if (question) {
       const detected = detectQuestionType(question);
       setType(detected);
@@ -151,6 +163,56 @@ export default function QuizQuestionFormModal({
     setType(newType);
     setOptions(newOptions);
     setCorrectAnswer(newCorrect);
+  }
+
+  function applyClipboardCard(
+    parsed: Extract<ParsedClipboard, { type: 'single_pair' | 'question_answer' }>
+  ) {
+    const questionValue = parsed.type === 'question_answer'
+      ? parsed.question
+      : buildClipboardQuestionPrompt(parsed.definition, parsed.term);
+    const answerValue = parsed.type === 'question_answer' ? parsed.answer : parsed.term;
+
+    setType('identification');
+    setQuestionText(questionValue);
+    setOptions([answerValue]);
+    setCorrectAnswer(0);
+    setAnswerText(answerValue);
+  }
+
+  function handleClipboardPaste(event: React.ClipboardEvent<HTMLElement>) {
+    const text = event.clipboardData.getData('text');
+    const html = event.clipboardData.getData('text/html');
+    if (!text && !html) return;
+
+    const parsed = parseSmartClipboard(text, html);
+    if (parsed?.type === 'question_answer' || parsed?.type === 'single_pair') {
+      event.preventDefault();
+      pasteRequestRef.current += 1;
+      applyClipboardCard(parsed);
+      return;
+    }
+
+    // Bulk/list/enumeration formats remain native because this modal edits one card.
+    if (parsed) return;
+
+    if (text && text.trim().length >= 15 && text.trim().length <= 800) {
+      const requestId = ++pasteRequestRef.current;
+      void parseWithSmolLM2(text)
+        .then((aiParsed) => {
+          if (
+            !mountedRef.current ||
+            requestId !== pasteRequestRef.current ||
+            aiParsed?.type !== 'single_pair'
+          ) {
+            return;
+          }
+          applyClipboardCard(aiParsed);
+        })
+        .catch(() => {
+          // Keep the browser's native paste when the local fallback fails.
+        });
+    }
   }
 
   async function handleSave() {
@@ -335,6 +397,7 @@ export default function QuizQuestionFormModal({
             <RichTextEditor
               value={questionText}
               onChange={setQuestionText}
+              onPaste={handleClipboardPaste}
               placeholder="Type question prompt here..."
               minHeight="120px"
               data-skip-clipboard-intercept="true"
@@ -457,6 +520,7 @@ export default function QuizQuestionFormModal({
               placeholder="e.g. Photosynthesis"
               value={answerText}
               onChange={(e) => setAnswerText(e.target.value)}
+              onPaste={handleClipboardPaste}
               className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
             />
             <p className="text-[11px] text-muted-foreground">
@@ -478,6 +542,7 @@ export default function QuizQuestionFormModal({
                 setOptions([e.target.value]);
                 setAnswerText(e.target.value);
               }}
+              onPaste={handleClipboardPaste}
               className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
             />
           </div>

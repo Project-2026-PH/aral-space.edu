@@ -245,6 +245,9 @@ export default function QuizRunner(props: QuizRunnerProps) {
 
   const isMultipleChoiceMode = currentMode === 'multiple_choice';
   const isDesktopViewportMode = isMultipleChoiceMode || currentMode === 'identification';
+  const sourceHandoutUrl = quiz.handout_path
+    ? `/api/quizzes/${encodeURIComponent(quiz.id)}/handout`
+    : null;
   const isResumePromptMode = mode === 'multiple_choice' || mode === 'identification';
   useEffect(() => {
     if (
@@ -461,7 +464,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
             <span className="flex min-w-0 items-center gap-2 text-xs font-bold text-foreground"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileText className="h-3.5 w-3.5" /></span><span className="truncate" title={quiz.handout_name || 'Source handout'}>{quiz.handout_name || 'Source handout'}</span></span>
             <button type="button" onClick={() => setShowSource(false)} className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Hide</button>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden p-2"><iframe title={quiz.handout_name || 'Source handout'} src={quiz.handout_path} className="h-full min-h-0 w-full rounded-xl border border-border/60 bg-muted" /></div>
+          <div className="min-h-0 flex-1 overflow-hidden p-2"><iframe title={quiz.handout_name || 'Source handout'} src={sourceHandoutUrl || undefined} className="h-full min-h-0 w-full rounded-xl border border-border/60 bg-muted" /></div>
         </aside>
       )}
       <div className={showSource && quiz.handout_path ? 'quiz-source-content-enter min-w-0 overflow-hidden lg:h-full lg:min-h-0 lg:overflow-y-auto lg:px-6 lg:pt-0' : 'min-w-0'}>
@@ -520,7 +523,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
 
       {isMobileSource && showSource && quiz.handout_path && (
         <Modal open={showSource} onOpenChange={setShowSource} title={quiz.handout_name || 'Source handout'} description="Reference this handout while answering.">
-          <iframe title={quiz.handout_name || 'Source handout'} src={quiz.handout_path} className="h-[70vh] w-full rounded-2xl border border-border/60 bg-muted" />
+          <iframe title={quiz.handout_name || 'Source handout'} src={sourceHandoutUrl || undefined} className="h-[70vh] w-full rounded-2xl border border-border/60 bg-muted" />
         </Modal>
       )}
 

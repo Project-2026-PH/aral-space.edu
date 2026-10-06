@@ -296,6 +296,8 @@ export class MemoryQuizRepository implements IQuizRepository {
     if (dto.description !== undefined) quiz.description = dto.description;
     if (dto.term !== undefined) quiz.term = dto.term;
     if (dto.subject_id !== undefined) quiz.subject_id = dto.subject_id;
+    if (dto.handout_name !== undefined) quiz.handout_name = dto.handout_name;
+    if (dto.handout_path !== undefined) quiz.handout_path = dto.handout_path;
     this.quizzes.set(id, quiz);
     return quiz;
   }

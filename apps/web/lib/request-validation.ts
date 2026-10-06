@@ -210,6 +210,10 @@ export function parseUpdateQuiz(value: unknown): UpdateQuizDto {
   if (term !== undefined) result.term = term;
   const subjectId = optionalText(object.subject_id, 'subject_id', 128);
   if (subjectId !== undefined) result.subject_id = subjectId;
+  const handoutName = optionalText(object.handout_name, 'handout_name', 500);
+  if (handoutName !== undefined) result.handout_name = handoutName;
+  const handoutPath = optionalText(object.handout_path, 'handout_path', 20_000_000);
+  if (handoutPath !== undefined) result.handout_path = handoutPath;
   if (!Object.keys(result).length) throw new RequestSecurityError(400, 'At least one quiz field is required');
   return result;
 }

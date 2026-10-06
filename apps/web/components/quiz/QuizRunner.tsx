@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   BookOpen,
+  FileText,
   Layers,
   PenTool,
   RotateCcw,
@@ -60,6 +61,8 @@ export default function QuizRunner(props: QuizRunnerProps) {
   const [showSceneModal, setShowSceneModal] = useState(false);
   const [sceneReaction, setSceneReaction] = useState<SceneReaction>('idle');
   const [sceneQuestion, setSceneQuestion] = useState<QuizQuestion | null>(null);
+  const [showSource, setShowSource] = useState(false);
+  const [isMobileSource, setIsMobileSource] = useState(false);
 
   const session = useQuizSession({ ...props, mode: currentMode });
   const {
@@ -114,6 +117,13 @@ export default function QuizRunner(props: QuizRunnerProps) {
     toggleMute,
     giveUp
   } = session;
+
+  useEffect(() => {
+    const update = () => setIsMobileSource(window.matchMedia('(max-width: 1023px)').matches);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   useEffect(() => {
     explanationRequestVersionRef.current += 1;
@@ -369,7 +379,7 @@ export default function QuizRunner(props: QuizRunnerProps) {
 
   return (
     <div
-      className={`mx-auto max-w-5xl ${isMultipleChoiceMode ? `mobile-multiple-choice-viewport ${pendingAdvance ? 'pb-20' : 'pb-4'}` : 'space-y-6 pb-28 sm:pb-32'} ${isDesktopViewportMode ? `desktop-quiz-viewport lg:flex lg:flex-col lg:gap-3 lg:space-y-0 ${pendingAdvance ? 'lg:pb-20' : 'lg:pb-8'}` : ''}`}
+      className={`mx-auto ${showSource && quiz.handout_path ? 'max-w-none px-4 lg:px-6 lg:overflow-hidden' : 'max-w-5xl'} ${isMultipleChoiceMode ? `mobile-multiple-choice-viewport ${pendingAdvance ? 'pb-20' : 'pb-4'}` : 'space-y-6 pb-28 sm:pb-32'} ${isDesktopViewportMode ? `desktop-quiz-viewport lg:flex lg:flex-col lg:gap-3 lg:space-y-0 ${pendingAdvance ? 'lg:pb-20' : 'lg:pb-8'}` : ''}`}
       onClick={handleSurfaceClick}
       onKeyDown={handleSurfaceKeyDown}
     >
@@ -397,13 +407,28 @@ export default function QuizRunner(props: QuizRunnerProps) {
             <Settings className="h-4 w-4" />
           </button>
 
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setShowSource(true);
+            }}
+            disabled={!quiz.handout_path}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Toggle source handout"
+            title={quiz.handout_path ? 'View source handout' : 'No source handout attached'}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Source</span>
+          </button>
+
           <button type="button" onClick={toggleMute} className="p-1.5 rounded-full border border-border/80 bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-colors active:scale-95" title={isMuted ? 'Unmute Sound' : 'Mute Sound'} aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}>{isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
           {/* {isStruggleReviewMode && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-bold text-amber-500">Struggle Pile Review</span>}
           {accumulatedStruggleIds.length > 0 && <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-500 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /><span>{accumulatedStruggleIds.length} in Struggle Pile</span></span>} */}
         </div>
       </div>
 
-      <div className="space-y-2" aria-label={`Quiz progress: ${totalLockedCount} of ${questions.length} questions mastered (${correctAnswerCount} answers correct)`}>
+      <div className={`${showSource && quiz.handout_path ? 'lg:ml-[40%] lg:w-[60%] lg:pl-6' : ''} space-y-2`} aria-label={`Quiz progress: ${totalLockedCount} of ${questions.length} questions mastered (${correctAnswerCount} answers correct)`}>
         <div className="flex items-center justify-between text-xs font-bold text-muted-foreground"><span>Progress</span></div>
         {currentMode === 'multiple_choice' || currentMode === 'reverse' || currentMode === 'identification' ? (
           <div className="flex w-full min-w-0 items-center gap-2 pt-1 pr-2">
@@ -429,6 +454,17 @@ export default function QuizRunner(props: QuizRunnerProps) {
         ) : <div className="h-2 w-full overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all duration-300" style={{ width: `${overallPercent}%` }} /></div>}
       </div>
 
+      <div className={showSource && quiz.handout_path ? 'grid min-w-0 items-start gap-0 overflow-hidden lg:mt-12 lg:h-[calc(100dvh-28rem)] lg:max-h-[calc(100dvh-11rem)] lg:min-h-0 lg:grid-cols-[minmax(300px,2fr)_minmax(0,3fr)] lg:divide-x lg:divide-border/70' : ''}>
+      {showSource && quiz.handout_path && (
+        <aside className="quiz-source-panel-enter hidden min-w-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-lg shadow-black/10 lg:order-first lg:flex lg:h-full lg:max-h-full lg:min-h-0 lg:mx-3">
+          <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-muted/30 px-3.5">
+            <span className="flex min-w-0 items-center gap-2 text-xs font-bold text-foreground"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileText className="h-3.5 w-3.5" /></span><span className="truncate" title={quiz.handout_name || 'Source handout'}>{quiz.handout_name || 'Source handout'}</span></span>
+            <button type="button" onClick={() => setShowSource(false)} className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Hide</button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden p-2"><iframe title={quiz.handout_name || 'Source handout'} src={quiz.handout_path} className="h-full min-h-0 w-full rounded-xl border border-border/60 bg-muted" /></div>
+        </aside>
+      )}
+      <div className={showSource && quiz.handout_path ? 'quiz-source-content-enter min-w-0 overflow-hidden lg:h-full lg:min-h-0 lg:overflow-y-auto lg:px-6 lg:pt-0' : 'min-w-0'}>
       <div className={isMultipleChoiceMode ? 'quiz-question-stage min-h-0 overflow-visible' : isDesktopViewportMode ? 'overflow-visible lg:min-h-0 lg:flex-none' : 'overflow-hidden'}>
         <div
           key={activeQuestion.id}
@@ -479,6 +515,14 @@ export default function QuizRunner(props: QuizRunnerProps) {
           />
         </div>
       </div>
+      </div>
+      </div>
+
+      {isMobileSource && showSource && quiz.handout_path && (
+        <Modal open={showSource} onOpenChange={setShowSource} title={quiz.handout_name || 'Source handout'} description="Reference this handout while answering.">
+          <iframe title={quiz.handout_name || 'Source handout'} src={quiz.handout_path} className="h-[70vh] w-full rounded-2xl border border-border/60 bg-muted" />
+        </Modal>
+      )}
 
       {pendingAdvance && !isRecapVisible && (
         <QuizContinueDock

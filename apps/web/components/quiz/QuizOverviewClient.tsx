@@ -10,7 +10,7 @@ import QuizExportMenu from './QuizExportMenu';
 import ConfirmModal from '../ui/ConfirmModal';
 import StickyActionDock from '../ui/StickyActionDock';
 import FloatingBottomNav from '../navigation/FloatingBottomNav';
-import { Play, Plus, Edit, Trash2, ArrowLeft, Share2, Save, Check } from 'lucide-react';
+import { Play, Plus, Edit, Trash2, ArrowLeft, Share2, Save, Check, FileText, Upload, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { publishLibraryMutation } from '@/lib/libraryMutationStore';
@@ -68,6 +68,8 @@ export default function QuizOverviewClient({
   const [showStartModal, setShowStartModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeleteQuizModal, setShowDeleteQuizModal] = useState(false);
+  const [savingHandout, setSavingHandout] = useState(false);
+  const handoutInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setQuiz(initialQuiz);
@@ -188,6 +190,24 @@ export default function QuizOverviewClient({
     } finally {
       setSavingTerm(false);
     }
+  }
+
+  async function handleRemoveHandout() {
+    setSavingHandout(true);
+    try {
+      const res = await fetch(`/api/quizzes/${quiz.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ handout_name: null, handout_path: null }) });
+      if (res.ok) setQuiz(await res.json());
+    } finally { setSavingHandout(false); }
+  }
+
+  async function handleUploadHandout(file: File) {
+    if (file.type !== 'application/pdf' || file.size > 15 * 1024 * 1024) return;
+    setSavingHandout(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(file); });
+      const res = await fetch(`/api/quizzes/${quiz.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ handout_name: file.name, handout_path: dataUrl }) });
+      if (res.ok) setQuiz(await res.json());
+    } finally { setSavingHandout(false); }
   }
 
   async function handleDeleteQuiz() {
@@ -413,9 +433,9 @@ export default function QuizOverviewClient({
                   )
                 )
               )}
-              {quiz.handout_name && (
-                <span>Source: {quiz.handout_name}</span>
-              )}
+              <span className="inline-flex items-center gap-1.5">
+                {quiz.handout_name ? <><FileText className="h-3 w-3" />Source: {quiz.handout_name}<button type="button" onClick={handleRemoveHandout} disabled={savingHandout} aria-label="Remove source handout" className="text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></button></> : !readOnly && <><button type="button" onClick={() => handoutInputRef.current?.click()} disabled={savingHandout} className="inline-flex items-center gap-1 font-bold text-primary hover:underline"><Upload className="h-3 w-3" />Add PDF</button><input ref={handoutInputRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleUploadHandout(file); e.currentTarget.value = ''; }} /></>}
+              </span>
             </div>
             {isEditingDesc ? (
               <div className="mt-2 space-y-1.5 max-w-2xl">
@@ -557,6 +577,7 @@ export default function QuizOverviewClient({
         onOpenChange={setShowStartModal}
         quizId={quiz.id}
         quizSlug={quiz.slug}
+        shareToken={quiz.share_token}
         title={quiz.title}
       />
 

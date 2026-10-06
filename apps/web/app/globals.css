@@ -1750,3 +1750,28 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
 @media (prefers-reduced-motion: reduce) {
   .kole-scene-node, .kole-scene-node--active { transition: none; transform: none; }
 }
+
+@keyframes quiz-source-panel-in {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes quiz-source-content-in {
+  from { opacity: 0.7; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.quiz-source-panel-enter {
+  animation: quiz-source-panel-in 360ms ease-in-out both;
+}
+
+.quiz-source-content-enter {
+  animation: quiz-source-content-in 360ms ease-in-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-source-panel-enter,
+  .quiz-source-content-enter {
+    animation: none;
+  }
+}

@@ -799,7 +799,9 @@ export class NeonQuizRepository implements IQuizRepository {
           SET title = ${dto.title !== undefined ? dto.title : existing.title},
               description = ${dto.description !== undefined ? dto.description : existing.description || null},
               term = ${dto.term !== undefined ? dto.term : existing.term || null},
-              subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null}
+              subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null},
+              handout_name = ${dto.handout_name !== undefined ? dto.handout_name : existing.handout_name || null},
+              handout_path = ${dto.handout_path !== undefined ? dto.handout_path : existing.handout_path || null}
           WHERE id = ${id}
           RETURNING *
         `
@@ -808,7 +810,9 @@ export class NeonQuizRepository implements IQuizRepository {
           SET title = ${dto.title !== undefined ? dto.title : existing.title},
               description = ${dto.description !== undefined ? dto.description : existing.description || null},
               term = ${dto.term !== undefined ? dto.term : existing.term || null},
-              subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null}
+              subject_id = ${dto.subject_id !== undefined ? dto.subject_id : existing.subject_id || null},
+              handout_name = ${dto.handout_name !== undefined ? dto.handout_name : existing.handout_name || null},
+              handout_path = ${dto.handout_path !== undefined ? dto.handout_path : existing.handout_path || null}
           WHERE id = ${id}
           RETURNING *
         `;

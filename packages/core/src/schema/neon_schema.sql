@@ -465,7 +465,23 @@ CREATE INDEX IF NOT EXISTS idx_user_subject_archives_subject ON user_subject_arc
 CREATE INDEX IF NOT EXISTS idx_user_quiz_archives_quiz ON user_quiz_archives(quiz_id);
 CREATE INDEX IF NOT EXISTS idx_user_quiz_archives_subject_cascade ON user_quiz_archives(user_id, archived_by_subject, archived_at DESC);
 
--- Deferred PDF-to-reviewer generation pipeline.
+CREATE TABLE IF NOT EXISTS quiz_handouts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    original_filename TEXT NOT NULL,
+    mime_type TEXT NOT NULL DEFAULT 'application/pdf',
+    file_size_bytes BIGINT NOT NULL,
+    content_hash TEXT NOT NULL,
+    storage_path TEXT,
+    pdf_data_base64 TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (quiz_id),
+    CHECK (mime_type = 'application/pdf'),
+    CHECK (file_size_bytes > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_quiz_handouts_quiz ON quiz_handouts(quiz_id);
+
+
 CREATE TABLE IF NOT EXISTS source_documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id TEXT NOT NULL,

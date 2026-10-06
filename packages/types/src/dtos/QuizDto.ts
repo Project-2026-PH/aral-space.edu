@@ -31,6 +31,8 @@ export interface UpdateQuizDto {
   description?: string | null;
   term?: string | null;
   subject_id?: string | null;
+  handout_name?: string | null;
+  handout_path?: string | null;
 }
 
 export interface CreateQuestionDto extends QuizQuestionInput {

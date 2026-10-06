@@ -33,21 +33,40 @@ describe('quizAnswerEvaluation', () => {
 
     it('derives a legacy enumeration count when the answer text is absent', () => {
       const q = makeQuestion({
-        question_type: 'typed_answer',
+        question_type: 'enumeration',
         answer_text: undefined,
         options: ['A', '', 'B', ' C ']
       });
       expect(getQuestionAnswer(q)).toBe('3');
     });
 
-    it('uses a numeric enumeration answer even when options are empty', () => {
+    it('preserves ordinary typed-answer options', () => {
       const q = makeQuestion({
         question_type: 'typed_answer',
+        answer_text: undefined,
+        options: ['First', 'Second'],
+        correct_answer: 1
+      });
+      expect(getQuestionAnswer(q)).toBe('Second');
+    });
+
+    it('derives the item count when an enumeration key is stale or malformed', () => {
+      const q = makeQuestion({
+        question_type: 'enumeration',
+        answer_text: '99',
+        options: ['A', 'A', 'B']
+      });
+      expect(getQuestionAnswer(q)).toBe('3');
+    });
+    it('uses a numeric enumeration answer even when options are empty', () => {
+      const q = makeQuestion({
+        question_type: 'enumeration',
         answer_text: '3',
         options: []
       });
       expect(getQuestionAnswer(q)).toBe('3');
     });
+
 
   });
 

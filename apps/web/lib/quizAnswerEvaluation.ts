@@ -4,16 +4,16 @@ import type { QuizQuestion } from '@quiz-creator/types';
 export type TypedAnswerMode = 'learn' | 'identification';
 
 function isEnumerationQuestion(question: QuizQuestion): boolean {
-  return question.question_type === 'typed_answer' && (
-    /^\\d+$/.test(question.answer_text?.trim() || '') || question.options.filter((option) => option.trim()).length > 1
-  );
+  return question.question_type === 'enumeration';
 }
 
 export function getQuestionAnswer(question: QuizQuestion): string {
   if (isEnumerationQuestion(question)) {
-    const explicitAnswer = question.answer_text?.trim();
-    if (explicitAnswer) return explicitAnswer;
-    return String(question.options.filter((option) => option.trim()).length);
+    const itemCount = question.options.filter((option) => option.trim()).length;
+    const explicitAnswer = question.answer_text?.trim() || '';
+    const explicitCount = Number.parseInt(explicitAnswer, 10);
+    if (/^\d+$/.test(explicitAnswer) && (explicitCount === itemCount || itemCount === 0)) return explicitAnswer;
+    return String(itemCount);
   }
 
   return question.answer_text?.trim() || question.options[question.correct_answer]?.trim() || '';

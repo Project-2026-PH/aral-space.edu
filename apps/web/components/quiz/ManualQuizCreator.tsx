@@ -614,7 +614,7 @@ export default function ManualQuizCreator({
       let opts = q.options.map((o) => o.trim());
       let correct = q.correct_answer;
       let answerText = '';
-      let questionType: 'multiple_choice' | 'typed_answer' = 'multiple_choice';
+      let questionType: 'multiple_choice' | 'typed_answer' | 'enumeration' = 'multiple_choice';
 
       if (q.type === 'multiple_choice') {
         if (!opts[correct]) {
@@ -645,7 +645,7 @@ export default function ManualQuizCreator({
         opts = filled;
         answerText = String(filled.length);
         correct = 0;
-        questionType = 'typed_answer';
+        questionType = 'enumeration';
       }
 
       payloadQuestions.push({

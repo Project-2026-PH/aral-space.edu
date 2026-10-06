@@ -23,9 +23,7 @@ export class QuizTransformService {
     return questions.map((question, index) => {
       // Enumeration cards use their numeric answer_text as the answer key;
       // their options are the listed items, not multiple-choice options.
-      if (question.question_type === 'typed_answer' && (
-        /^\\d+$/.test(question.answer_text?.trim() || '') || question.options.filter((option) => option.trim()).length > 1
-      )) {
+      if (question.question_type === 'enumeration') {
         return question;
       }
 

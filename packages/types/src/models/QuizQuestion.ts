@@ -1,4 +1,4 @@
-export type QuizQuestionType = 'multiple_choice' | 'typed_answer';
+export type QuizQuestionType = 'multiple_choice' | 'typed_answer' | 'enumeration';
 
 export interface ElaborativeFeedback {
   correct_explanation: string;

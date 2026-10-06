@@ -71,6 +71,9 @@ export default function QuizRunner(props: QuizRunnerProps) {
     currentProg,
     isRetryQuestion,
     currentOptions,
+    enumerationState,
+    submitEnumerationTerm,
+    selectEnumerationOption,
     isCardFlipped,
     selectedOptionId,
     isEvaluating,
@@ -448,10 +451,19 @@ export default function QuizRunner(props: QuizRunnerProps) {
             isHintVisible={isHintVisible}
             isExplanationVisible={isExplanationVisible}
             currentOptions={currentOptions}
+            enumerationState={enumerationState}
+            onSubmitEnumerationTerm={submitEnumerationTerm}
+            onSelectEnumerationOption={selectEnumerationOption}
             isCardFlipped={isCardFlipped}
             isRetryQuestion={isRetryQuestion}
-            onAnswer={(option) => answerQuestion(option)}
-            onSubmitTyped={submitTypedAnswer}
+            onAnswer={(option) => {
+              if (activeQuestion.question_type === 'enumeration') return;
+              answerQuestion(option);
+            }}
+            onSubmitTyped={(typedMode) => {
+              if (activeQuestion.question_type === 'enumeration') return;
+              submitTypedAnswer(typedMode);
+            }}
             onInputChange={setIdentificationInput}
             onFlip={() => setIsCardFlipped((flipped) => !flipped)}
             onShowHint={() => setIsHintVisible(true)}

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { QuizQuestion } from '@quiz-creator/types';
+import { MemoryQuizRepository } from '@quiz-creator/core';
 import {
   evaluateTypedAnswer,
   getQuestionAnswer,
@@ -65,6 +66,30 @@ describe('quizAnswerEvaluation', () => {
         options: []
       });
       expect(getQuestionAnswer(q)).toBe('3');
+    });
+
+    it('preserves an empty enumeration key through repository round-trip for Learn Mode', async () => {
+      const repository = new MemoryQuizRepository();
+      const created = await repository.createQuiz({
+        title: 'Enumeration persistence regression',
+        questions: [{
+          question_text: 'How many stages are there?',
+          question_type: 'enumeration',
+          options: [],
+          answer_text: '3',
+          correct_answer: 0
+        }]
+      });
+      const loaded = await repository.getQuizById(created.id);
+      const questions = await repository.getQuestionsByQuizId(created.id);
+      expect(loaded).not.toBeNull();
+      const question = questions[0];
+
+      expect(question?.question_type).toBe('enumeration');
+      expect(question?.answer_text).toBe('3');
+      expect(question?.options).toEqual([]);
+      expect(question && getQuestionAnswer(question)).toBe('3');
+      expect(question && evaluateTypedAnswer('3', getQuestionAnswer(question), 'learn')).toBe(true);
     });
 
 

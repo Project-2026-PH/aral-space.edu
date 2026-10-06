@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getQuestionHint } from '@/lib/quizAnswerEvaluation';
+import { getEnumerationMetadata, getQuestionHint } from '@/lib/quizAnswerEvaluation';
 import { quizAudio } from '@/lib/audio';
 import { triggerCelebrationConfetti } from '@/lib/confetti';
 import Modal from '@/components/ui/Modal';
@@ -57,6 +57,12 @@ interface CardToolbarProps {
   isDrawMode: boolean;
   onSpeak: () => void;
   canEdit: boolean;
+}
+
+function getVisibleEnumerationTerms(question: QuizQuestion, canViewAnswerKey: boolean): string[] {
+  if (!canViewAnswerKey || question.question_type !== 'enumeration') return [];
+  const metadata = getEnumerationMetadata(question);
+  return metadata.status === 'available' ? metadata.terms : [];
 }
 
 function getAnswer(question: QuizQuestion, canViewAnswerKey: boolean = true): string {
@@ -709,8 +715,11 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
   function speakCard() {
     if (!currentCard || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
+    const visibleTerms = getVisibleEnumerationTerms(currentCard, canViewAnswerKey);
     const textToSpeak = isFlipped
-      ? richTextToPlainText(getAnswer(currentCard, canViewAnswerKey))
+      ? visibleTerms.length > 0
+        ? visibleTerms.join(', ')
+        : richTextToPlainText(getAnswer(currentCard, canViewAnswerKey))
       : richTextToPlainText(currentCard.question_text);
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(textToSpeak));
   }
@@ -960,10 +969,25 @@ export default function FlashcardReview({ quiz, questions, shareToken, subjectSh
                 >
                   <div className="max-w-3xl space-y-4">
                     <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Answer</span>
-                    <RichTextContent
-                      html={getAnswer(currentCard, canViewAnswerKey)}
-                      className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-primary [overflow-wrap:anywhere] line-clamp-8 sm:text-3xl text-center"
-                    />
+                    {(() => {
+                      const terms = getVisibleEnumerationTerms(currentCard, canViewAnswerKey);
+                      if (terms.length > 0) {
+                        const quota = getEnumerationMetadata(currentCard).total;
+                        return (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 gap-2 text-left sm:grid-cols-2">
+                              {terms.map((term, index) => (
+                                <div key={`${currentCard.id}-term-${index}`} className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-semibold leading-snug text-primary">
+                                  <span className="mr-2 text-xs text-muted-foreground">{index + 1}.</span>{term}
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-center text-xs font-semibold text-muted-foreground">Quota: {quota} terms</p>
+                          </div>
+                        );
+                      }
+                      return <RichTextContent html={getAnswer(currentCard, canViewAnswerKey)} className="max-h-full max-w-3xl overflow-hidden break-words text-xl font-medium leading-snug text-primary [overflow-wrap:anywhere] line-clamp-8 sm:text-3xl text-center" />;
+                    })()}
                     {canViewAnswerKey && currentCard.explanation && (
                       <RichTextContent
                         html={currentCard.explanation}

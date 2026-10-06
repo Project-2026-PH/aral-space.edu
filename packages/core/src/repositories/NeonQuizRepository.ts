@@ -679,6 +679,8 @@ export class NeonQuizRepository implements IQuizRepository {
       return {
         question_text: question.question_text,
         answer_text: fields.answer_text,
+        answer_terms: fields.answer_terms,
+        enumeration_distractors: fields.enumeration_distractors,
         question_type: fields.question_type,
         options: fields.options,
         correct_answer: fields.correct_answer,
@@ -728,6 +730,8 @@ export class NeonQuizRepository implements IQuizRepository {
           quiz_id,
           question_text,
           answer_text,
+          answer_terms,
+          enumeration_distractors,
           question_type,
           options,
           correct_answer,
@@ -742,6 +746,8 @@ export class NeonQuizRepository implements IQuizRepository {
           created_quiz.id,
           question.question_text,
           question.answer_text,
+          question.answer_terms,
+          question.enumeration_distractors,
           question.question_type,
           question.options,
           question.correct_answer,
@@ -755,6 +761,8 @@ export class NeonQuizRepository implements IQuizRepository {
         CROSS JOIN LATERAL jsonb_to_recordset(${questionPayload}::jsonb) AS question(
           question_text text,
           answer_text text,
+          answer_terms jsonb,
+          enumeration_distractors jsonb,
           question_type text,
           options jsonb,
           correct_answer integer,
@@ -956,12 +964,15 @@ export class NeonQuizRepository implements IQuizRepository {
 
     const rows = await this.sql`
       INSERT INTO quiz_questions (
-        quiz_id, question_text, answer_text, question_type, options, correct_answer,
+        quiz_id, question_text, answer_text, answer_terms, enumeration_distractors, question_type, options, correct_answer,
         explanation, correct_explanation, distractor_explanations, discriminatory_keywords,
         source_pages, order_index
       )
       VALUES (
-        ${quizId}, ${dto.question_text}, ${fields.answer_text}, ${fields.question_type},
+        ${quizId}, ${dto.question_text}, ${fields.answer_text},
+        ${fields.answer_terms ? this.sql`${JSON.stringify(fields.answer_terms)}::jsonb` : null},
+        ${fields.enumeration_distractors ? this.sql`${JSON.stringify(fields.enumeration_distractors)}::jsonb` : null},
+        ${fields.question_type},
         ${optionsJson}::jsonb, ${fields.correct_answer}, ${dto.explanation || null},
         ${fields.correct_explanation || null},
         ${distractorExpJson ? this.sql`${distractorExpJson}::jsonb` : null},
@@ -992,7 +1003,10 @@ export class NeonQuizRepository implements IQuizRepository {
 
     const rows = await this.sql`
       UPDATE quiz_questions
-      SET question_text = ${questionText}, answer_text = ${fields.answer_text}, question_type = ${fields.question_type},
+      SET question_text = ${questionText}, answer_text = ${fields.answer_text},
+          answer_terms = ${fields.answer_terms ? this.sql`${JSON.stringify(fields.answer_terms)}::jsonb` : null},
+          enumeration_distractors = ${fields.enumeration_distractors ? this.sql`${JSON.stringify(fields.enumeration_distractors)}::jsonb` : null},
+          question_type = ${fields.question_type},
           options = ${optionsJson}::jsonb, correct_answer = ${fields.correct_answer}, explanation = ${explanation},
           correct_explanation = ${fields.correct_explanation || null},
           distractor_explanations = ${distractorExpJson ? this.sql`${distractorExpJson}::jsonb` : null},
@@ -1163,6 +1177,8 @@ export class NeonQuizRepository implements IQuizRepository {
       questions: questions.map((question) => ({
         question_text: question.question_text,
         answer_text: question.answer_text || null,
+        answer_terms: question.answer_terms || null,
+        enumeration_distractors: question.enumeration_distractors || null,
         question_type: question.question_type || null,
         options: question.options,
         correct_answer: question.correct_answer,

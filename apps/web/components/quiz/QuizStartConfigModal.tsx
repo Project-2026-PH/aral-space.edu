@@ -11,6 +11,8 @@ interface QuizStartConfigModalProps {
   onOpenChange: (open: boolean) => void;
   quizId: string;
   quizSlug?: string | null;
+  shareToken?: string | null;
+  subjectShareToken?: string | null;
   title: string;
 }
 
@@ -19,6 +21,8 @@ export default function QuizStartConfigModal({
   onOpenChange,
   quizId,
   quizSlug,
+  shareToken,
+  subjectShareToken,
   title
 }: QuizStartConfigModalProps) {
   const router = useRouter();
@@ -32,19 +36,22 @@ export default function QuizStartConfigModal({
       mode,
       shuffleQuestions: String(shuffleQuestions),
       shuffleOptions: String(shuffleOptions)
-    }).toString();
+    });
+
+    if (shareToken) query.set('shareToken', shareToken);
+    if (subjectShareToken) query.set('subjectShareToken', subjectShareToken);
 
     const locator = encodeURIComponent(quizSlug || quizId);
-    router.push(mode === 'flashcard' ? `/review/${locator}` : `/practice/${locator}?${query}`);
+    router.push(mode === 'flashcard' ? `/review/${locator}` : mode === 'learn' ? `/review/test/${locator}?${query.toString()}` : `/practice/${locator}?${query.toString()}`);
   }
 
   const modes = [
-    // {
-    //   id: 'learn' as QuizMode,
-    //   name: 'Learn Mode',
-    //   desc: 'Type the answer, get immediate feedback, and build mastery through active recall.',
-    //   icon: PenTool
-    // },
+    {
+      id: 'learn' as QuizMode,
+      name: 'Learn / Test',
+      desc: 'Adaptive practice combining enumeration, true/false, multiple choice, and typed recall.',
+      icon: PenTool
+    },
     {
       id: 'multiple_choice' as QuizMode,
       name: 'Multiple Choice',

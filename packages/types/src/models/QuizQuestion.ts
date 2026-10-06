@@ -24,6 +24,10 @@ export interface QuizQuestion {
   question_type?: QuizQuestionType | null;
   /** Legacy option storage and optional multiple-choice choices. */
   options: string[];
+  /** Canonical ordered terms for enumeration questions. */
+  answer_terms?: string[] | null;
+  /** Explicit wrong choices for enumeration multiple choice. */
+  enumeration_distractors?: string[] | null;
   /** Legacy correct option index. New typed-answer cards use 0 when no choices exist. */
   correct_answer: number;
   explanation?: string | null;

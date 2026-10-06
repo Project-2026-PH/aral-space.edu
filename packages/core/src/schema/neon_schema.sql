@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
     quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
     question_text TEXT NOT NULL,
     answer_text TEXT,
+    answer_terms JSONB,
+    enumeration_distractors JSONB,
     question_type TEXT NOT NULL DEFAULT 'multiple_choice',
     options JSONB NOT NULL DEFAULT '[]'::jsonb,
     correct_answer INTEGER NOT NULL DEFAULT 0,
@@ -151,6 +153,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_quizzes_slug_unique ON quizzes(slug) WHERE
 
 UPDATE quizzes SET is_public = TRUE WHERE is_public IS NULL;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS answer_text TEXT;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS answer_terms JSONB;
+ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS enumeration_distractors JSONB;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type TEXT NOT NULL DEFAULT 'multiple_choice';
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS correct_explanation TEXT;
 ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS distractor_explanations JSONB;

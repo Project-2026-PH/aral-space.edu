@@ -5,7 +5,7 @@ import type {
   SessionType
 } from '@quiz-creator/types';
 
-export const QUIZ_PROGRESS_SNAPSHOT_VERSION = 1;
+export const QUIZ_PROGRESS_SNAPSHOT_VERSION = 2;
 const QUIZ_PROGRESS_SNAPSHOT_PREFIX = 'quiz_creator_quiz_progress_v1';
 const QUIZ_PROGRESS_RETENTION_MS = 24 * 60 * 60 * 1000;
 
@@ -27,6 +27,28 @@ export interface PersistedAnswerEvent {
   sessionType: SessionType;
   latencyMs: number;
   createdAt: string;
+}
+
+export interface PersistedEnumerationAttempt {
+  key: string;
+  rawValue: string;
+  isCorrect: boolean;
+  sequence: number;
+  feedback: 'correct' | 'incorrect';
+}
+
+export interface PersistedEnumerationRecord {
+  questionId: string;
+  presentationKey: string;
+  total: number;
+  canonicalKeys: string[];
+  attempts: PersistedEnumerationAttempt[];
+  attemptedKeys: string[];
+  correctKeys: string[];
+  wrongKeys: string[];
+  status: 'active' | 'complete' | 'unavailable';
+  verdict: boolean | null;
+  lastFeedback: 'correct' | 'incorrect' | null;
 }
 
 export interface QuizProgressSnapshot {
@@ -54,6 +76,7 @@ export interface QuizProgressSnapshot {
   isCompleted: boolean;
   cardTelemetry: Record<string, CardTelemetryRecord>;
   pendingAnswerEvents: PersistedAnswerEvent[];
+  enumerationByPresentation: Record<string, PersistedEnumerationRecord>;
   savedAt: string;
 }
 
@@ -103,6 +126,44 @@ function isPendingAdvance(value: unknown): value is PersistedPendingAdvance {
   );
 }
 
+function isEnumerationAttempt(value: unknown): value is PersistedEnumerationAttempt {
+  return isRecord(value)
+    && typeof value.key === 'string'
+    && typeof value.rawValue === 'string'
+    && typeof value.isCorrect === 'boolean'
+    && Number.isInteger(value.sequence)
+    && (value.feedback === 'correct' || value.feedback === 'incorrect');
+}
+
+function isEnumerationRecord(value: unknown): value is PersistedEnumerationRecord {
+  return isRecord(value)
+    && typeof value.questionId === 'string'
+    && typeof value.presentationKey === 'string'
+    && typeof value.total === 'number'
+    && Number.isSafeInteger(value.total)
+    && value.total > 0
+    && Array.isArray(value.canonicalKeys)
+    && value.canonicalKeys.every((key) => typeof key === 'string')
+    && Array.isArray(value.attempts)
+    && value.attempts.every(isEnumerationAttempt)
+    && Array.isArray(value.attemptedKeys)
+    && value.attemptedKeys.every((key) => typeof key === 'string')
+    && Array.isArray(value.correctKeys)
+    && value.correctKeys.every((key) => typeof key === 'string')
+    && Array.isArray(value.wrongKeys)
+    && value.wrongKeys.every((key) => typeof key === 'string')
+    && (value.status === 'active' || value.status === 'complete' || value.status === 'unavailable')
+    && (value.verdict === null || typeof value.verdict === 'boolean')
+    && (value.lastFeedback === null || value.lastFeedback === 'correct' || value.lastFeedback === 'incorrect');
+}
+
+function deserializeEnumerationRecords(value: unknown): Record<string, PersistedEnumerationRecord> {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(([, record]) => isEnumerationRecord(record))
+  ) as Record<string, PersistedEnumerationRecord>;
+}
+
 export function readQuizProgressSnapshot(
   quizId: string,
   sessionId: string
@@ -115,8 +176,10 @@ export function readQuizProgressSnapshot(
 
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return null;
+    const isCurrentVersion = parsed.version === QUIZ_PROGRESS_SNAPSHOT_VERSION;
+    const isMigratableVersion = parsed.version === 1;
     if (
-      parsed.version !== QUIZ_PROGRESS_SNAPSHOT_VERSION ||
+      (!isCurrentVersion && !isMigratableVersion) ||
       parsed.quizId !== quizId ||
       parsed.sessionId !== sessionId ||
       !isPracticeSessionState(parsed.queueState)
@@ -130,14 +193,20 @@ export function readQuizProgressSnapshot(
     }
 
     return {
-      ...(parsed as Omit<QuizProgressSnapshot, 'progressEntries' | 'pendingAdvance'>),
+      ...(parsed as Omit<QuizProgressSnapshot, 'progressEntries' | 'pendingAdvance' | 'enumerationByPresentation' | 'version'>),
+      version: QUIZ_PROGRESS_SNAPSHOT_VERSION,
       progressEntries: deserializeProgressEntries(parsed.progressEntries),
       pendingAdvance: isPendingAdvance(parsed.pendingAdvance)
         ? {
             ...parsed.pendingAdvance,
             progressEntries: deserializeProgressEntries(parsed.pendingAdvance.progressEntries)
           }
-        : null
+        : null,
+      // Version 1 did not persist this state. Invalid records are isolated to
+      // their presentation instead of invalidating the ordinary session.
+      enumerationByPresentation: isCurrentVersion
+        ? deserializeEnumerationRecords(parsed.enumerationByPresentation)
+        : {}
     };
   } catch {
     return null;
@@ -150,6 +219,7 @@ export function writeQuizProgressSnapshot(snapshot: QuizProgressSnapshot): void 
   try {
     const safeSnapshot: QuizProgressSnapshot = {
       ...snapshot,
+      version: QUIZ_PROGRESS_SNAPSHOT_VERSION,
       // Do not retain a user's free-form answer after the session snapshot is written.
       identificationInput: '',
       pendingAnswerEvents: snapshot.pendingAnswerEvents.slice(-50).map(({ answerText: _answerText, ...event }) => event),

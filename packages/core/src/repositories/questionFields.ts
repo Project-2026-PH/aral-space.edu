@@ -2,6 +2,8 @@ import { CreateQuestionDto, QuizQuestion, QuizQuestionType, UpdateQuestionDto } 
 
 export interface NormalizedQuestionFields {
   options: string[];
+  answer_terms: string[] | null;
+  enumeration_distractors: string[] | null;
   correct_answer: number;
   answer_text: string | null;
   question_type: QuizQuestionType;
@@ -13,6 +15,12 @@ export interface NormalizedQuestionFields {
 
 function normalizeOptions(options: unknown): string[] {
   return Array.isArray(options) ? options.map((option) => String(option).trim()) : [];
+}
+
+function normalizeStringList(value: unknown): string[] | null {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) return null;
+  return value.map((item) => item.trim()).filter(Boolean);
 }
 
 function normalizedText(value: unknown): string | null {
@@ -116,8 +124,17 @@ export function normalizeQuestionFields(
     ? normalizeKeywords(input.concept_tags)
     : (existing?.concept_tags !== undefined ? normalizeKeywords(existing.concept_tags) : null);
 
+  const answerTerms = input.answer_terms !== undefined
+    ? normalizeStringList(input.answer_terms)
+    : (existing?.answer_terms === undefined ? null : normalizeStringList(existing.answer_terms));
+  const enumerationDistractors = input.enumeration_distractors !== undefined
+    ? normalizeStringList(input.enumeration_distractors)
+    : (existing?.enumeration_distractors === undefined ? null : normalizeStringList(existing.enumeration_distractors));
+
   return {
     options,
+    answer_terms: answerTerms,
+    enumeration_distractors: enumerationDistractors,
     correct_answer: correctAnswer,
     answer_text: answerText,
     question_type: questionType,

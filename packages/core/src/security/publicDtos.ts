@@ -32,6 +32,8 @@ export function toPublicQuizDto(
 
       if (includeAnswerKey) {
         publicQuestion.answer_text = question.answer_text || question.options[question.correct_answer] || null;
+        publicQuestion.answer_terms = question.answer_terms || null;
+        publicQuestion.enumeration_distractors = question.enumeration_distractors || null;
         publicQuestion.correct_answer = question.correct_answer;
         publicQuestion.explanation = question.explanation || null;
         publicQuestion.correct_explanation = question.correct_explanation || null;

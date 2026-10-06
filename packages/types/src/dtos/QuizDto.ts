@@ -5,6 +5,8 @@ export interface QuizQuestionInput {
   answer_text?: string | null;
   question_type?: QuizQuestionType | null;
   options?: string[];
+  answer_terms?: string[] | null;
+  enumeration_distractors?: string[] | null;
   correct_answer?: number;
   explanation?: string | null;
   correct_explanation?: string | null;
@@ -40,6 +42,8 @@ export interface UpdateQuestionDto {
   answer_text?: string | null;
   question_type?: QuizQuestionType | null;
   options?: string[];
+  answer_terms?: string[] | null;
+  enumeration_distractors?: string[] | null;
   correct_answer?: number;
   explanation?: string | null;
   correct_explanation?: string | null;
@@ -128,6 +132,8 @@ export interface PublicQuizDto {
     answer_text?: string | null;
     question_type?: QuizQuestionType | null;
     options: string[];
+    answer_terms?: string[] | null;
+    enumeration_distractors?: string[] | null;
     correct_answer?: number;
     explanation?: string | null;
     correct_explanation?: string | null;

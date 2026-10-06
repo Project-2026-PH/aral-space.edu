@@ -134,6 +134,8 @@ export class MemoryQuizRepository implements IQuizRepository {
         quiz_id: defaultQuiz.id,
         question_text: q.question_text,
         answer_text: fields.answer_text,
+        answer_terms: fields.answer_terms,
+        enumeration_distractors: fields.enumeration_distractors,
         question_type: fields.question_type,
         options: fields.options,
         correct_answer: fields.correct_answer,
@@ -264,6 +266,8 @@ export class MemoryQuizRepository implements IQuizRepository {
         quiz_id: quizId,
         question_text: q.question_text,
         answer_text: fields.answer_text,
+        answer_terms: fields.answer_terms,
+        enumeration_distractors: fields.enumeration_distractors,
         question_type: fields.question_type,
         options: fields.options,
         correct_answer: fields.correct_answer,
@@ -447,6 +451,8 @@ export class MemoryQuizRepository implements IQuizRepository {
       quiz_id: quizId,
       question_text: dto.question_text,
       answer_text: fields.answer_text,
+      answer_terms: fields.answer_terms,
+      enumeration_distractors: fields.enumeration_distractors,
       question_type: fields.question_type,
       options: fields.options,
       correct_answer: fields.correct_answer,
@@ -471,6 +477,8 @@ export class MemoryQuizRepository implements IQuizRepository {
     const fields = normalizeQuestionFields(dto, question);
     if (dto.question_text !== undefined) question.question_text = dto.question_text;
     question.answer_text = fields.answer_text;
+    question.answer_terms = fields.answer_terms;
+    question.enumeration_distractors = fields.enumeration_distractors;
     question.question_type = fields.question_type;
     question.options = fields.options;
     question.correct_answer = fields.correct_answer;
@@ -836,6 +844,8 @@ export class MemoryQuizRepository implements IQuizRepository {
       questions: questions.map((question) => ({
         question_text: question.question_text,
         answer_text: question.answer_text || null,
+        answer_terms: question.answer_terms || null,
+        enumeration_distractors: question.enumeration_distractors || null,
         question_type: question.question_type || null,
         options: question.options,
         correct_answer: question.correct_answer,

@@ -19,7 +19,16 @@ import type {
   QuestionProgress,
   ShuffledOption
 } from '@quiz-creator/types';
-import { getQuestionAnswer, getQuestionHint } from '@/lib/quizAnswerEvaluation';
+import {
+  getAnswerIdentityKey,
+  getEnumerationMetadata,
+  getQuestionAnswer,
+  getQuestionHint,
+  projectEnumerationOptions,
+  type EnumerationMetadata,
+  type EnumerationState
+} from '@/lib/quizAnswerEvaluation';
+import { getLearnInteraction } from '@/lib/learnModeDispatcher';
 import WindFlameBadge from '@/components/quiz/WindFlameBadge';
 import RichTextContent from '@/components/editor/RichTextContent';
 
@@ -56,6 +65,10 @@ interface SharedQuestionProps {
   isRetryQuestion: boolean;
   onAnswer: (option: ShuffledOption) => void;
   onSubmitTyped: (mode: 'learn' | 'identification') => void;
+  onSubmitEnumerationTerm?: (value: string) => void;
+  onSelectEnumerationOption?: (optionId: string | number) => void;
+  enumerationState?: EnumerationState | null;
+  enumerationMetadata?: EnumerationMetadata | null;
   onInputChange: (value: string) => void;
   onFlip: () => void;
   onShowHint: () => void;
@@ -493,6 +506,119 @@ export function FlashcardQuestion(props: SharedQuestionProps): React.ReactElemen
   );
 }
 
+function EnumerationUnavailableQuestion({ question }: { question: QuizQuestion }): React.ReactElement {
+  return (
+    <div className="flex min-h-[480px] w-full flex-col items-center justify-center rounded-3xl border border-amber-500/30 bg-card p-6 text-center shadow-md sm:p-9">
+      <AlertTriangle className="mb-3 h-8 w-8 text-amber-500" aria-hidden="true" />
+      <h2 className="text-sm font-bold text-foreground">Answer key unavailable</h2>
+      <p className="mt-2 max-w-md text-xs leading-relaxed text-muted-foreground">
+        This enumeration cannot be graded until it has a valid set of answer terms. No mastery will be recorded for this question.
+      </p>
+      <span className="sr-only">Enumeration question {question.id} has unavailable answer terms.</span>
+    </div>
+  );
+}
+
+function EnumerationIdentificationQuestion(props: SharedQuestionProps): React.ReactElement {
+  const {
+    question,
+    identificationInput,
+    isEvaluating,
+    isHintVisible,
+    onInputChange,
+    onShowHint,
+    onAnimate,
+    onDontKnow,
+    onSubmitEnumerationTerm,
+    enumerationState,
+    enumerationMetadata,
+    desktopViewport
+  } = props;
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const metadata = enumerationMetadata || getEnumerationMetadata(question);
+  const state = enumerationState;
+  const attempts = state?.attempts || [];
+  const complete = state?.status === 'complete' || isEvaluating;
+  const latestAttempt = attempts[attempts.length - 1];
+
+  const submit = () => {
+    const value = identificationInput.trim();
+    if (!value || complete || !onSubmitEnumerationTerm) return;
+    inputRef.current?.blur();
+    onSubmitEnumerationTerm(value);
+    onInputChange('');
+  };
+
+  return (
+    <div className={`flex min-h-[480px] w-full flex-col justify-between space-y-4 rounded-3xl border border-border/80 bg-card p-6 shadow-md sm:p-9 ${desktopViewport ? 'desktop-quiz-card lg:p-5' : ''}`}>
+      <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span>Enumeration · Type one term</span>
+        <div className="flex items-center gap-2.5">
+          <AnimateButton onAnimate={onAnimate} />
+          <button type="button" onClick={onShowHint} disabled={isHintVisible || complete} className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
+            <Lightbulb className={isHintVisible ? 'h-3.5 w-3.5 fill-amber-500/20 text-amber-500' : 'h-3.5 w-3.5 text-primary'} />
+            <span>{isHintVisible ? 'Hint active' : 'Hint'}</span>
+          </button>
+        </div>
+      </div>
+      <div className="my-auto flex flex-1 flex-col items-center justify-center space-y-5 py-2 text-center">
+        <RichTextContent html={question.question_text} className="max-w-xl text-base font-bold leading-relaxed text-foreground sm:text-lg" />
+        {isHintVisible && <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">Hint: {getQuestionHint(question)}</div>}
+        <div role="status" aria-live="polite" className="text-xs font-bold text-muted-foreground">Selected {attempts.length}/{metadata.total}</div>
+        <form autoComplete="off" onSubmit={(event) => { event.preventDefault(); submit(); }} className="w-full max-w-md space-y-3">
+          <input ref={inputRef} type="text" name="quiz_enumeration_response" value={identificationInput} onChange={(event) => onInputChange(event.target.value)} disabled={complete} placeholder="Type one answer term..." className={`w-full rounded-2xl border bg-background px-4 py-3 text-center text-sm font-medium text-foreground focus:border-primary focus:outline-none ${latestAttempt?.isCorrect ? 'border-emerald-500 ring-1 ring-emerald-500' : latestAttempt ? 'border-destructive ring-1 ring-destructive' : 'border-border'}`} />
+          <button type="submit" disabled={complete || !identificationInput.trim()} className="w-full rounded-2xl bg-primary py-3 text-xs font-bold text-white shadow-md disabled:cursor-not-allowed disabled:opacity-50">{complete ? 'Quota reached' : 'Submit term'}</button>
+        </form>
+      </div>
+      <div className="min-h-[72px] text-center text-xs">
+        {latestAttempt && !complete && <p className={latestAttempt.isCorrect ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'font-bold text-destructive'}>{latestAttempt.isCorrect ? 'Correct term selected.' : 'Not one of the answer terms.'}</p>}
+        {complete && (
+          <div className={`rounded-2xl border p-4 ${state?.verdict ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-destructive/30 bg-destructive/10'}`}>
+            <p className="font-bold">{state?.verdict ? 'Correct enumeration' : 'Keep practicing'}</p>
+            <p className="mt-1 text-muted-foreground">Answer key: <span className="font-bold text-foreground">{metadata.terms.join(', ')}</span></p>
+            {attempts.length > 0 && <p className="mt-1 text-muted-foreground">Your submissions: <span className="font-semibold text-foreground">{attempts.map((attempt) => attempt.rawValue).join(', ')}</span></p>}
+          </div>
+        )}
+        {!complete && onDontKnow && <button type="button" onClick={onDontKnow} className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 font-bold text-muted-foreground hover:border-destructive/40 hover:text-destructive"><Flag className="h-3.5 w-3.5" />Don&apos;t know</button>}
+      </div>
+    </div>
+  );
+}
+
+function EnumerationMultipleChoiceQuestion(props: SharedQuestionProps): React.ReactElement {
+  const { question, onSelectEnumerationOption, enumerationState, enumerationMetadata, onShowHint, isHintVisible, onAnimate, onDontKnow, isRetryQuestion } = props;
+  const metadata = enumerationMetadata || getEnumerationMetadata(question);
+  const state = enumerationState;
+  const options = projectEnumerationOptions(metadata);
+  const attempted = new Set(state?.attemptedKeys || []);
+  const complete = state?.status === 'complete' || props.isEvaluating;
+  const latestAttempt = state?.attempts[state.attempts.length - 1];
+  return (
+    <div className="multiple-choice-study-card flex min-h-[480px] w-full min-w-0 flex-col gap-4 overflow-y-auto rounded-3xl border border-border/80 bg-card p-4 shadow-md sm:p-6">
+      <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground"><span>Enumeration · Select terms</span><div className="flex items-center gap-2"><AnimateButton onAnimate={onAnimate} /><button type="button" onClick={onShowHint} disabled={isHintVisible || complete} className="rounded-xl px-2.5 py-1 text-[11px] font-bold disabled:opacity-50"><Lightbulb className="inline h-3.5 w-3.5 text-primary" /> Hint</button></div></div>
+      <RichTextContent html={question.question_text} className="text-sm font-bold leading-relaxed text-foreground sm:text-base" />
+      {isHintVisible && <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">Hint: {getQuestionHint(question)}</div>}
+      <div role="status" aria-live="polite" className="text-xs font-bold text-muted-foreground">Selected {state?.attempts.length || 0}/{metadata.total}</div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {options.map((option) => {
+          const key = getAnswerIdentityKey(option.text);
+          const selected = attempted.has(key);
+          const isCorrect = option.isCorrect;
+          const style = selected
+            ? isCorrect ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 opacity-60 dark:text-emerald-300' : 'border-destructive bg-destructive/10 text-destructive opacity-60'
+            : 'border-border bg-background/50 hover:border-primary/50 hover:bg-card';
+          return <button key={option.id} type="button" aria-pressed={selected} disabled={selected || complete} onClick={() => onSelectEnumerationOption?.(option.id)} className={`flex min-h-14 items-center gap-3 rounded-2xl border p-3 text-left text-xs font-semibold transition-all disabled:cursor-not-allowed ${style}`}><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-muted text-[11px] text-muted-foreground">{selected ? (isCorrect ? '✓' : '×') : '＋'}</span><span>{option.text}</span></button>;
+        })}
+      </div>
+      <div className="min-h-16 text-center text-xs">
+        {latestAttempt && !complete && <p className={latestAttempt.isCorrect ? 'font-bold text-emerald-600 dark:text-emerald-400' : 'font-bold text-destructive'}>{latestAttempt.isCorrect ? 'Correct term selected.' : 'Wrong term selected.'}</p>}
+        {complete && <div className={`rounded-2xl border p-3 ${state?.verdict ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-destructive/30 bg-destructive/10'}`}><p className="font-bold">{state?.verdict ? 'Correct enumeration' : 'Keep practicing'}</p><p className="mt-1 text-muted-foreground">Answer key: <span className="font-semibold text-foreground">{metadata.terms.join(', ')}</span></p></div>}
+        {!complete && onDontKnow && <button type="button" onClick={onDontKnow} className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 font-bold text-muted-foreground hover:text-destructive"><Flag className="h-3.5 w-3.5" />Don&apos;t know</button>}
+      </div>
+    </div>
+  );
+}
+
 export function IdentificationQuestion(props: SharedQuestionProps): React.ReactElement {
   const {
     question,
@@ -911,7 +1037,27 @@ export function MultipleChoiceQuestion(props: SharedQuestionProps): React.ReactE
 }
 
 export function QuestionRenderer({ mode, ...props }: QuizQuestionRendererProps): React.ReactElement {
-  if (mode === 'learn' || ((mode === 'multiple_choice' || mode === 'reverse') && props.question.options.length < 2)) {
+  const isEnumeration = props.question.question_type === 'enumeration';
+  const enumerationMetadata = props.enumerationMetadata || (isEnumeration ? getEnumerationMetadata(props.question) : null);
+
+  if (isEnumeration && (!enumerationMetadata || enumerationMetadata.status !== 'available')) {
+    return <EnumerationUnavailableQuestion question={props.question} />;
+  }
+  if (isEnumeration && (mode === 'identification' || mode === 'learn')) {
+    return <EnumerationIdentificationQuestion {...props} enumerationMetadata={enumerationMetadata} />;
+  }
+  if (isEnumeration && (mode === 'multiple_choice' || mode === 'reverse')) {
+    return <EnumerationMultipleChoiceQuestion {...props} enumerationMetadata={enumerationMetadata} />;
+  }
+
+  if (mode === 'learn') {
+    const interaction = getLearnInteraction(props.question);
+    if (interaction === 'multiple_choice' || interaction === 'true_false') {
+      return <MultipleChoiceQuestion {...props} />;
+    }
+    return <LearnQuestion mode={mode} {...props} />;
+  }
+  if ((mode === 'multiple_choice' || mode === 'reverse') && props.question.options.length < 2) {
     return <LearnQuestion mode={mode} {...props} />;
   }
   if (mode === 'flashcard') return <FlashcardQuestion {...props} />;

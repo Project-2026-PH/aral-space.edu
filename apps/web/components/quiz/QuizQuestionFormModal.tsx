@@ -116,6 +116,7 @@ export default function QuizQuestionFormModal({
 
   function clearModalSnapshots() {
     undoHistoryRef.current.clear();
+    pasteRequestRef.current += 1;
   }
 
   function handleModalUndo(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -126,8 +127,8 @@ export default function QuizQuestionFormModal({
     const target = event.target as HTMLElement | null;
     if (
       !(
-        (target?.closest('input, textarea, [contenteditable="true"]') ||
-          target?.closest('[data-authoring-undo-target="true"]'))
+        target?.closest('[data-authoring-undo-input="true"]') ||
+          target?.closest('[data-authoring-undo-target="true"]')
       ) ||
       !undoHistoryRef.current.hasPendingSnapshot()
     ) {
@@ -506,6 +507,7 @@ export default function QuizQuestionFormModal({
               placeholder="Type question prompt here..."
               minHeight="120px"
               data-skip-clipboard-intercept="true"
+              data-authoring-undo-input="true"
               hideToolbarUntilFocus
             />
           </div>
@@ -632,6 +634,7 @@ export default function QuizQuestionFormModal({
                 setAnswerText(e.target.value);
               }}
               onPaste={handleClipboardPaste}
+              data-authoring-undo-input="true"
               className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
             />
             <p className="text-[11px] text-muted-foreground">
@@ -656,6 +659,7 @@ export default function QuizQuestionFormModal({
                 setAnswerText(e.target.value);
               }}
               onPaste={handleClipboardPaste}
+              data-authoring-undo-input="true"
               className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
             />
           </div>

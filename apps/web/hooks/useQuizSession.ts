@@ -27,9 +27,10 @@ import {
   removeQuizProgressSnapshot,
   writeQuizProgressSnapshot,
   type PersistedAnswerEvent,
+  type PersistedEnumerationRecord,
   type QuizProgressSnapshot
 } from '@/lib/quizProgressPersistence';
-import { evaluateTypedAnswer, getQuestionAnswer } from '@/lib/quizAnswerEvaluation';
+import { evaluateTypedAnswer, getQuestionAnswer, getAnswerIdentityKey, getEnumerationMetadata, createEnumerationState, finalizeEnumerationState, projectEnumerationOptions, submitEnumerationAttempt, type EnumerationMetadata, type EnumerationState } from '@/lib/quizAnswerEvaluation';
 import {
   calculateAnswerTransition,
   QUIZ_SESSION_POLICY
@@ -66,6 +67,30 @@ function getProgressSourceId(questionId: string): string {
   const tfIndex = questionId.indexOf('-tf-');
   if (tfIndex !== -1) return questionId.slice(0, tfIndex);
   return questionId;
+}
+
+function getEnumerationPresentationKey(sessionId: string, question: QuizQuestion, attemptNumber: number, isStruggleReviewMode: boolean): string {
+  return `${sessionId}:${question.id}:${isStruggleReviewMode ? 'struggle' : 'round'}:${attemptNumber}`;
+}
+
+function toPersistedEnumerationRecord(
+  presentationKey: string,
+  state: EnumerationState
+): PersistedEnumerationRecord {
+  return { ...state, presentationKey };
+}
+
+function fromPersistedEnumerationRecord(record: PersistedEnumerationRecord): EnumerationState {
+  const { presentationKey: _presentationKey, ...state } = record;
+  return state;
+}
+
+function matchesEnumerationMetadata(state: EnumerationState, metadata: EnumerationMetadata): boolean {
+  const canonicalKeys = metadata.terms.map(getAnswerIdentityKey);
+  return metadata.status === 'available'
+    && state.total === metadata.total
+    && state.canonicalKeys.length === canonicalKeys.length
+    && state.canonicalKeys.every((key, index) => key === canonicalKeys[index]);
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -203,6 +228,7 @@ export function useQuizSession({
   );
   const [isMuted, setIsMuted] = useState(false);
   const [currentOptions, setCurrentOptions] = useState<ShuffledOption[]>([]);
+  const [enumerationState, setEnumerationState] = useState<EnumerationState | null>(null);
   const [sessionSummary, setSessionSummary] = useState<SessionMasterySummary | null>(null);
   const [correctAnswerIds, setCorrectAnswerIds] = useState<Set<string>>(new Set());
   const [currentStreak, setCurrentStreak] = useState<number>(0);
@@ -280,6 +306,25 @@ export function useQuizSession({
         setIsCompleted(snapshot.isCompleted);
         telemetry.restore(snapshot.cardTelemetry);
         setPendingAnswerEvents(snapshot.pendingAnswerEvents);
+        latestSnapshotRef.current = snapshot;
+        const restoredQuestion = questions.find((question) => question.id === snapshot.queueState.activeQueue[0]);
+        if (restoredQuestion?.question_type === 'enumeration') {
+          const restoredMetadata = getEnumerationMetadata(restoredQuestion);
+          const restoredKey = getEnumerationPresentationKey(
+            session.id,
+            restoredQuestion,
+            snapshot.queueState.attemptsByQuestion[restoredQuestion.id] || 0,
+            snapshot.isStruggleReviewMode
+          );
+          const restoredEnumeration = snapshot.enumerationByPresentation[restoredKey];
+          setEnumerationState(
+            restoredEnumeration && matchesEnumerationMetadata(fromPersistedEnumerationRecord(restoredEnumeration), restoredMetadata)
+              ? fromPersistedEnumerationRecord(restoredEnumeration)
+              : createEnumerationState({ ...restoredMetadata, questionId: restoredQuestion.id })
+          );
+        } else {
+          setEnumerationState(null);
+        }
       } else {
         removeQuizProgressSnapshot(quiz.id, session.id);
       }
@@ -318,6 +363,20 @@ export function useQuizSession({
     ? questions.find((question) => question.id === activeQuestionId) || null
     : null;
   const currentProg = activeQuestion ? progressMap.get(activeQuestion.id) || null : null;
+  const enumerationMetadata = activeQuestion?.question_type === 'enumeration'
+    ? getEnumerationMetadata(activeQuestion)
+    : null;
+  const enumerationPresentationKey = activeQuestion && enumerationMetadata
+    ? getEnumerationPresentationKey(
+      session.id,
+      activeQuestion,
+      queueState.attemptsByQuestion[activeQuestion.id] || 0,
+      isStruggleReviewMode
+    )
+    : null;
+  const enumerationMetadataKey = enumerationMetadata
+    ? `${enumerationMetadata.status}:${enumerationMetadata.total}:${enumerationMetadata.terms.map(getAnswerIdentityKey).join('|')}`
+    : '';
   const isRetryQuestion = Boolean(
     activeQuestion && (
       (queueState.attemptsByQuestion[activeQuestion.id] || 0) > 0 ||
@@ -334,8 +393,19 @@ export function useQuizSession({
 
   function persistCurrentSnapshot(): void {
     if (!isProgressHydrated) return;
+    const enumerationByPresentation = {
+      ...(latestSnapshotRef.current?.enumerationByPresentation || {})
+    };
+    if (enumerationPresentationKey && enumerationState?.status === 'active') {
+      enumerationByPresentation[enumerationPresentationKey] = toPersistedEnumerationRecord(
+        enumerationPresentationKey,
+        enumerationState
+      );
+    } else if (enumerationPresentationKey) {
+      delete enumerationByPresentation[enumerationPresentationKey];
+    }
     const snapshot: QuizProgressSnapshot = {
-      version: 1,
+      version: 2,
       quizId: quiz.id,
       sessionId: session.id,
       queueState,
@@ -365,6 +435,7 @@ export function useQuizSession({
       isCompleted,
       cardTelemetry: telemetry.recordsRef.current,
       pendingAnswerEvents,
+      enumerationByPresentation,
       savedAt: new Date().toISOString()
     };
     latestSnapshotRef.current = snapshot;
@@ -396,7 +467,9 @@ export function useQuizSession({
     isExplanationVisible,
     isCompleted,
     telemetry.records,
-    pendingAnswerEvents
+    pendingAnswerEvents,
+    enumerationState,
+    enumerationPresentationKey
   ]);
 
   async function syncAnswerEvent(event: PersistedAnswerEvent): Promise<void> {
@@ -437,6 +510,19 @@ export function useQuizSession({
       })));
 
     const restoredSnapshot = restoringSnapshotRef.current;
+    if (enumerationMetadata) {
+      const persisted = restoredSnapshot && enumerationPresentationKey
+        ? restoredSnapshot.enumerationByPresentation[enumerationPresentationKey]
+        : undefined;
+      setEnumerationState(
+        persisted && matchesEnumerationMetadata(fromPersistedEnumerationRecord(persisted), enumerationMetadata)
+          ? fromPersistedEnumerationRecord(persisted)
+          : createEnumerationState({ ...enumerationMetadata, questionId: activeQuestion.id })
+      );
+    } else {
+      setEnumerationState(null);
+    }
+
     if (restoredSnapshot?.queueState.activeQueue[0] === activeQuestion.id) {
       setIsEvaluating(restoredSnapshot.isEvaluating);
       setIsCardFlipped(restoredSnapshot.isCardFlipped);
@@ -464,7 +550,7 @@ export function useQuizSession({
     setFeedbackMessage(null);
     setIsHintVisible(false);
     setIsExplanationVisible(false);
-  }, [activeQuestion?.id, shuffleOptions]);
+  }, [activeQuestion?.id, shuffleOptions, enumerationPresentationKey, enumerationMetadataKey]);
 
   async function refreshQuestionsFromApi(): Promise<QuizQuestion[]> {
     try {
@@ -500,7 +586,7 @@ export function useQuizSession({
     setQueueState(CognitiveMasteryQueue.initialize(validIds));
   }
 
-  function answerQuestion(option: ShuffledOption | undefined, typedAnswerMode?: 'learn' | 'identification'): void {
+  function commitTransitionBoundary(option: ShuffledOption | undefined, typedAnswerMode?: 'learn' | 'identification'): void {
     if (!isProgressHydrated || !option || isEvaluating || !activeQuestion || !currentProg) return;
 
     setIsEvaluating(true);
@@ -650,6 +736,53 @@ export function useQuizSession({
     }, QUIZ_SESSION_POLICY.questionExitDurationMs);
   }
 
+  /**
+   * Enumeration completion has its own boundary so intermediate attempts never
+   * enter ordinary answer handling. The shared transition implementation is
+   * invoked only after the aggregate enumeration verdict is finalized.
+   */
+  function commitEnumerationTransition(verdict: boolean, value: string, answerMode?: 'identification'): void {
+    commitTransitionBoundary({
+      optionId: -1,
+      text: value,
+      isCorrect: verdict
+    }, answerMode);
+  }
+
+  function submitEnumerationValue(value: string, answerMode?: 'identification'): void {
+    if (!isProgressHydrated || !activeQuestion || activeQuestion.question_type !== 'enumeration'
+      || !currentProg || !enumerationMetadata || enumerationMetadata.status !== 'available'
+      || !enumerationState || enumerationState.status !== 'active' || isEvaluating || pendingAdvance) return;
+
+    const nextState = submitEnumerationAttempt(enumerationState, value, enumerationMetadata);
+    if (nextState === enumerationState) return;
+    setEnumerationState(nextState);
+    const latestAttempt = nextState.attempts[nextState.attempts.length - 1];
+    setTypedAnswerCorrect(latestAttempt?.isCorrect ?? false);
+    setIdentificationSubmitted(true);
+    setIdentificationInput(value);
+    setFeedbackMessage(latestAttempt?.isCorrect ? getRandomFeedbackMessage(CORRECT_FEEDBACK_MESSAGES) : getRandomFeedbackMessage(INCORRECT_FEEDBACK_MESSAGES));
+
+    if (nextState.status === 'complete') {
+      const finalState = finalizeEnumerationState(nextState, enumerationMetadata);
+      setEnumerationState(finalState);
+      commitEnumerationTransition(finalState.verdict === true, value, answerMode);
+    }
+  }
+
+  function submitEnumerationTerm(value: string): void {
+    submitEnumerationValue(value, 'identification');
+  }
+
+  function selectEnumerationOption(optionId: string | number): void {
+    if (!enumerationMetadata || enumerationMetadata.status !== 'available') return;
+    const options = projectEnumerationOptions(enumerationMetadata);
+    const option = typeof optionId === 'number'
+      ? options[optionId]
+      : options.find((candidate) => candidate.id === String(optionId));
+    if (!option) return;
+    submitEnumerationValue(option.text);
+  }
   function submitTypedAnswer(answerMode: 'learn' | 'identification'): void {
     if (!isProgressHydrated || isEvaluating || !activeQuestion || !currentProg || !identificationInput.trim()) return;
     const isCorrect = evaluateTypedAnswer(
@@ -659,7 +792,7 @@ export function useQuizSession({
     );
     setTypedAnswerCorrect(isCorrect);
     setIdentificationSubmitted(true);
-    answerQuestion({
+    commitTransitionBoundary({
       optionId: activeQuestion.correct_answer,
       text: identificationInput,
       isCorrect
@@ -669,11 +802,16 @@ export function useQuizSession({
   function giveUp(answerMode?: 'learn' | 'identification'): void {
     if (!isProgressHydrated || isEvaluating || !activeQuestion || !currentProg) return;
 
+    if (activeQuestion.question_type === 'enumeration') {
+      submitEnumerationValue("Don't know", answerMode === 'identification' ? 'identification' : undefined);
+      return;
+    }
+
     if (answerMode === 'learn' || answerMode === 'identification') {
       setIdentificationInput("Don't know");
       setTypedAnswerCorrect(false);
       setIdentificationSubmitted(true);
-      answerQuestion({
+      commitTransitionBoundary({
         optionId: -1,
         text: "Don't know",
         isCorrect: false
@@ -681,7 +819,7 @@ export function useQuizSession({
       return;
     }
 
-    answerQuestion({
+    commitTransitionBoundary({
       optionId: -1,
       text: "Don't know",
       isCorrect: false
@@ -748,7 +886,7 @@ export function useQuizSession({
       const choiceIndex = Number.parseInt(event.key, 10) - 1;
       if (choiceIndex < 0 || choiceIndex >= currentOptions.length) return;
       event.preventDefault();
-      answerQuestion(currentOptions[choiceIndex]);
+      commitTransitionBoundary(currentOptions[choiceIndex]);
     }
 
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -818,6 +956,7 @@ export function useQuizSession({
     setIsCardFlipped(false);
     setSelectedOptionId(null);
     setIsEvaluating(false);
+    setEnumerationState(null);
     setEvaluatedCardIds([]);
     setPendingAdvance(null);
     setIsRecapVisible(false);
@@ -867,6 +1006,7 @@ export function useQuizSession({
     currentProg,
     isRetryQuestion,
     currentOptions,
+    enumerationState,
     isCardFlipped,
     selectedOptionId,
     isEvaluating,
@@ -896,8 +1036,10 @@ export function useQuizSession({
     setIdentificationInput,
     setIsHintVisible,
     setIsExplanationVisible,
-    answerQuestion,
+    answerQuestion: commitTransitionBoundary,
     submitTypedAnswer,
+    submitEnumerationTerm,
+    selectEnumerationOption,
     giveUp,
     advance,
     startStruggleReview,

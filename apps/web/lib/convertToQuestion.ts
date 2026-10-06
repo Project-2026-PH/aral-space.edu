@@ -35,7 +35,9 @@ export function convertToQuestion(text: string, term: string): string {
     namingPredicatePattern,
     (match, prefix: string, punctuation: string | undefined, offset: number, source: string) => {
       const isFinalSentence = /^\s*$/.test(source.slice(offset + match.length));
-      return `${prefix}what${isFinalSentence ? '?' : punctuation ?? ''}`;
+      return isFinalSentence
+        ? `${prefix}what?`
+        : match;
     }
   );
 
@@ -47,7 +49,9 @@ export function convertToQuestion(text: string, term: string): string {
     copularPredicatePattern,
     (match, prefix: string, punctuation: string | undefined, offset: number, source: string) => {
       const isFinalSentence = /^\s*$/.test(source.slice(offset + match.length));
-      return `${prefix}known as what${isFinalSentence ? '?' : punctuation ?? ''}`;
+      return isFinalSentence
+        ? `${prefix}known as what?`
+        : match;
     }
   );
 

@@ -115,6 +115,10 @@ export function parseQuestionInput(value: unknown, field = 'question', partial =
     if (options === null) result.options = null;
     else result.options = options.map((item, index) => boundedString(item, `${field}.options[${index}]`, 5_000, true)!);
   }
+  const answerTerms = optionalStringArray(object.answer_terms, `${field}.answer_terms`, 20, 5_000);
+  if (answerTerms !== undefined) result.answer_terms = answerTerms;
+  const enumerationDistractors = optionalStringArray(object.enumeration_distractors, `${field}.enumeration_distractors`, 20, 5_000);
+  if (enumerationDistractors !== undefined) result.enumeration_distractors = enumerationDistractors;
   const correctAnswer = boundedInteger(object.correct_answer, `${field}.correct_answer`, 0, 100);
   if (correctAnswer !== undefined) result.correct_answer = correctAnswer;
   const explanation = optionalText(object.explanation, `${field}.explanation`, 10_000);

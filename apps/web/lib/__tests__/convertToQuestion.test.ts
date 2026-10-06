@@ -24,9 +24,30 @@ describe('convertToQuestion', () => {
     );
   });
 
-  it('transforms predicate and repeated mentions', () => {
+  it('replaces copular and naming predicate answer slots', () => {
+    expect(
+      convertToQuestion(
+        'Individual numbers (that are not part of a point or vector) are often called scalars',
+        'scalars'
+      )
+    ).toBe('Individual numbers (that are not part of a point or vector) are often called what?');
+    expect(convertToQuestion('This is photosynthesis.', 'photosynthesis')).toBe(
+      'This is known as what?'
+    );
+    expect(convertToQuestion('Numbers are known as scalars.', 'scalars')).toBe(
+      'Numbers are known as what?'
+    );
+  });
+
+  it('transforms repeated mentions without inserting a mid-sentence question', () => {
     expect(convertToQuestion('This is photosynthesis. Photosynthesis needs light.', 'photosynthesis')).toBe(
-      'This is known as what? this process needs light. What is this operation called?'
+      'This is known as what. this process needs light. What is this operation called?'
+    );
+  });
+
+  it('capitalizes only the first alphabetic output character', () => {
+    expect(convertToQuestion('in gravity, NASA studies objects.', 'gravity')).toBe(
+      'Here, NASA studies objects. What is this operation called?'
     );
   });
 

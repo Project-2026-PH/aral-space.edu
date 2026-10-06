@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Repair convertToQuestion so scalar/naming predicates become grammatical final questions without mid-sentence fragments, while preserving deterministic opener, repeated-term, boundary, suffix, and capitalization behavior.",
+  "status": "completed",
+  "steps": [
+    "Update apps/web/lib/convertToQuestion.ts with explicit escaped case-insensitive word-boundary patterns for In/With/During/For openers, copular predicates, and called/known-as predicates; substitute the answer slot with what and append only one final question when needed.",
+    "Keep apps/web/lib/clipboardQuestionPrompt.ts as the integration point and preserve QuizTransformService fallback for parser-stripped definitions.",
+    "Extend apps/web/lib/__tests__/convertToQuestion.test.ts and apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts with scalar, predicate, repeated mention, opener, capitalization, boundary, suffix, and fallback cases."
+  ],
+  "acceptance_criteria": [
+    "The scalar input ending in `are often called scalars` becomes a grammatical question ending in `are often called what?` or an equivalent deterministic final-question form; it contains no mid-sentence `What is this called?` fragment.",
+    "The matrix multiplication example still begins with a contextual opener such as `Here,` and ends with one natural operation question.",
+    "Term matching remains case-insensitive and word-boundary-aware, no underscores are generated, and only the first alphabetic output character is capitalized by default.",
+    "Focused converter and prompt tests pass."
+  ],
+  "verification": [
+    "pnpm vitest run apps/web/lib/__tests__/convertToQuestion.test.ts apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts"
+  ],
+  "blocked_reason": null,
+  "findings": "Implemented sentence-aware deterministic predicate substitution. Naming predicates such as `are often called scalars` now replace only the answer slot with `what` and receive a final question mark when they end the input; non-final predicate clauses do not receive a mid-sentence question fragment. Existing opener, repeated mention, boundary, suffix, and parser-stripped fallback behavior remains covered.",
+  "implementation_details": [
+    "Added explicit escaped, case-insensitive word-boundary regexes for In/With/During/For openers, copular predicates, and called/known-as/referred-to-as predicates.",
+    "Preserved `apps/web/lib/clipboardQuestionPrompt.ts` as the prompt integration point and did not add the absent ai/clipboardQuestionPrompt.ts path.",
+    "Added first-alphabetic-character capitalization without changing later source capitalization or generating underscore blanks."
+  ],
+  "test_results": "PASS — pnpm vitest run apps/web/lib/__tests__/convertToQuestion.test.ts apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts (2 files, 16 tests).",
+  "source_discrepancies": "The requested apps/web/lib/ai/clipboardQuestionPrompt.ts does not exist; the actual integration module is apps/web/lib/clipboardQuestionPrompt.ts and was preserved.",
+  "later_features": "FEAT-002 and later authoring-flow work can consume buildClipboardQuestionPrompt unchanged. Preserve the converter's parser-stripped fallback contract and do not alter unrelated pre-existing changes, especially apps/web/hooks/useQuizSession.ts."
+}

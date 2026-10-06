@@ -11,6 +11,15 @@ describe('buildClipboardQuestionPrompt', () => {
     ).toBe('Here, rows are multiplied by columns. What is this operation called?');
   });
 
+  it('uses the corrected naming predicate conversion for scalar definitions', () => {
+    expect(
+      buildClipboardQuestionPrompt(
+        'Individual numbers (that are not part of a point or vector) are often called scalars',
+        'scalars'
+      )
+    ).toBe('Individual numbers (that are not part of a point or vector) are often called what?');
+  });
+
   it('uses the contextual fallback when the parser stripped the term', () => {
     expect(
       buildClipboardQuestionPrompt(

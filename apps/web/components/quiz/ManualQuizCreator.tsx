@@ -8,6 +8,7 @@ import NewSubjectModal from '../subject/NewSubjectModal';
 import StickyActionDock from '../ui/StickyActionDock';
 import { parseSmartClipboard, type ParsedClipboard } from '@/lib/clipboardParser';
 import { parseWithSmolLM2 } from '@/lib/ai/localClipboardParser';
+import { buildClipboardQuestionPrompt } from '@/lib/clipboardQuestionPrompt';
 import { QuizTransformService } from '@quiz-creator/core';
 import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
 import RichTextEditor from '@/components/editor/RichTextEditor';
@@ -423,7 +424,7 @@ export default function ManualQuizCreator({
 
     if (parsed && parsed.type === 'single_pair') {
       e.preventDefault();
-      const phrasedPrompt = QuizTransformService.phraseIdentificationPrompt(parsed.definition, parsed.term);
+      const phrasedPrompt = buildClipboardQuestionPrompt(parsed.definition, parsed.term);
       const targetEditor = (e.target as HTMLElement).closest('[contenteditable="true"]') as HTMLElement | null;
       if (targetEditor) {
         targetEditor.innerHTML = normalizeRichTextHtml(phrasedPrompt);
@@ -450,7 +451,7 @@ export default function ManualQuizCreator({
     if (text && text.trim().length >= 15 && text.trim().length <= 800) {
       parseWithSmolLM2(text).then((aiParsed) => {
         if (aiParsed && aiParsed.type === 'single_pair') {
-          const phrasedPrompt = QuizTransformService.phraseIdentificationPrompt(aiParsed.definition, aiParsed.term);
+          const phrasedPrompt = buildClipboardQuestionPrompt(aiParsed.definition, aiParsed.term);
           setQuestions((prev) => {
             const updated = [...prev];
             if (!updated[qIdx]) return prev;
@@ -486,7 +487,7 @@ export default function ManualQuizCreator({
       next[qIdx] = {
         ...next[qIdx],
         type: 'identification',
-        question_text: QuizTransformService.phraseIdentificationPrompt(parsed.definition, parsed.term),
+        question_text: buildClipboardQuestionPrompt(parsed.definition, parsed.term),
         options: [parsed.term],
         correct_answer: 0
       };
@@ -510,7 +511,7 @@ export default function ManualQuizCreator({
             updated[qIdx] = {
               ...updated[qIdx],
               type: 'identification',
-              question_text: QuizTransformService.phraseIdentificationPrompt(aiParsed.definition, aiParsed.term),
+              question_text: buildClipboardQuestionPrompt(aiParsed.definition, aiParsed.term),
               options: [aiParsed.term],
               correct_answer: 0
             };
@@ -565,7 +566,7 @@ export default function ManualQuizCreator({
     if (pendingImport.type === 'bulk_terms') {
       const newCards: QuestionDraft[] = pendingImport.items.map((item) => ({
         type: 'identification',
-        question_text: QuizTransformService.phraseIdentificationPrompt(item.definition, item.term),
+        question_text: buildClipboardQuestionPrompt(item.definition, item.term),
         options: [item.term],
         correct_answer: 0,
         explanation: ''

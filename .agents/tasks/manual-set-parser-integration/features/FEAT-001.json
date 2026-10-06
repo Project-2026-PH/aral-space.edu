@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Centralize deterministic clipboard-pair prompt construction and make manual set creation use the converter without changing structured Q&A or bulk import semantics.",
+  "status": "completed",
+  "steps": [
+    "Create C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\lib\\clipboardQuestionPrompt.ts with a single adapter that calls convertToQuestion first, preserves already-question-ending prompts, and uses phraseIdentificationPrompt only for parser-stripped term fallbacks with one guarded suffix.",
+    "Add C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\lib\\__tests__\\clipboardQuestionPrompt.test.ts covering term-present substitution, term-absent fallback, existing question punctuation, and empty inputs.",
+    "Replace all identification prompt construction call sites in C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\components\\quiz\\ManualQuizCreator.tsx for direct single pairs, async SmolLM2 results, and bulk terms; leave question_answer, enumeration, pending bulk handling, answer fields, save payloads, and navigation unchanged."
+  ],
+  "acceptance_criteria": [
+    "Every parsed term/definition card created by ManualQuizCreator uses the shared adapter and ultimately has the original term as its answer option.",
+    "Definitions containing the term use convertToQuestion's case-insensitive word-boundary substitution and have no blank underscores or duplicate question suffix.",
+    "Question/answer pastes remain verbatim and parser/model failures do not prevent native fallback behavior.",
+    "The focused converter, parser, and adapter Vitest tests pass and the web typecheck passes."
+  ],
+  "verification": [
+    "pnpm exec vitest run apps/web/lib/__tests__/convertToQuestion.test.ts apps/web/lib/__tests__/clipboardParser.test.ts apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts",
+    "pnpm --filter @quiz-creator/web typecheck"
+  ],
+  "verification_results": {
+    "pnpm exec vitest run apps/web/lib/__tests__/convertToQuestion.test.ts apps/web/lib/__tests__/clipboardParser.test.ts apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts": "passed: 3 files, 52 tests",
+    "pnpm --filter @quiz-creator/web typecheck": "passed",
+    "pnpm --filter @quiz-creator/web build": "passed"
+  },
+  "blocked_reason": null,
+  "findings": "Centralized parsed definition prompt construction in buildClipboardQuestionPrompt. Term-containing definitions use convertToQuestion; parser-stripped definitions use QuizTransformService.phraseIdentificationPrompt with one guarded question suffix. ManualQuizCreator now uses the adapter for direct single pairs, async SmolLM2 results, and bulk terms; question_answer, question_answers, enumeration_blocks, answer options, and persistence payload behavior remain unchanged. The encoded-slug overview route was not modified. Browser-only manual verification was not available in this workflow; static integration checks and the web build passed."
+}

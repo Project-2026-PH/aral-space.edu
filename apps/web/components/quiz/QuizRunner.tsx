@@ -30,6 +30,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { recordExplanationFeedback } from '@/lib/ai/explanationPreferences';
 import { getClientUserId } from '@/lib/authoringPreferences';
 import KoleSceneModal from '@/components/quiz/KoleSceneModal';
+import PdfHandoutViewer from '@/components/quiz/PdfHandoutViewer';
 import type { SceneReaction } from '@/lib/ai/sceneTypes';
 
 interface QuizRunnerProps {
@@ -458,13 +459,17 @@ export default function QuizRunner(props: QuizRunnerProps) {
       </div>
 
       <div className={showSource && quiz.handout_path ? 'grid min-w-0 items-start gap-0 overflow-hidden lg:mt-12 lg:h-[calc(100dvh-28rem)] lg:max-h-[calc(100dvh-11rem)] lg:min-h-0 lg:grid-cols-[minmax(300px,2fr)_minmax(0,3fr)] lg:divide-x lg:divide-border/70' : ''}>
-      {showSource && quiz.handout_path && (
+      {showSource && sourceHandoutUrl && (
         <aside className="quiz-source-panel-enter hidden min-w-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-lg shadow-black/10 lg:order-first lg:flex lg:h-full lg:max-h-full lg:min-h-0 lg:mx-3">
           <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-muted/30 px-3.5">
             <span className="flex min-w-0 items-center gap-2 text-xs font-bold text-foreground"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileText className="h-3.5 w-3.5" /></span><span className="truncate" title={quiz.handout_name || 'Source handout'}>{quiz.handout_name || 'Source handout'}</span></span>
             <button type="button" onClick={() => setShowSource(false)} className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Hide</button>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden p-2"><iframe title={quiz.handout_name || 'Source handout'} src={sourceHandoutUrl || undefined} className="h-full min-h-0 w-full rounded-xl border border-border/60 bg-muted" /></div>
+          <PdfHandoutViewer
+            sourceUrl={sourceHandoutUrl}
+            title={quiz.handout_name || 'Source handout'}
+            className="min-h-0 flex-1 rounded-xl border border-border/60"
+          />
         </aside>
       )}
       <div className={showSource && quiz.handout_path ? 'quiz-source-content-enter min-w-0 overflow-hidden lg:h-full lg:min-h-0 lg:overflow-y-auto lg:px-6 lg:pt-0' : 'min-w-0'}>
@@ -521,9 +526,13 @@ export default function QuizRunner(props: QuizRunnerProps) {
       </div>
       </div>
 
-      {isMobileSource && showSource && quiz.handout_path && (
+      {isMobileSource && showSource && sourceHandoutUrl && (
         <Modal open={showSource} onOpenChange={setShowSource} title={quiz.handout_name || 'Source handout'} description="Reference this handout while answering.">
-          <iframe title={quiz.handout_name || 'Source handout'} src={sourceHandoutUrl || undefined} className="h-[70vh] w-full rounded-2xl border border-border/60 bg-muted" />
+          <PdfHandoutViewer
+            sourceUrl={sourceHandoutUrl}
+            title={quiz.handout_name || 'Source handout'}
+            className="h-[70vh] w-full rounded-2xl border border-border/60"
+          />
         </Modal>
       )}
 

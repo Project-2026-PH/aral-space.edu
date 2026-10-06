@@ -59,7 +59,7 @@ export default function PdfHandoutViewer({ sourceUrl, title, className = '' }: P
         if (!response.ok) throw new Error(`Unable to load source PDF (${response.status})`);
 
         const data = new Uint8Array(await response.arrayBuffer());
-        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js');
         // Brave on iPadOS uses WebKit and can fail to start the module worker.
         // Keep PDF parsing/rendering on the main thread for reliable mobile display.
         loadingTask = pdfjs.getDocument({

@@ -19,6 +19,10 @@ const QUESTION_TYPES: { id: QuestionType; label: string; icon: React.ComponentTy
 ];
 
 function detectQuestionType(question: QuizQuestion): QuestionType {
+  if (question.question_type === 'enumeration') {
+    return 'enumeration';
+  }
+
   const options = question.options || [];
   if (
     options.length === 2 &&
@@ -195,7 +199,7 @@ export default function QuizQuestionFormModal({
       }
       cleanedOptions = filled;
       cleanedCorrect = 0;
-      cleanedAnswer = cleanedAnswer || cleanedOptions[0];
+      cleanedAnswer = String(filled.length);
     }
 
     setSaving(true);
@@ -204,7 +208,9 @@ export default function QuizQuestionFormModal({
     const payload = {
       question_text: questionText.trim(),
       answer_text: cleanedAnswer || null,
-      question_type: type === 'typed_answer' || type === 'identification' ? 'typed_answer' as const : 'multiple_choice' as const,
+      question_type: type === 'enumeration'
+        ? 'enumeration' as const
+        : type === 'typed_answer' || type === 'identification' ? 'typed_answer' as const : 'multiple_choice' as const,
       options: cleanedOptions,
       correct_answer: cleanedCorrect,
       explanation: explanation.trim() || null

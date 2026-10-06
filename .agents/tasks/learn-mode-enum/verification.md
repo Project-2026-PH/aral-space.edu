@@ -27,3 +27,12 @@
 - `pnpm --filter @quiz-creator/types typecheck; pnpm --filter @quiz-creator/core typecheck; pnpm --filter @quiz-creator/web typecheck` — passed.
 - `pnpm --filter @quiz-creator/web build` — passed; Next.js production build completed successfully.
 - `git diff --check` — passed.
+
+## Review findings iteration 2
+
+- Fixed `QuizQuestionFormModal` to preserve an existing `question_type: 'enumeration'` during edit instead of inferring multiple choice from item count.
+- Fixed enumeration saves to persist `answer_text` as the number of non-empty items, preserving the canonical Learn Mode answer key.
+- `pnpm exec vitest run apps/web/lib/__tests__/requestValidation.test.ts apps/web/lib/__tests__/quizAnswerEvaluation.test.ts packages/core/src/services/__tests__/QuizTransformService.test.ts` — passed, 3 files / 36 tests.
+- `pnpm --filter @quiz-creator/types typecheck; pnpm --filter @quiz-creator/core typecheck; pnpm --filter @quiz-creator/web typecheck` — passed.
+- `pnpm --filter @quiz-creator/web build` — passed; Next.js production build completed successfully.
+- `git diff --check` — passed.

@@ -31,10 +31,24 @@ describe('quizAnswerEvaluation', () => {
       expect(getQuestionAnswer(q)).toBe('Cell division');
     });
 
-    it('returns empty string if no answer found', () => {
-      const q = makeQuestion({ answer_text: undefined, options: [], correct_answer: 0 });
-      expect(getQuestionAnswer(q)).toBe('');
+    it('derives a legacy enumeration count when the answer text is absent', () => {
+      const q = makeQuestion({
+        question_type: 'typed_answer',
+        answer_text: undefined,
+        options: ['A', '', 'B', ' C ']
+      });
+      expect(getQuestionAnswer(q)).toBe('3');
     });
+
+    it('uses a numeric enumeration answer even when options are empty', () => {
+      const q = makeQuestion({
+        question_type: 'typed_answer',
+        answer_text: '3',
+        options: []
+      });
+      expect(getQuestionAnswer(q)).toBe('3');
+    });
+
   });
 
   describe('normalizeTypedAnswer', () => {

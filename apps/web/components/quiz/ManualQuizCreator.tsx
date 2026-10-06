@@ -643,7 +643,7 @@ export default function ManualQuizCreator({
           return;
         }
         opts = filled;
-        answerText = filled.join(', ');
+        answerText = String(filled.length);
         correct = 0;
         questionType = 'typed_answer';
       }

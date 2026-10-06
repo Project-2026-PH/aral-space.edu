@@ -51,6 +51,19 @@ describe('QuizTransformService.prepareQuestionsForOptions', () => {
     expect(result[9].correct_answer).toBe(0);
   });
 
+  it('preserves numeric enumeration answer keys and item options', () => {
+    const question: QuizQuestion = {
+      ...makeMockQuestion('q1', 'List three items', 'A'),
+      question_type: 'typed_answer',
+      options: ['A', 'B', 'C'],
+      answer_text: '3'
+    };
+
+    const result = QuizTransformService.prepareQuestionsForOptions([question]);
+    expect(result[0]).toEqual(question);
+  });
+
+
   it('preserves existing full options when question already has 4 options', () => {
     const question: QuizQuestion = {
       ...makeMockQuestion('q1', 'Term 1', 'Answer 1'),

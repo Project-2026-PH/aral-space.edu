@@ -17,3 +17,13 @@
 - `pnpm --filter @quiz-creator/web typecheck` — passed.
 - `pnpm --filter @quiz-creator/web build` — passed; Next.js production build completed successfully.
 - `git diff --check` — passed.
+
+## Review findings iteration
+
+- Added `enumeration` to the web request-validation question-type allowlist so create/update payloads reach persistence.
+- Added create/update regression coverage for an enumeration with empty options and numeric `answer_text`.
+- Updated completion review to use the explicit `enumeration` discriminator, preserving ordinary `typed_answer` behavior.
+- `pnpm exec vitest run apps/web/lib/__tests__/requestValidation.test.ts apps/web/lib/__tests__/quizAnswerEvaluation.test.ts packages/core/src/services/__tests__/QuizTransformService.test.ts` — passed, 3 files / 36 tests.
+- `pnpm --filter @quiz-creator/types typecheck; pnpm --filter @quiz-creator/core typecheck; pnpm --filter @quiz-creator/web typecheck` — passed.
+- `pnpm --filter @quiz-creator/web build` — passed; Next.js production build completed successfully.
+- `git diff --check` — passed.

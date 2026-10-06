@@ -385,6 +385,8 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
   }
 
   function handleShortcut(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.defaultPrevented) return;
+
     if (event.key === ' ' && handleAutoBullet()) {
       event.preventDefault();
       return;

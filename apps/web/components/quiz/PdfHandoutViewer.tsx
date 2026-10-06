@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+const MIN_ZOOM = 0.75;
+const MAX_ZOOM = 2.5;
+const ZOOM_STEP = 0.25;
+
 interface PdfHandoutViewerProps {
   sourceUrl: string;
   title: string;
@@ -17,6 +21,7 @@ export default function PdfHandoutViewer({ sourceUrl, title, className = '' }: P
   const [containerWidth, setContainerWidth] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRendering, setIsRendering] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,6 +46,7 @@ export default function PdfHandoutViewer({ sourceUrl, title, className = '' }: P
     setPageCount(0);
     setIsLoading(true);
     setIsRendering(false);
+    setZoom(1);
     setError(null);
     canvasRefs.current = {};
 
@@ -53,13 +59,15 @@ export default function PdfHandoutViewer({ sourceUrl, title, className = '' }: P
         if (!response.ok) throw new Error(`Unable to load source PDF (${response.status})`);
 
         const data = new Uint8Array(await response.arrayBuffer());
-        const pdfjs = await import('pdfjs-dist/build/pdf.mjs');
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          'pdfjs-dist/build/pdf.worker.mjs',
-          import.meta.url
-        ).toString();
-
-        loadingTask = pdfjs.getDocument({ data });
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        // Brave on iPadOS uses WebKit and can fail to start the module worker.
+        // Keep PDF parsing/rendering on the main thread for reliable mobile display.
+        loadingTask = pdfjs.getDocument({
+          data,
+          disableWorker: true,
+          useSystemFonts: true,
+          isEvalSupported: false,
+        });
         loadedDocument = await loadingTask.promise;
         if (cancelled) return;
 
@@ -103,7 +111,7 @@ export default function PdfHandoutViewer({ sourceUrl, title, className = '' }: P
 
           const page = await pdfDocument.getPage(pageNumber);
           const baseViewport = page.getViewport({ scale: 1 });
-          const scale = availableWidth / baseViewport.width;
+          const scale = (availableWidth / baseViewport.width) * zoom;
           const viewport = page.getViewport({ scale });
 
           canvas.width = Math.ceil(viewport.width * deviceScale);
@@ -132,19 +140,48 @@ export default function PdfHandoutViewer({ sourceUrl, title, className = '' }: P
     };
 
     void renderPages();
-  }, [containerWidth, pageCount, pdfDocument]);
+  }, [containerWidth, pageCount, pdfDocument, zoom]);
 
   return (
     <div
       ref={containerRef}
-      className={`relative min-h-0 overflow-y-auto overscroll-contain bg-muted/40 p-2 [touch-action:pan-y] ${className}`}
+      className={`relative min-h-0 overflow-auto overscroll-contain bg-muted/40 p-2 [touch-action:pan-x_pan-y_pinch-zoom] ${className}`}
       aria-label={title}
     >
-      {(isLoading || isRendering) && !error && (
-        <div className="sticky top-2 z-10 mx-auto w-fit rounded-full border border-border/70 bg-card/95 px-3 py-1.5 text-[11px] font-semibold text-muted-foreground shadow-sm">
-          {isLoading ? 'Loading source…' : 'Rendering pages…'}
-        </div>
-      )}
+      <div className="sticky top-2 z-10 mx-auto flex w-fit items-center gap-1 rounded-full border border-border/70 bg-card/95 p-1 shadow-sm backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setZoom((current) => Math.max(MIN_ZOOM, current - ZOOM_STEP))}
+          disabled={zoom <= MIN_ZOOM || Boolean(error)}
+          className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-black text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Zoom out of source PDF"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoom(1)}
+          disabled={zoom === 1 || Boolean(error)}
+          className="min-w-14 rounded-full px-2 py-1 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Reset source PDF zoom"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoom((current) => Math.min(MAX_ZOOM, current + ZOOM_STEP))}
+          disabled={zoom >= MAX_ZOOM || Boolean(error)}
+          className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-black text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Zoom in on source PDF"
+        >
+          +
+        </button>
+        {(isLoading || isRendering) && !error && (
+          <span className="pl-1 pr-2 text-[11px] font-semibold text-muted-foreground" aria-live="polite">
+            {isLoading ? 'Loading…' : 'Rendering…'}
+          </span>
+        )}
+      </div>
 
       {error ? (
         <div className="flex min-h-full items-center justify-center p-6 text-center">
@@ -161,7 +198,7 @@ export default function PdfHandoutViewer({ sourceUrl, title, className = '' }: P
           </div>
         </div>
       ) : (
-        <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-3">
+        <div className="mx-auto flex w-max min-w-full flex-col items-center gap-3">
           {Array.from({ length: pageCount }, (_, index) => {
             const pageNumber = index + 1;
             return (
@@ -171,7 +208,7 @@ export default function PdfHandoutViewer({ sourceUrl, title, className = '' }: P
                   canvasRefs.current[pageNumber] = canvas;
                 }}
                 aria-label={`${title}, page ${pageNumber}`}
-                className="block h-auto max-w-full rounded-sm bg-white shadow-sm"
+                className="block h-auto shrink-0 rounded-sm bg-white shadow-sm"
               />
             );
           })}

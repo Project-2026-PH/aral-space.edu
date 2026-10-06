@@ -38,7 +38,7 @@ interface QuizCompletionProps {
 type TelemetryTab = 'all' | 'green' | 'yellow' | 'red';
 
 function getReviewAnswer(question: QuizQuestion): string {
-  const enumerationItems = question.question_type === 'typed_answer'
+  const enumerationItems = question.question_type === 'enumeration'
     ? question.options.map((option) => option.trim()).filter(Boolean)
     : [];
 

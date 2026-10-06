@@ -18,7 +18,7 @@ import {
   RequestSecurityError
 } from './request-security';
 
-const QUESTION_TYPES = new Set<QuizQuestionType>(['multiple_choice', 'typed_answer']);
+const QUESTION_TYPES = new Set<QuizQuestionType>(['multiple_choice', 'typed_answer', 'enumeration']);
 const AUTHORING_QUESTION_TYPES: AuthoringQuestionType[] = [
   'multiple_choice',
   'typed_answer',

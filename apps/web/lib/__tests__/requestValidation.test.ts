@@ -18,6 +18,19 @@ describe('request validation boundaries', () => {
     });
   });
 
+  it('accepts enumeration questions for create and update requests', () => {
+    const question = {
+      question_text: 'Name the stages',
+      question_type: 'enumeration',
+      options: [],
+      answer_text: '3',
+      correct_answer: 0
+    };
+
+    expect(parseCreateQuestion(question)).toEqual(question);
+    expect(parseUpdateQuestion(question)).toEqual(question);
+  });
+
   it('rejects an empty question update', () => {
     expect(() => parseUpdateQuestion({})).toThrow('At least one question field is required');
   });

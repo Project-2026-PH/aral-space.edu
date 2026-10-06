@@ -396,7 +396,10 @@ export default function QuizQuestionFormModal({
             </label>
             <RichTextEditor
               value={questionText}
-              onChange={setQuestionText}
+              onChange={(value) => {
+                pasteRequestRef.current += 1;
+                setQuestionText(value);
+              }}
               onPaste={handleClipboardPaste}
               placeholder="Type question prompt here..."
               minHeight="120px"
@@ -451,6 +454,7 @@ export default function QuizQuestionFormModal({
                       value={opt}
                       onChange={(e) => {
                         e.stopPropagation();
+                        pasteRequestRef.current += 1;
                         const next = [...options];
                         next[idx] = e.target.value;
                         setOptions(next);
@@ -519,7 +523,10 @@ export default function QuizQuestionFormModal({
               type="text"
               placeholder="e.g. Photosynthesis"
               value={answerText}
-              onChange={(e) => setAnswerText(e.target.value)}
+              onChange={(e) => {
+                pasteRequestRef.current += 1;
+                setAnswerText(e.target.value);
+              }}
               onPaste={handleClipboardPaste}
               className="w-full rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs font-semibold text-foreground focus:border-primary focus:outline-none"
             />
@@ -539,6 +546,7 @@ export default function QuizQuestionFormModal({
               placeholder="e.g. Photosynthesis"
               value={options[0] || ''}
               onChange={(e) => {
+                pasteRequestRef.current += 1;
                 setOptions([e.target.value]);
                 setAnswerText(e.target.value);
               }}

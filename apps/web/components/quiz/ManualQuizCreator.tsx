@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Save, ArrowLeft, X, Check, CircleDot, PenLine, ToggleLeft, ListOrdered, Tag, Sparkles, ClipboardPaste } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -8,7 +8,7 @@ import NewSubjectModal from '../subject/NewSubjectModal';
 import StickyActionDock from '../ui/StickyActionDock';
 import { parseSmartClipboard, type ParsedClipboard } from '@/lib/clipboardParser';
 import { parseWithSmolLM2 } from '@/lib/ai/localClipboardParser';
-import { buildClipboardQuestionPrompt } from '@/lib/clipboardQuestionPrompt';
+import { createClipboardAuthoringCard, type ClipboardAuthoringCard } from '@/lib/clipboardAuthoring';
 import { QuizTransformService } from '@quiz-creator/core';
 import { makeAuthoringQuestionSnapshot, recordLocalAuthoringEvent } from '@/lib/authoringPreferences';
 import RichTextEditor from '@/components/editor/RichTextEditor';
@@ -20,6 +20,9 @@ interface QuestionDraft {
   type: QuestionType;
   question_text: string;
   options: string[];
+  answer_terms?: string[];
+  enumeration_total?: number;
+  enumeration_distractors?: string[];
   correct_answer: number;
   explanation?: string;
 }
@@ -83,7 +86,15 @@ function parseManualQuizDraft(raw: string | null): ManualQuizDraft | null {
       description: parsed.description,
       term: typeof parsed.term === 'string' ? parsed.term : undefined,
       subjectId: parsed.subjectId,
-      questions: parsed.questions as QuestionDraft[]
+      questions: parsed.questions.map((question) => question.type === 'enumeration'
+        ? {
+          ...question,
+          options: [],
+          answer_terms: Array.isArray(question.answer_terms) ? question.answer_terms : question.options,
+          enumeration_total: question.enumeration_total || question.options.filter((option) => option.trim()).length,
+          enumeration_distractors: Array.isArray(question.enumeration_distractors) ? question.enumeration_distractors : []
+        }
+        : question)
     };
   } catch {
     return null;
@@ -129,6 +140,15 @@ export default function ManualQuizCreator({
   const [draftRecovery, setDraftRecovery] = useState<ManualQuizDraft | null>(null);
   const [draftHydrated, setDraftHydrated] = useState(false);
   const [draftStatus, setDraftStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const pasteRequestRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      pasteRequestRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     const requestedSubjectId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('subjectId') : null;
@@ -218,7 +238,7 @@ export default function ManualQuizCreator({
     const hasContent = Boolean(
       title.trim() ||
       description.trim() ||
-      questions.some((question) => hasRichTextContent(question.question_text) || question.options.some((option) => option.trim()))
+      questions.some((question) => hasRichTextContent(question.question_text) || question.options.some((option) => option.trim()) || (question.answer_terms || []).some((term) => term.trim()))
     );
     if (!hasContent) return;
 
@@ -270,6 +290,7 @@ export default function ManualQuizCreator({
   }
   function moveQuestion(fromIndex: number, toIndex: number) {
     if (toIndex < 0 || toIndex >= questions.length || fromIndex === toIndex) return;
+    pasteRequestRef.current += 1;
     const next = [...questions];
     const [moved] = next.splice(fromIndex, 1);
     next.splice(toIndex, 0, moved);
@@ -277,6 +298,7 @@ export default function ManualQuizCreator({
   }
 
   function addQuestion() {
+    pasteRequestRef.current += 1;
     setQuestions((current) => [
       ...current,
       {
@@ -291,10 +313,12 @@ export default function ManualQuizCreator({
 
   function removeQuestion(index: number) {
     if (questions.length <= 1) return;
+    pasteRequestRef.current += 1;
     setQuestions((current) => current.filter((_, i) => i !== index));
   }
 
   function setQuestionType(index: number, type: QuestionType) {
+    pasteRequestRef.current += 1;
     const next = [...questions];
     const current = next[index];
     let newOptions = current.options;
@@ -322,9 +346,23 @@ export default function ManualQuizCreator({
       newOptions = [newOptions[0] || ''];
       newCorrect = 0;
     } else if (type === 'enumeration') {
-      const valid = newOptions.filter((o) => o.trim());
-      newOptions = valid.length > 0 ? valid : ['', ''];
+      const legacyTerms = current.answer_terms !== undefined
+        ? current.answer_terms
+        : current.options.filter((option) => option.trim());
+      newOptions = [];
       newCorrect = 0;
+      next[index] = {
+        ...current,
+        type,
+        question_text: newQuestionText,
+        options: newOptions,
+        answer_terms: legacyTerms,
+        enumeration_total: current.enumeration_total || legacyTerms.length,
+        enumeration_distractors: current.enumeration_distractors || [],
+        correct_answer: newCorrect
+      };
+      setQuestions(next);
+      return;
     }
 
     next[index] = {
@@ -338,6 +376,7 @@ export default function ManualQuizCreator({
   }
 
   function updateQuestionText(index: number, text: string) {
+    pasteRequestRef.current += 1;
     const next = [...questions];
     next[index].question_text = text;
     setQuestions(next);
@@ -350,6 +389,7 @@ export default function ManualQuizCreator({
   }
 
   function updateOptionText(qIdx: number, optIdx: number, val: string) {
+    pasteRequestRef.current += 1;
     const next = [...questions];
     next[qIdx].options[optIdx] = val;
     setQuestions(next);
@@ -357,14 +397,15 @@ export default function ManualQuizCreator({
 
   function addEnumerationItem(qIdx: number) {
     const next = [...questions];
-    next[qIdx].options.push('');
+    next[qIdx].answer_terms = [...(next[qIdx].answer_terms || []), ''];
     setQuestions(next);
   }
 
   function removeEnumerationItem(qIdx: number, optIdx: number) {
     const next = [...questions];
-    if (next[qIdx].options.length <= 1) return;
-    next[qIdx].options = next[qIdx].options.filter((_, i) => i !== optIdx);
+    const terms = next[qIdx].answer_terms || [];
+    if (terms.length <= 1) return;
+    next[qIdx].answer_terms = terms.filter((_, i) => i !== optIdx);
     setQuestions(next);
   }
 
@@ -374,13 +415,17 @@ export default function ManualQuizCreator({
     setQuestions(next);
   }
 
-  function applyQuestionAnswer(qIdx: number, question: string, answer: string) {
+  function applyClipboardCard(qIdx: number, card: ClipboardAuthoringCard, target?: HTMLElement) {
+    if (!questions[qIdx]) return;
+    if (card.question && target?.closest('[contenteditable="true"]')) {
+      target.closest<HTMLElement>('[contenteditable="true"]')!.innerHTML = normalizeRichTextHtml(card.question);
+    }
     const next = [...questions];
     next[qIdx] = {
       ...next[qIdx],
       type: 'identification',
-      question_text: question,
-      options: [answer],
+      question_text: card.question,
+      options: [card.answer],
       correct_answer: 0
     };
     setQuestions(next);
@@ -416,56 +461,30 @@ export default function ManualQuizCreator({
     if (!text && !html) return;
 
     const parsed = parseSmartClipboard(text, html);
-    if (parsed && parsed.type === 'question_answer') {
+    const card = createClipboardAuthoringCard(parsed);
+    if (card) {
       e.preventDefault();
-      applyQuestionAnswer(qIdx, parsed.question, parsed.answer);
+      pasteRequestRef.current += 1;
+      applyClipboardCard(qIdx, card, e.target as HTMLElement);
       return;
     }
 
-    if (parsed && parsed.type === 'single_pair') {
-      e.preventDefault();
-      const phrasedPrompt = buildClipboardQuestionPrompt(parsed.definition, parsed.term);
-      const targetEditor = (e.target as HTMLElement).closest('[contenteditable="true"]') as HTMLElement | null;
-      if (targetEditor) {
-        targetEditor.innerHTML = normalizeRichTextHtml(phrasedPrompt);
+    if (parsed) {
+      if (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks') {
+        e.preventDefault();
+        e.stopPropagation();
+        queuePendingImport(parsed, text, html, qIdx);
       }
-      const next = [...questions];
-      next[qIdx] = {
-        ...next[qIdx],
-        type: 'identification',
-        question_text: phrasedPrompt,
-        options: [parsed.term],
-        correct_answer: 0
-      };
-      setQuestions(next);
       return;
     }
 
-    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
-      e.preventDefault();
-      queuePendingImport(parsed, text, html, qIdx);
-      return;
-    }
-
-    // Local SmolLM2 AI Fallback for unstructured/passive text
     if (text && text.trim().length >= 15 && text.trim().length <= 800) {
-      parseWithSmolLM2(text).then((aiParsed) => {
-        if (aiParsed && aiParsed.type === 'single_pair') {
-          const phrasedPrompt = buildClipboardQuestionPrompt(aiParsed.definition, aiParsed.term);
-          setQuestions((prev) => {
-            const updated = [...prev];
-            if (!updated[qIdx]) return prev;
-            updated[qIdx] = {
-              ...updated[qIdx],
-              type: 'identification',
-              question_text: phrasedPrompt,
-              options: [aiParsed.term],
-              correct_answer: 0
-            };
-            return updated;
-          });
-        }
-      });
+      const requestId = ++pasteRequestRef.current;
+      void parseWithSmolLM2(text).then((aiParsed) => {
+        if (!mountedRef.current || requestId !== pasteRequestRef.current) return;
+        const aiCard = createClipboardAuthoringCard(aiParsed);
+        if (aiCard) applyClipboardCard(qIdx, aiCard);
+      }).catch(() => undefined);
     }
   }
 
@@ -475,50 +494,30 @@ export default function ManualQuizCreator({
     if (!text && !html) return;
 
     const parsed = parseSmartClipboard(text, html);
-    if (parsed && parsed.type === 'question_answer') {
+    const card = createClipboardAuthoringCard(parsed);
+    if (card) {
       e.preventDefault();
-      applyQuestionAnswer(qIdx, parsed.question, parsed.answer);
+      pasteRequestRef.current += 1;
+      applyClipboardCard(qIdx, card);
       return;
     }
 
-    if (parsed && parsed.type === 'single_pair') {
-      e.preventDefault();
-      const next = [...questions];
-      next[qIdx] = {
-        ...next[qIdx],
-        type: 'identification',
-        question_text: buildClipboardQuestionPrompt(parsed.definition, parsed.term),
-        options: [parsed.term],
-        correct_answer: 0
-      };
-      setQuestions(next);
+    if (parsed) {
+      if (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks') {
+        e.preventDefault();
+        e.stopPropagation();
+        queuePendingImport(parsed, text, html, qIdx);
+      }
       return;
     }
 
-    if (parsed && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
-      e.preventDefault();
-      queuePendingImport(parsed, text, html, qIdx);
-      return;
-    }
-
-    // Local SmolLM2 AI Fallback
     if (text && text.trim().length >= 15 && text.trim().length <= 800) {
-      parseWithSmolLM2(text).then((aiParsed) => {
-        if (aiParsed && aiParsed.type === 'single_pair') {
-          setQuestions((prev) => {
-            const updated = [...prev];
-            if (!updated[qIdx]) return prev;
-            updated[qIdx] = {
-              ...updated[qIdx],
-              type: 'identification',
-              question_text: buildClipboardQuestionPrompt(aiParsed.definition, aiParsed.term),
-              options: [aiParsed.term],
-              correct_answer: 0
-            };
-            return updated;
-          });
-        }
-      });
+      const requestId = ++pasteRequestRef.current;
+      void parseWithSmolLM2(text).then((aiParsed) => {
+        if (!mountedRef.current || requestId !== pasteRequestRef.current) return;
+        const aiCard = createClipboardAuthoringCard(aiParsed);
+        if (aiCard) applyClipboardCard(qIdx, aiCard);
+      }).catch(() => undefined);
     }
   }
 
@@ -564,13 +563,20 @@ export default function ManualQuizCreator({
     };
 
     if (pendingImport.type === 'bulk_terms') {
-      const newCards: QuestionDraft[] = pendingImport.items.map((item) => ({
-        type: 'identification',
-        question_text: buildClipboardQuestionPrompt(item.definition, item.term),
-        options: [item.term],
-        correct_answer: 0,
-        explanation: ''
-      }));
+      const newCards: QuestionDraft[] = pendingImport.items.map((item) => {
+        const card = createClipboardAuthoringCard({
+          type: 'single_pair',
+          term: item.term,
+          definition: item.definition
+        });
+        return {
+          type: 'identification',
+          question_text: card?.question || item.definition,
+          options: [card?.answer || item.term],
+          correct_answer: 0,
+          explanation: ''
+        };
+      });
 
       appendOrReplaceEmptyTarget(newCards);
     } else if (pendingImport.type === 'question_answers') {
@@ -587,7 +593,10 @@ export default function ManualQuizCreator({
       const newCards: QuestionDraft[] = pendingImport.blocks.map((block) => ({
         type: 'enumeration',
         question_text: `Enumerate: ${block.header}`,
-        options: block.items.length > 0 ? [...block.items] : ['', ''],
+        options: [],
+        answer_terms: [...block.items],
+        enumeration_total: block.items.length,
+        enumeration_distractors: [],
         correct_answer: 0,
         explanation: ''
       }));
@@ -638,13 +647,22 @@ export default function ManualQuizCreator({
         correct = 0;
         questionType = 'typed_answer';
       } else if (q.type === 'enumeration') {
-        const filled = opts.filter(Boolean);
-        if (filled.length === 0) {
-          setError(`Question #${i + 1} must have at least one enumeration item.`);
+        const terms = (q.answer_terms || q.options).map((term) => term.trim());
+        const total = q.enumeration_total || terms.length;
+        if (!Number.isSafeInteger(total) || total <= 0) {
+          setError(`Question #${i + 1} must have a positive enumeration total.`);
           return;
         }
-        opts = filled;
-        answerText = String(filled.length);
+        if (terms.some((term) => !term) || terms.length < total) {
+          setError(`Question #${i + 1} must have at least ${total} answer terms.`);
+          return;
+        }
+        if (terms.length > total) {
+          setError(`Question #${i + 1} has more answer terms than its total.`);
+          return;
+        }
+        opts = [];
+        answerText = String(total);
         correct = 0;
         questionType = 'enumeration';
       }
@@ -654,6 +672,10 @@ export default function ManualQuizCreator({
         answer_text: answerText,
         question_type: questionType,
         options: opts,
+        ...(q.type === 'enumeration' ? {
+          answer_terms: (q.answer_terms || q.options).map((term) => term.trim()),
+          enumeration_distractors: (q.enumeration_distractors || []).map((term) => term.trim()).filter(Boolean)
+        } : {}),
         correct_answer: correct,
         explanation: hasRichTextContent(q.explanation) ? q.explanation : null,
         source_pages: null
@@ -1266,42 +1288,18 @@ export default function ManualQuizCreator({
 
               {q.type === 'enumeration' && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-                    <span>Enumeration Items / Answers</span>
-                    <button
-                      type="button"
-                      onClick={() => addEnumerationItem(qIdx)}
-                      className="flex items-center gap-1 text-primary hover:underline text-xs font-bold cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Add Item</span>
-                    </button>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <label className="space-y-1 text-[11px] font-semibold text-muted-foreground"><span className="block">Total terms</span><input type="number" min="1" step="1" value={q.enumeration_total || ''} onChange={(event) => { const next = [...questions]; next[qIdx].enumeration_total = Number(event.target.value); setQuestions(next); }} className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-foreground focus:border-primary focus:outline-none" /></label>
+                    <p className="self-end pb-2 text-[11px] text-muted-foreground">Options are saved as [] and answer terms are stored independently.</p>
                   </div>
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground"><span>Answer terms</span><button type="button" onClick={() => addEnumerationItem(qIdx)} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Plus className="h-3.5 w-3.5" />Add term</button></div>
                   <div className="space-y-2">
-                    {q.options.map((opt, optIdx) => (
-                      <div key={optIdx} className="flex items-center gap-2">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-muted text-muted-foreground text-[11px] font-bold shrink-0">
-                          {optIdx + 1}
-                        </span>
-                        <input
-                          type="text"
-                          placeholder={`Item #${optIdx + 1}`}
-                          value={opt}
-                          onChange={(e) => updateOptionText(qIdx, optIdx, e.target.value)}
-                          className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
-                        />
-                        {q.options.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeEnumerationItem(qIdx, optIdx)}
-                            className="text-muted-foreground hover:text-destructive p-1.5 rounded-lg hover:bg-destructive/10 transition-colors cursor-pointer"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
+                    {(q.answer_terms || []).map((term, optIdx) => (
+                      <div key={optIdx} className="flex items-center gap-2"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-muted text-[11px] font-bold text-muted-foreground">{optIdx + 1}</span><input type="text" placeholder={`Term #${optIdx + 1}`} value={term} onChange={(event) => { const next = [...questions]; const terms = [...(next[qIdx].answer_terms || [])]; terms[optIdx] = event.target.value; next[qIdx].answer_terms = terms; setQuestions(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none" />{(q.answer_terms || []).length > 1 && <button type="button" onClick={() => removeEnumerationItem(qIdx, optIdx)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>}</div>
                     ))}
                   </div>
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground"><span>Distractors (optional)</span><button type="button" onClick={() => { const next = [...questions]; next[qIdx].enumeration_distractors = [...(next[qIdx].enumeration_distractors || []), '']; setQuestions(next); }} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Plus className="h-3.5 w-3.5" />Add distractor</button></div>
+                  {(q.enumeration_distractors || []).map((term, index) => <div key={index} className="flex items-center gap-2"><input type="text" placeholder="Wrong choice" value={term} onChange={(event) => { const next = [...questions]; const distractors = [...(next[qIdx].enumeration_distractors || [])]; distractors[index] = event.target.value; next[qIdx].enumeration_distractors = distractors; setQuestions(next); }} className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none" /><button type="button" onClick={() => { const next = [...questions]; next[qIdx].enumeration_distractors = (next[qIdx].enumeration_distractors || []).filter((_, itemIndex) => itemIndex !== index); setQuestions(next); }} className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button></div>)}
                 </div>
               )}
             </div>

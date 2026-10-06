@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Unify explicit paste-to-card conversion for manual creation and the add/edit question modal, preserving structured imports, native fallback, and stale optional SmolLM2 protection.",
+  "status": "completed",
+  "steps": [
+    "Create a typed clipboard-authoring helper and pure tests that map single_pair and question_answer to one card, leave bulk/list/enumeration formats to manual preview, preserve null/empty/native fallback, and call buildClipboardQuestionPrompt exactly once.",
+    "Refactor ManualQuizCreator.tsx prompt and identification target-answer paste handlers to use the helper; retain container handling only for bulk imports and leave metadata Term / Grading Period controls unparsed.",
+    "Refactor QuizQuestionFormModal.tsx paste handlers for question and typed/identification answer fields in both add and edit modes; guard asynchronous SmolLM2 results against later user edits, paste events, close, or index changes.",
+    "Verify QuizOverviewClient.tsx continues to own modal add/edit state without duplicate paste handling, and perform browser checks for all authoring boundaries."
+  ],
+  "acceptance_criteria": [
+    "Pasting a recognized definition into a manual question prompt or target identification term/answer creates one identification card using the deterministic prompt converter.",
+    "The same behavior works in add-question and edit-question modal flows, without double application or ordinary typing interception.",
+    "Structured Q&A, bulk imports, enumeration blocks, empty input, parser-null, and unavailable/failing SmolLM2 preserve existing fallback behavior.",
+    "The metadata grading-period Term / Grading Period field remains ordinary metadata entry unless browser evidence proves the report refers to it.",
+    "Focused parser, authoring-helper, and prompt tests plus web typecheck pass."
+  ],
+  "verification": [
+    "pnpm vitest run apps/web/lib/__tests__/clipboardParser.test.ts apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts apps/web/lib/__tests__/clipboardAuthoring.test.ts",
+    "pnpm --filter @quiz-creator/web typecheck",
+    "Browser verification of manual, add, and edit paste boundaries and native fallback"
+  ],
+  "blocked_reason": null,
+  "findings": "Implemented the shared explicit paste-to-card flow. Single pairs and Q&A pairs become one identification card; bulk/list/question-answer-list/enumeration formats remain preview/native paths. Manual metadata Term / Grading Period controls remain ordinary metadata inputs, and QuizOverviewClient remains the modal add/edit state owner without duplicate paste handling.",
+  "implementation_details": [
+    "Added apps/web/lib/clipboardAuthoring.ts with the typed createClipboardAuthoringCard helper. It returns null for parser-null, empty, bulk, list, and enumeration formats, and calls buildClipboardQuestionPrompt once for single_pair input.",
+    "Added apps/web/lib/__tests__/clipboardAuthoring.test.ts covering single pairs, Q&A pairs, unsupported structured formats, null input, and prompt-builder call count.",
+    "Refactored ManualQuizCreator prompt and identification-answer paste boundaries to use the helper while retaining preview handling for structured imports and guarding optional SmolLM2 results against edits, paste events, unmount, and question index changes.",
+    "Refactored QuizQuestionFormModal prompt and typed/identification answer paste boundaries for add and edit modes. Pending SmolLM2 results are invalidated by later edits, paste events, close, question/open changes, and type changes.",
+    "Preserved native paste fallback for parser-null, empty, unsupported structured, and unavailable/failing SmolLM2 cases."
+  ],
+  "test_results": "PASS — focused command: pnpm vitest run apps/web/lib/__tests__/clipboardParser.test.ts apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts apps/web/lib/__tests__/clipboardAuthoring.test.ts (3 files, 50 tests). PASS — pnpm --filter @quiz-creator/web typecheck. PASS — pnpm --filter @quiz-creator/web build. FULL SUITE ATTEMPTED — pnpm vitest run reached 43/44 files and 391/396 tests, then failed in unrelated packages/core/src/repositories/__tests__/NeonRepositories.test.ts with worker ERR_IPC_CHANNEL_CLOSED; isolated rerun failed with ERR_WORKER_OUT_OF_MEMORY before executing tests.",
+  "runtime_verification": "NEEDS VERIFICATION — No browser runtime/harness was available in this implementation step. Manually verify paste propagation and native fallback in manual creation, add-question, and edit-question flows; verify rich-text/native undo remains intact; verify the metadata Term / Grading Period field is not parsed.",
+  "source_discrepancies": "QuizOverviewClient.tsx was inspected and left unchanged as the owner of modal add/edit state. The actual prompt integration remains apps/web/lib/clipboardQuestionPrompt.ts, not the absent apps/web/lib/ai/clipboardQuestionPrompt.ts.",
+  "later_features": "Do not modify apps/web/hooks/useQuizSession.ts or broaden converter behavior. Browser verification remains the follow-up requirement for explicit paste event propagation, rich-text/native undo, stale SmolLM2 cancellation, and the meaning of the reported term field."
+}

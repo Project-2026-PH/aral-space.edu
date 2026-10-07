@@ -1,4 +1,4 @@
-const CACHE_NAME = 'quizmaster-pwa-v2';
+const CACHE_NAME = 'quizmaster-pwa-v3';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon-192.png',
@@ -31,18 +31,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Never cache HTML documents. A cached document can reference chunks from a
+  // previous deployment and trigger an endless ChunkLoadError reload loop.
   if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .then((networkResponse) => {
-          if (networkResponse.ok) {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
-          }
-          return networkResponse;
-        })
-        .catch(() => caches.match(event.request).then((cachedResponse) => cachedResponse || caches.match('/')))
-    );
+    event.respondWith(fetch(event.request));
     return;
   }
 

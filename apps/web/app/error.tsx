@@ -17,16 +17,25 @@ export default function RootErrorBoundary({
     );
 
   useEffect(() => {
-    if (isChunkError) {
-      const reloadKey = 'chunk_reload_attempted';
-      const lastReload = parseInt(sessionStorage.getItem(reloadKey) || '0', 10);
-      const now = Date.now();
-      // Auto-reload once if not attempted in the last 15 seconds
-      if (now - lastReload > 15000) {
-        sessionStorage.setItem(reloadKey, String(now));
-        window.location.reload();
+    if (!isChunkError) return;
+
+    const reloadKey = 'chunk_reload_attempted';
+    const attempted = sessionStorage.getItem(reloadKey) === '1';
+    if (attempted) return;
+
+    sessionStorage.setItem(reloadKey, '1');
+    void (async () => {
+      // Remove stale application state before the single recovery reload.
+      try {
+        const registrations = await navigator.serviceWorker?.getRegistrations();
+        await Promise.all((registrations || []).map((registration) => registration.unregister()));
+        const cacheNames = await caches?.keys();
+        await Promise.all((cacheNames || []).map((name) => caches.delete(name)));
+      } catch {
+        // Reload is still useful when service-worker APIs are unavailable.
       }
-    }
+      window.location.reload();
+    })();
   }, [isChunkError]);
 
   return (
@@ -48,7 +57,14 @@ export default function RootErrorBoundary({
       <div className="flex items-center gap-3 mt-6">
         <button
           type="button"
-          onClick={() => (isChunkError ? window.location.reload() : reset())}
+          onClick={() => {
+            if (isChunkError) {
+              sessionStorage.removeItem('chunk_reload_attempted');
+              window.location.reload();
+            } else {
+              reset();
+            }
+          }}
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
         >
           <RefreshCw className="w-4 h-4" />

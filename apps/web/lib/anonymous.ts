@@ -22,7 +22,10 @@ export async function getAnonymousUserId(req?: NextRequest): Promise<string> {
     const userId = `anon_${crypto.randomUUID()}`;
     cookieStore.set(ANON_COOKIE_NAME, await createAnonymousSessionValue(userId), anonymousCookieOptions());
     return userId;
-  } catch {
-    return `anon_${crypto.randomUUID()}`;
+  } catch (error) {
+    // Middleware and API routes establish the cookie before this helper runs.
+    // Never return a new random ID here: it would make persisted data belong to
+    // an identity that is different from the browser's session.
+    throw error instanceof Error ? error : new Error('Unable to establish anonymous session');
   }
 }

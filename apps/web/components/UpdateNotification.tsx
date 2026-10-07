@@ -89,12 +89,9 @@ export default function UpdateNotification() {
 
     const tryAutoReload = () => {
       const reloadKey = 'chunk_reload_attempted';
-      const lastReload = parseInt(sessionStorage.getItem(reloadKey) || '0', 10);
-      const now = Date.now();
-      if (now - lastReload > 15000) {
-        sessionStorage.setItem(reloadKey, String(now));
-        window.location.reload();
-      }
+      if (sessionStorage.getItem(reloadKey) === '1') return;
+      sessionStorage.setItem(reloadKey, '1');
+      window.location.reload();
     };
 
     const handleError = (event: ErrorEvent) => {

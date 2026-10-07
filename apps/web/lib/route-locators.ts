@@ -40,6 +40,15 @@ export async function resolveQuizRoute(
   const bySlug = quizzes.find((quiz) => quiz.slug === locator);
   if (bySlug) return { entity: bySlug, id: bySlug.id, isLegacyId: false };
 
+  // Public shared reviewers are not included in the user-scoped list for an
+  // anonymous recipient. Resolve their slug from the public library before the
+  // review page passes the value to UUID-based repository methods.
+  const publicQuizzes = await repository.listQuizzes();
+  const publicBySlug = publicQuizzes.find((quiz) => quiz.slug === locator);
+  if (publicBySlug) {
+    return { entity: publicBySlug, id: publicBySlug.id, isLegacyId: false };
+  }
+
   const byId = quizzes.find((quiz) => quiz.id === locator);
   if (!byId) return null;
   return { entity: byId, id: byId.id, isLegacyId: Boolean(byId.slug && byId.slug !== locator) };

@@ -4,6 +4,7 @@ packages:
 
 allowBuilds:
   '@google/genai': true
+  canvas: true
   esbuild: true
   onnxruntime-node: false
   protobufjs: true

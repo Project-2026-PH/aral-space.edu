@@ -540,6 +540,7 @@ export default function LibraryClient({
         sharedQuizzes={synchronizedLibrary.sharedQuizzes}
         subjects={synchronizedLibrary.subjects}
         sharedSubjects={synchronizedLibrary.sharedSubjects}
+        viewerId={viewerId}
       />
 
       {activeView === 'overview' && hasSearch && (

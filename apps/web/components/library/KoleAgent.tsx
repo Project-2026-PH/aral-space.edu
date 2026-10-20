@@ -1,8 +1,10 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, BookOpen, ChevronDown, LoaderCircle, X } from 'lucide-react';
+import { ArrowUp, BookOpen, LoaderCircle, Pause, Play, RotateCcw, X } from 'lucide-react';
 import type { Quiz, Subject } from '@quiz-creator/types';
+import SearchableSelect from '@/components/ui/SearchableSelect';
+import { isKoleUiBlock, type KoleUiBlock } from '@/lib/ai/koleUi';
 
 type ChatRole = 'user' | 'assistant';
 
@@ -10,6 +12,7 @@ type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
+  ui?: KoleUiBlock[];
 };
 
 type KoleAgentProps = {
@@ -17,6 +20,7 @@ type KoleAgentProps = {
   sharedQuizzes: Quiz[];
   subjects: Subject[];
   sharedSubjects: Subject[];
+  viewerId: string;
 };
 
 type KoleAvatarSize = 'sm' | 'md' | 'lg';
@@ -29,6 +33,15 @@ type QuizOption = {
   scope: 'Your set' | 'Shared set';
 };
 
+type PersistedConversation = {
+  version: number;
+  selectedQuizId: string;
+  messages: ChatMessage[];
+};
+
+const STORAGE_VERSION = 1;
+const MAX_STORED_MESSAGES = 40;
+
 const SUGGESTED_PROMPTS = [
   "I can't understand a set",
   "I'm cramming",
@@ -37,28 +50,27 @@ const SUGGESTED_PROMPTS = [
   'How do I review the whole set?',
 ] as const;
 
-const WELCOME_MESSAGE =
-  "Hi! I'm Kole, your bubbly study buddy. Pick a set or ask me anything about reviewing smarter — no judgment, just tiny steps and big wins!";
-
 function createMessageId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
   return `kole-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function KoleAvatar({
+export function KoleAvatar({
   size = 'md',
   emotion = 'idle',
   animated = false,
   decorative = false,
+  className = '',
 }: {
   size?: KoleAvatarSize;
   emotion?: KoleAvatarEmotion;
   animated?: boolean;
   decorative?: boolean;
+  className?: string;
 }) {
   return (
     <span
-      className={`kole-avatar kole-avatar--${size} kole-avatar--emotion-${emotion} ${animated ? 'kole-avatar--animated' : 'kole-avatar--static'}`}
+      className={`kole-avatar kole-avatar--${size} kole-avatar--emotion-${emotion} ${animated ? 'kole-avatar--animated' : 'kole-avatar--static'} ${className || ''}`}
       role={decorative ? undefined : 'img'}
       aria-label={decorative ? undefined : 'Kole, your study buddy'}
       aria-hidden={decorative || undefined}
@@ -86,18 +98,83 @@ function KoleAvatar({
   );
 }
 
+function StudyTimer({ title, minutes, focus }: Extract<KoleUiBlock, { type: 'study_timer' }>) {
+  const initialSeconds = Math.max(60, Math.min(60 * 60, Math.round(minutes * 60)));
+  const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
+  const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    if (!running || secondsLeft <= 0) return;
+    const timer = window.setInterval(() => setSecondsLeft((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [running, secondsLeft]);
+
+  useEffect(() => {
+    if (secondsLeft === 0) setRunning(false);
+  }, [secondsLeft]);
+
+  const displayTime = `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}`;
+
+  return (
+    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-black text-slate-800 dark:text-white">{title}</p>
+          <p className="mt-0.5 text-[10px] font-semibold leading-snug text-slate-500 dark:text-slate-300">{focus}</p>
+        </div>
+        <span className="font-mono text-lg font-black tabular-nums text-primary">{displayTime}</span>
+      </div>
+      <div className="mt-2 flex gap-1.5">
+        <button type="button" onClick={() => setRunning((current) => !current)} className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-[10px] font-black text-primary-foreground">
+          {running ? <Pause className="h-3 w-3" aria-hidden="true" /> : <Play className="h-3 w-3" aria-hidden="true" />}
+          {running ? 'Pause' : secondsLeft === 0 ? 'Finished' : 'Start'}
+        </button>
+        <button type="button" onClick={() => { setSecondsLeft(initialSeconds); setRunning(false); }} className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[10px] font-black text-foreground">
+          <RotateCcw className="h-3 w-3" aria-hidden="true" /> Reset
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KoleUiBlocks({ blocks, onAction, disabled }: { blocks: KoleUiBlock[]; onAction: (prompt: string) => void; disabled: boolean }) {
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      {blocks.map((block, index) => {
+        if (block.type === 'study_timer') {
+          return <StudyTimer key={`timer-${index}`} {...block} />;
+        }
+        return (
+          <div key={`choices-${index}`} className="rounded-2xl border border-sky-100 bg-sky-50/70 p-2 dark:border-white/10 dark:bg-primary/10">
+            <p className="px-1 text-[11px] font-black text-slate-800 dark:text-white">{block.title}</p>
+            {block.description && <p className="px-1 pt-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-300">{block.description}</p>}
+            <div className="mt-1.5 grid gap-1">
+              {block.options.map((option) => (
+                <button key={option.id} type="button" disabled={disabled} onClick={() => onAction(option.prompt)} className="rounded-xl border border-sky-100 bg-white px-2.5 py-2 text-left transition hover:border-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-card">
+                  <span className="block text-[10px] font-black text-slate-800 dark:text-white">{option.label}</span>
+                  {option.description && <span className="mt-0.5 block text-[10px] font-semibold leading-snug text-slate-500 dark:text-slate-300">{option.description}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function KoleAgent({
   quizzes,
   sharedQuizzes,
   subjects,
   sharedSubjects,
+  viewerId,
 }: KoleAgentProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'kole-welcome', role: 'assistant', content: WELCOME_MESSAGE },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [selectedQuizId, setSelectedQuizId] = useState('');
+  const [isHydrated, setIsHydrated] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +182,54 @@ export default function KoleAgent({
   const [typedContent, setTypedContent] = useState<Record<string, string>>({});
   const typedMessageIdsRef = useRef(new Set<string>());
   const typingTimerRef = useRef<number | null>(null);
+  const storageKey = `kole-conversation:${viewerId}`;
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      if (!stored) {
+        setIsHydrated(true);
+        return;
+      }
+      const conversation = JSON.parse(stored) as Partial<PersistedConversation>;
+      if (conversation.version !== STORAGE_VERSION || !Array.isArray(conversation.messages)) {
+        setIsHydrated(true);
+        return;
+      }
+      const restoredMessages = conversation.messages.filter(
+        (message): message is ChatMessage => Boolean(
+          message
+          && typeof message.id === 'string'
+          && (message.role === 'user' || message.role === 'assistant')
+          && typeof message.content === 'string'
+          && message.content.trim(),
+        ),
+      ).map((message) => ({
+        ...message,
+        ui: Array.isArray(message.ui) ? message.ui.filter(isKoleUiBlock).slice(0, 2) : undefined,
+      }));
+      setMessages(restoredMessages.slice(-MAX_STORED_MESSAGES));
+      setSelectedQuizId(typeof conversation.selectedQuizId === 'string' ? conversation.selectedQuizId : '');
+    } catch {
+      // Ignore malformed or unavailable browser storage.
+    } finally {
+      setIsHydrated(true);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!viewerId || !isHydrated) return;
+    try {
+      const conversation: PersistedConversation = {
+        version: STORAGE_VERSION,
+        selectedQuizId,
+        messages: messages.slice(-MAX_STORED_MESSAGES),
+      };
+      window.localStorage.setItem(storageKey, JSON.stringify(conversation));
+    } catch {
+      // The live conversation remains usable when storage is unavailable.
+    }
+  }, [isHydrated, messages, selectedQuizId, storageKey, viewerId]);
 
   const quizOptions = useMemo(() => {
     const subjectNames = new Map<string, string>([
@@ -133,8 +258,8 @@ export default function KoleAgent({
   }, [quizzes, sharedQuizzes, subjects, sharedSubjects]);
 
   const contextQuizIds = useMemo(
-    () => (selectedQuizId ? [selectedQuizId] : quizOptions.slice(0, 6).map((option) => option.id)),
-    [quizOptions, selectedQuizId],
+    () => (selectedQuizId ? [selectedQuizId] : []),
+    [selectedQuizId],
   );
 
   useEffect(() => {
@@ -237,7 +362,8 @@ export default function KoleAgent({
       const reply = typeof payload.reply === 'string' && payload.reply.trim()
         ? payload.reply.trim()
         : 'I had a tiny brain-lag. Try sending that again and I’ll be right back!';
-      setMessages((current) => [...current, { id: createMessageId(), role: 'assistant', content: reply }]);
+      const ui = Array.isArray(payload.ui) ? payload.ui.filter(isKoleUiBlock).slice(0, 2) : [];
+      setMessages((current) => [...current, { id: createMessageId(), role: 'assistant', content: reply, ui }]);
     } catch (error) {
       console.error('Kole chat request failed:', error);
       setMessages((current) => [
@@ -295,26 +421,33 @@ export default function KoleAgent({
             {isFresh ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <KoleAvatar size="md" decorative />
-                <p className="mt-2.5 text-sm font-black tracking-tight text-slate-900 dark:text-white">Ask Ko-le anything</p>
+                <p className="mt-2.5 text-sm font-black tracking-tight text-slate-900 dark:text-white">Start with a reviewer set</p>
                 <p className="mt-0.5 max-w-[220px] text-[11px] font-semibold leading-snug text-slate-400">
-                  I can turn a giant reviewer into a friendly little game plan.
+                  Attach one below, then ask about a card, a topic, or what to study next.
                 </p>
               </div>
             ) : (
               <div className="space-y-2.5" aria-live="polite">
                 {messages.map((message) => (
                   <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`flex max-w-[92%] items-end gap-1.5 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                      {message.role === 'assistant' && <KoleAvatar size="sm" decorative />}
-                      <p
-                        className={`rounded-2xl px-3 py-2 text-[13px] font-semibold leading-snug ${
-                          message.role === 'user'
-                            ? 'rounded-br-md bg-sky-50 text-sky-700 dark:bg-primary/15 dark:text-sky-100'
-                            : 'rounded-bl-md bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-100'
-                        }`}
-                      >
-                        {message.id === typingMessageId ? typedContent[message.id] : message.content}
-                      </p>
+                    <div className={`flex max-w-[92%] items-start gap-1.5 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                      {message.role === 'assistant' && <KoleAvatar size="sm" decorative className="mt-0.5 shrink-0" />}
+                      <div className={`flex flex-col gap-1.5 ${message.role === 'user' ? 'items-end' : 'items-start'} min-w-0 flex-1`}>
+                        <p
+                          className={`rounded-2xl px-3 py-2 text-[13px] font-semibold leading-snug break-words ${
+                            message.role === 'user'
+                              ? 'rounded-br-md bg-sky-50 text-sky-700 dark:bg-primary/15 dark:text-sky-100'
+                              : 'rounded-bl-md bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-100'
+                          }`}
+                        >
+                          {message.id === typingMessageId ? typedContent[message.id] : message.content}
+                        </p>
+                        {message.role === 'assistant' && message.ui && message.ui.length > 0 && message.id !== typingMessageId && (
+                          <div className="w-full">
+                            <KoleUiBlocks blocks={message.ui} onAction={(prompt) => void sendMessage(prompt)} disabled={isSending} />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -354,22 +487,26 @@ export default function KoleAgent({
             <div className="mt-1.5 flex items-center gap-1.5">
               <BookOpen className="ml-1 h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
               <label htmlFor="kole-set-context" className="sr-only">Choose the reviewer set Kole should use</label>
-              <div className="relative min-w-0 flex-1">
-                <select
-                  id="kole-set-context"
-                  value={selectedQuizId}
-                  onChange={(event) => setSelectedQuizId(event.target.value)}
-                  className="w-full appearance-none truncate rounded-md border border-transparent bg-transparent py-0.5 pr-5 text-[10px] font-black text-slate-400 outline-none transition hover:border-slate-200 focus:border-primary dark:hover:border-white/15"
-                >
-                  <option value="">My Sets ({quizOptions.length})</option>
-                  {quizOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.title} · {option.scope} · {option.subjectName}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-1 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-              </div>
+              <SearchableSelect
+                id="kole-set-context"
+                value={selectedQuizId}
+                onChange={setSelectedQuizId}
+                placeholder="No set attached"
+                searchPlaceholder="Search your sets..."
+                options={[
+                  { value: '', label: 'No set attached', description: 'Ask general study questions' },
+                  ...quizOptions.map((option) => ({
+                    value: option.id,
+                    label: option.title,
+                    description: `${option.scope} · ${option.subjectName}`,
+                  })),
+                ]}
+                maxVisible={5}
+                className="flex-1"
+              />
+              {selectedQuizId && (
+                <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-black text-primary">Attached</span>
+              )}
             </div>
 
             <form onSubmit={handleSubmit} className="mt-1.5 flex items-center gap-1.5 rounded-full bg-slate-100 p-1 dark:bg-white/10">

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-convert-to-question",
+  "task_description": "Fix deterministic definition-to-question grammar, make paste parsing consistent across manual/add/edit authoring flows, and add scoped Ctrl+Z restoration for programmatic changes.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

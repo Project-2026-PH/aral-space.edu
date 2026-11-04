@@ -1,0 +1,30 @@
+{
+  "project_type": "pnpm/turbo TypeScript monorepo with a Next.js 15 App Router web app and shared core/types packages",
+  "language": "TypeScript and TSX",
+  "build_system": "pnpm 11 workspace monorepo with Turbo; apps/web uses Next.js 15, strict TypeScript, path aliases, and client components for browser-only local AI",
+  "test_framework": "Vitest 3.0.7 from the repository root; focused web utility tests live under apps/web/lib/__tests__; no component-test framework is configured",
+  "build_command": "pnpm --filter @quiz-creator/web build",
+  "test_command": "pnpm exec vitest run apps/web/lib/__tests__/convertToQuestion.test.ts apps/web/lib/__tests__/clipboardParser.test.ts apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts",
+  "verification_instructions": "Run the focused Vitest command, then pnpm --filter @quiz-creator/web typecheck and pnpm --filter @quiz-creator/web build. Manually verify pasted definitions, structured question/answer input, empty input, parser/model-unavailable fallback, encoded-slug navigation, and add/edit persistence on the quiz overview.",
+  "snapshot_or_generated_files": "Next build output is apps/web/.next and is not a source deliverable; do not edit generated .next-dev or .next files.",
+  "environment_constraints": "Windows PowerShell workspace at C:\\Users\\User\\IntelliJ\\quiz-creator; SmolLM2/getPipeline is browser-only and must remain behind use-client interaction handlers; do not send project content to external APIs or add runtime dependencies.",
+  "contribution_requirements": "Follow README.md and .kiro/steering/codebase-navigation.md; keep changes minimal, preserve strict typing, do not change server routes for browser-only behavior, and do not modify unrelated AI generation flows.",
+  "key_patterns": "ManualQuizCreator uses parseSmartClipboard first, keeps question_answer verbatim, queues bulk imports, and falls back asynchronously to parseWithSmolLM2. RichTextEditor accepts onPaste and normalizes programmatic innerHTML. QuizQuestionFormModal owns one-card POST/PATCH/DELETE state and QuizOverviewClient supplies it from the encoded quiz route. convertToQuestion is already tested and phraseIdentificationPrompt is covered in core tests.",
+  "relevant_files": [
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\components\\quiz\\ManualQuizCreator.tsx",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\components\\quiz\\QuizQuestionFormModal.tsx",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\components\\quiz\\QuizQuestionList.tsx",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\components\\quiz\\QuizOverviewClient.tsx",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\lib\\clipboardParser.ts",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\lib\\ai\\localClipboardParser.ts",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\lib\\convertToQuestion.ts",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\packages\\core\\src\\services\\QuizTransformService.ts",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\app\\(app)\\quizzes\\[quizId]\\page.tsx",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\app\\api\\quizzes\\[quizId]\\questions\\route.ts",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\app\\api\\quizzes\\[quizId]\\questions\\[questionId]\\route.ts",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\lib\\__tests__\\convertToQuestion.test.ts",
+    "C:\\Users\\User\\IntelliJ\\quiz-creator\\apps\\web\\lib\\__tests__\\clipboardParser.test.ts"
+  ],
+  "directory_structure": "apps/web/components/quiz contains manual and overview authoring UI; apps/web/lib contains deterministic clipboard/converter utilities and client AI adapters; apps/web/app/(app)/quizzes/[quizId] renders the overview; apps/web/app/api/quizzes/[quizId]/questions handles persistence; packages/core/src/services contains reusable deterministic transformations; .agents/tasks stores workflow artifacts outside the source worktree deliverables.",
+  "source_corrections": "The established facts are consistent with the inspected source except localClipboardParser's internal SmolLMParsedCard field is named question while its returned ParsedClipboard field is definition; no behavior change is required. The manual creator already contains parser/model handling, so integration means centralizing its transformation and adding the missing overview modal handling rather than adding a new parser implementation."
+}

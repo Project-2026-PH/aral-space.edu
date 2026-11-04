@@ -19,6 +19,7 @@ interface RichTextEditorProps {
   enableGrammarCheck?: boolean;
   onPaste?: React.ClipboardEventHandler<HTMLDivElement>;
   'data-skip-clipboard-intercept'?: string;
+  'data-authoring-undo-input'?: string;
 }
 
 export default function RichTextEditor({ value, onChange, placeholder = 'Start writing...', minHeight = '150px', className = '', floatingToolbar = false, hideToolbarUntilFocus = false, enableGrammarCheck = false, ...props }: RichTextEditorProps) {

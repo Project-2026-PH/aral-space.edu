@@ -9,12 +9,18 @@ const FALLBACK_SUFFIX = 'What is this called?';
  * parser-stripped definitions use the existing contextual fallback instead.
  */
 export function buildClipboardQuestionPrompt(text: string, term: string): string {
-  const converted = convertToQuestion(text, term);
-  if (!text.trim() || !term.trim() || /\?\s*$/.test(converted)) {
+  const trimmedText = text.trim();
+  const trimmedTerm = term.trim();
+  if (trimmedText && trimmedTerm && /\?\s*$/.test(trimmedText)) {
+    return trimmedText;
+  }
+
+  const converted = convertToQuestion(trimmedText, trimmedTerm);
+  if (!trimmedText || !trimmedTerm || /\?\s*$/.test(converted)) {
     return converted;
   }
 
-  const fallback = QuizTransformService.phraseIdentificationPrompt(text, term).trim();
+  const fallback = QuizTransformService.phraseIdentificationPrompt(trimmedText, trimmedTerm).trim();
   if (!fallback || /\?\s*$/.test(fallback)) {
     return fallback;
   }

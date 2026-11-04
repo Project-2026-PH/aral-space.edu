@@ -1,0 +1,27 @@
+diff --git a/apps/web/components/quiz/QuizQuestionFormModal.tsx b/apps/web/components/quiz/QuizQuestionFormModal.tsx
+--- a/apps/web/components/quiz/QuizQuestionFormModal.tsx
++++ b/apps/web/components/quiz/QuizQuestionFormModal.tsx
+@@ -395,4 +395,7 @@
+             <RichTextEditor
+               value={questionText}
+-              onChange={setQuestionText}
++              onChange={(value) => {
++                pasteRequestRef.current += 1;
++                setQuestionText(value);
++              }}
+@@ -451,3 +454,4 @@
+                       onChange={(e) => {
+                         e.stopPropagation();
++                        pasteRequestRef.current += 1;
+                         const next = [...options];
+@@ -519,3 +523,6 @@
+               value={answerText}
+-              onChange={(e) => setAnswerText(e.target.value)}
++              onChange={(e) => {
++                pasteRequestRef.current += 1;
++                setAnswerText(e.target.value);
++              }}
+@@ -539,3 +546,4 @@
+               onChange={(e) => {
++                pasteRequestRef.current += 1;
+                 setOptions([e.target.value]);

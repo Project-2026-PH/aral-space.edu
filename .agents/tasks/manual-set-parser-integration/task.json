@@ -1,0 +1,7 @@
+{
+  "task_id": "task-manual-set-parser-integration",
+  "task_description": "Integrate the local clipboard parser and deterministic term-substitution converter into manual set creation and quiz overview add/edit question flows.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

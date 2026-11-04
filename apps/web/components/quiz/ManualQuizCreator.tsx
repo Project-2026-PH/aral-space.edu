@@ -30,7 +30,10 @@ interface QuestionDraft {
 
 type PendingClipboardImport = ParsedClipboard & {
   rawText: string;
+  rawHtml?: string;
   questionIndex: number;
+  replaceTarget?: boolean;
+  sourceField?: 'question' | 'answer';
 };
 
 interface ManualQuizDraft {
@@ -156,6 +159,7 @@ export default function ManualQuizCreator({
 
   function clearManualSnapshots() {
     undoHistoryRef.current.clear();
+    pasteRequestRef.current += 1;
   }
 
   function handleManualUndo(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -489,11 +493,51 @@ export default function ManualQuizCreator({
     setQuestions(next);
   }
 
-  function queuePendingImport(parsed: ParsedClipboard, text: string, html: string, questionIndex: number) {
+  function plainTextToRichText(text: string): string {
+    return text
+      .split(/\r?\n/)
+      .map((line) => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+      .join('<br>');
+  }
+
+  function applyRawClipboardFallback(qIdx: number, text: string, sourceField: 'question' | 'answer', html = '') {
+    if (!questions[qIdx]) return;
+    recordManualSnapshot();
+    setQuestions((prev) => {
+      const current = prev[qIdx];
+      if (!current) return prev;
+      const next = [...prev];
+
+      if (sourceField === 'question') {
+        const richHtml = html.trim() ? normalizeRichTextHtml(html) : '';
+        next[qIdx] = {
+          ...current,
+          question_text: richHtml || plainTextToRichText(text)
+        };
+      } else {
+        const options = [...current.options];
+        const answerIndex = current.type === 'multiple_choice' ? current.correct_answer : 0;
+        options[answerIndex] = text;
+        next[qIdx] = { ...current, options };
+      }
+
+      return next;
+    });
+  }
+
+  function queuePendingImport(
+    parsed: ParsedClipboard,
+    text: string,
+    html: string,
+    questionIndex: number,
+    options: { replaceTarget?: boolean; sourceField?: 'question' | 'answer' } = {}
+  ) {
     setPendingImport({
       ...parsed,
       rawText: text.trim() ? text : html,
-      questionIndex
+      rawHtml: html || undefined,
+      questionIndex,
+      ...options
     } as PendingClipboardImport);
   }
 
@@ -501,17 +545,44 @@ export default function ManualQuizCreator({
     if (!pendingImport) return;
 
     recordManualSnapshot();
-    const { rawText, questionIndex } = pendingImport;
+    const { rawText, questionIndex, sourceField } = pendingImport;
     setQuestions((prev) => {
       if (!prev[questionIndex] || !rawText) return prev;
       const next = [...prev];
-      next[questionIndex] = {
-        ...next[questionIndex],
-        question_text: rawText
-      };
+      if (sourceField === 'answer') {
+        const current = next[questionIndex];
+        const options = [...current.options];
+        const answerIndex = current.type === 'multiple_choice' ? current.correct_answer : 0;
+        options[answerIndex] = rawText;
+        next[questionIndex] = { ...current, options };
+      } else {
+        const richHtml = pendingImport.rawHtml?.trim()
+          ? normalizeRichTextHtml(pendingImport.rawHtml)
+          : '';
+        const questionText = richHtml || (pendingImport.replaceTarget ? plainTextToRichText(rawText) : rawText);
+        next[questionIndex] = { ...next[questionIndex], question_text: questionText };
+      }
       return next;
     });
     setPendingImport(null);
+  }
+
+  function parseUnstructuredClipboard(qIdx: number, text: string, sourceField: 'question' | 'answer', html = '') {
+    pasteRequestRef.current += 1;
+    const requestId = pasteRequestRef.current;
+    applyRawClipboardFallback(qIdx, text, sourceField, html);
+
+    void parseWithSmolLM2(text).then((aiParsed) => {
+      if (!mountedRef.current || requestId !== pasteRequestRef.current || !aiParsed) return;
+
+      if (aiParsed.type === 'bulk_terms' || aiParsed.type === 'question_answers' || aiParsed.type === 'enumeration_blocks') {
+        queuePendingImport(aiParsed, text, html, qIdx, { replaceTarget: true, sourceField });
+        return;
+      }
+
+      const aiCard = createClipboardAuthoringCard(aiParsed);
+      if (aiCard) applyClipboardCard(qIdx, aiCard);
+    }).catch(() => undefined);
   }
 
   function handlePromptPaste(qIdx: number, e: React.ClipboardEvent<HTMLElement>) {
@@ -532,18 +603,14 @@ export default function ManualQuizCreator({
       if (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks') {
         e.preventDefault();
         e.stopPropagation();
-        queuePendingImport(parsed, text, html, qIdx);
+        queuePendingImport(parsed, text, html, qIdx, { sourceField: 'question' });
       }
       return;
     }
 
     if (text && text.trim().length >= 15 && text.trim().length <= 800) {
-      const requestId = ++pasteRequestRef.current;
-      void parseWithSmolLM2(text).then((aiParsed) => {
-        if (!mountedRef.current || requestId !== pasteRequestRef.current) return;
-        const aiCard = createClipboardAuthoringCard(aiParsed);
-        if (aiCard) applyClipboardCard(qIdx, aiCard);
-      }).catch(() => undefined);
+      e.preventDefault();
+      parseUnstructuredClipboard(qIdx, text, 'question', html);
     }
   }
 
@@ -565,18 +632,14 @@ export default function ManualQuizCreator({
       if (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks') {
         e.preventDefault();
         e.stopPropagation();
-        queuePendingImport(parsed, text, html, qIdx);
+        queuePendingImport(parsed, text, html, qIdx, { sourceField: 'answer' });
       }
       return;
     }
 
     if (text && text.trim().length >= 15 && text.trim().length <= 800) {
-      const requestId = ++pasteRequestRef.current;
-      void parseWithSmolLM2(text).then((aiParsed) => {
-        if (!mountedRef.current || requestId !== pasteRequestRef.current) return;
-        const aiCard = createClipboardAuthoringCard(aiParsed);
-        if (aiCard) applyClipboardCard(qIdx, aiCard);
-      }).catch(() => undefined);
+      e.preventDefault();
+      parseUnstructuredClipboard(qIdx, text, 'answer', html);
     }
   }
 
@@ -594,7 +657,7 @@ export default function ManualQuizCreator({
     const parsed = parseSmartClipboard(text, html);
     if (parsed && questionIndex !== null && (parsed.type === 'bulk_terms' || parsed.type === 'question_answers' || parsed.type === 'enumeration_blocks')) {
       e.preventDefault();
-      queuePendingImport(parsed, text, html, questionIndex);
+      queuePendingImport(parsed, text, html, questionIndex, { sourceField: 'question' });
     }
   }
 
@@ -612,7 +675,7 @@ export default function ManualQuizCreator({
           target.options.every((option) => !option.trim())
         );
 
-        if (!isTargetEmpty) return [...prev, ...newCards];
+        if (!isTargetEmpty && !pendingImport.replaceTarget) return [...prev, ...newCards];
 
         return [
           ...prev.slice(0, targetIndex),
@@ -805,7 +868,7 @@ export default function ManualQuizCreator({
                     {pendingImport.type === 'bulk_terms'
                       ? 'Term/Definition List'
                       : pendingImport.type === 'question_answers'
-                        ? 'Question/Answer List'
+                        ? 'Question/Answer Cards'
                         : 'Slide Enumeration'}
                   </span>
                 </h4>
@@ -813,7 +876,7 @@ export default function ManualQuizCreator({
                   {pendingImport.type === 'bulk_terms'
                     ? `✨ Detected ${pendingImport.items.length} Term/Definition pairs ready to convert into identification cards.`
                     : pendingImport.type === 'question_answers'
-                      ? `✨ Detected ${pendingImport.items.length} numbered question/answer pairs ready to import.`
+                      ? `✨ Detected ${pendingImport.items.length} question/answer pairs ready to import.`
                       : pendingImport.type === 'enumeration_blocks'
                         ? `✨ Detected ${pendingImport.blocks.length} Enumeration group(s) (${pendingImport.blocks.map((b) => b.header).slice(0, 2).join(', ')}${pendingImport.blocks.length > 2 ? '...' : ''}) ready to convert.`
                         : '✨ Detected structured text ready to convert.'}

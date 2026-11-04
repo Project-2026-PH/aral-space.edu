@@ -1,0 +1,98 @@
+{
+  "name": "Quiz-Creator-Workflow",
+  "description": "Coordinates repository reconnaissance, parallel UI/UX, database, bug, and testing audits, triage, scoped implementation, verification, and a high-effort review/repair loop. The workflow inherits the launching session model, currently GPT 5.6 Luna.",
+  "enabled": false,
+  "inputs": {
+    "task": "prompt"
+  },
+  "steps": [
+    {
+      "type": "step",
+      "id": "reconnaissance",
+      "agent": "wf-coder",
+      "effortLevel": "high",
+      "captureOutput": true,
+      "prompt": "Act as the repository reconnaissance lead for this task: {{task}}. Work read-only. Inspect the quiz-creator monorepo using CodeGraph or other repository-aware/token-saving tools when available, then targeted source inspection. Map affected areas across apps/web, apps/mobile, packages/core, API routes, repositories, schemas, and tests. Identify relevant symbols, callers, runtime entry points, existing validation commands, and files that must not be edited concurrently. Do not implement changes. Return a concise navigation brief for the specialist audits, including confirmed facts and items requiring runtime verification. Treat current source as authoritative if graph data is stale."
+    },
+    {
+      "type": "parallel",
+      "id": "parallel-audits",
+      "joinPolicy": "all",
+      "branches": [
+        {
+          "type": "step",
+          "id": "ui-ux-audit",
+          "agent": "wf-coder",
+          "effortLevel": "xhigh",
+          "captureOutput": true,
+          "prompt": "Act as a senior UI/UX, accessibility, and frontend quality specialist. Audit the task and reconnaissance context below without modifying code. Use repository-aware/token-saving tools when available and inspect only relevant files. Look for functional UX bugs, responsive web/mobile failures, touch and keyboard behavior, accessibility, loading/error/empty states, visual hierarchy, and inconsistent interaction patterns. Do not declare a user-reported issue fixed from source inspection alone; mark runtime verification as required when needed. Return findings with severity, affected files/symbols, evidence, reproduction or verification steps, user impact, and a concrete recommendation. Task: {{task}}. Reconnaissance: {{reconnaissance.output}}"
+        },
+        {
+          "type": "step",
+          "id": "database-audit",
+          "agent": "wf-coder",
+          "effortLevel": "xhigh",
+          "captureOutput": true,
+          "prompt": "Act as a senior database performance engineer. Audit the task and reconnaissance context below without modifying code. Inspect relevant packages/core repositories, SQL schema, API data access, and callers. Look for N+1 queries, unnecessary round trips or columns, ineffective indexes, pagination problems, transaction and consistency issues, and local-first/database race conditions. Do not recommend optimization from intuition alone: identify required EXPLAIN, benchmark, or runtime evidence. Return prioritized findings with severity, affected files/symbols, query or data-flow evidence, measurement plan, and safest recommendation. Task: {{task}}. Reconnaissance: {{reconnaissance.output}}"
+        },
+        {
+          "type": "step",
+          "id": "bug-architecture-audit",
+          "agent": "wf-coder",
+          "effortLevel": "xhigh",
+          "captureOutput": true,
+          "prompt": "Act as a senior application architect and bug investigator. Audit the task and reconnaissance context below without modifying code. Trace control flow, shared package boundaries, API contracts, state management, error handling, concurrency, malformed inputs, and regressions across web, mobile, and core. Distinguish confirmed defects from hypotheses requiring execution. Return prioritized findings with severity, affected files/symbols, evidence, reproduction steps, and recommended fix boundaries. Task: {{task}}. Reconnaissance: {{reconnaissance.output}}"
+        },
+        {
+          "type": "step",
+          "id": "testing-audit",
+          "agent": "wf-coder",
+          "effortLevel": "xhigh",
+          "captureOutput": true,
+          "prompt": "Act as a senior test engineer. Audit the task and reconnaissance context below without modifying code. Inspect existing test structure and identify missing unit, integration, end-to-end, edge-case, malformed-input, empty/error-state, offline/local-first, concurrency, and responsive-runtime coverage. Separate tests that should be added from checks possible with existing tooling. Return a prioritized verification matrix tied to requirements, files, commands, and expected outcomes. Task: {{task}}. Reconnaissance: {{reconnaissance.output}}"
+        }
+      ]
+    },
+    {
+      "type": "step",
+      "id": "triage",
+      "agent": "wf-coder",
+      "effortLevel": "medium",
+      "captureOutput": true,
+      "prompt": "Act as the workflow orchestrator and triage lead. Do not modify code. Consolidate the reconnaissance and all specialist audits into one precise implementation brief for this task: {{task}}. Deduplicate findings, resolve conflicts using source evidence, and prioritize blocker/high/medium/low. Clearly separate confirmed defects, findings needing runtime verification, performance claims needing measurement, and recommendations that should not be implemented. For each approved change, specify exact files/symbols, dependency order, acceptance criteria, non-goals, and validation commands. Ensure parallel edits will not overlap. Include the testing matrix and require token-saving/repository-aware tools when available. Reconnaissance: {{reconnaissance.output}} UI/UX audit: {{ui-ux-audit.output}} Database audit: {{database-audit.output}} Bug/architecture audit: {{bug-architecture-audit.output}} Testing audit: {{testing-audit.output}}"
+    },
+    {
+      "type": "repeat",
+      "id": "implementation-review-loop",
+      "maxIterations": 5,
+      "onMaxIterations": "pause",
+      "stopWhen": "{{review.output}} contains APPROVED",
+      "steps": [
+        {
+          "type": "step",
+          "id": "implementation",
+          "agent": "wf-coder",
+          "effortLevel": "medium",
+          "captureOutput": true,
+          "prompt": "Implement only the approved changes in the orchestrator brief. Do not re-plan broadly or expand scope. Read the current source before editing, preserve existing interfaces unless the brief requires otherwise, and avoid files assigned to concurrent work. For database changes, use evidence-driven optimization and preserve local-first/consistency behavior. For UI changes, verify reported behavior in context when possible. Run focused checks after editing. Do not commit or push. Task: {{task}}. Orchestrator brief: {{triage.output}}"
+        },
+        {
+          "type": "step",
+          "id": "verification",
+          "agent": "wf-coder",
+          "effortLevel": "high",
+          "captureOutput": true,
+          "prompt": "Act as an independent verification and test engineer. Inspect the implementation and orchestrator brief, then verify every acceptance criterion. Run the narrowest relevant existing unit, integration, edge-case, typecheck, lint, build, database/query-plan or benchmark, and browser/runtime checks. Do not assume a UI issue is fixed from source appearance. Report commands, results, failures, unverified items, regressions, and exact fixes required. Modify code only if a tiny test fixture or verification adjustment is explicitly necessary; otherwise remain read-only. Task: {{task}}. Orchestrator brief: {{triage.output}}. Implementation report: {{implementation.output}}"
+        },
+        {
+          "type": "step",
+          "id": "review",
+          "agent": "semantic_reviewer",
+          "effortLevel": "high",
+          "captureOutput": true,
+          "prompt": "Perform the final behavioral and semantic review for this iteration. Compare the current diff against the orchestrator brief, implementation report, and verification report. Check scope discipline, correctness, regressions, accessibility/UI behavior, database evidence, error handling, edge cases, and whether validation is sufficient. Do not modify code. If all critical and high-priority requirements pass, end your response with the exact token APPROVED. Otherwise end with the exact token REPAIR_REQUIRED and list actionable findings ordered by severity, including files, evidence, and required corrections. Task: {{task}}. Orchestrator brief: {{triage.output}}. Implementation report: {{implementation.output}}. Verification report: {{verification.output}}"
+        }
+      ]
+    }
+  ]
+}

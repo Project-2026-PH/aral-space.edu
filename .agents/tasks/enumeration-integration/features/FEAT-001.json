@@ -1,0 +1,21 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Persist canonical enumeration terms/distractors and implement shared metadata, identity, quota, privacy, and session persistence contracts.",
+  "status": "pending",
+  "steps": [
+    "Extend QuizQuestion and DTOs, validate fields, add nullable JSONB columns to sql/schema.sql, and update Neon, Supabase, Memory, LocalFirst, Cached, and public projection mappings.",
+    "Implement getAnswerIdentityKey, getEnumerationMetadata, pure enumeration state/attempt/option utilities, and preserve numeric getQuestionAnswer semantics.",
+    "Extend useQuizSession with submitEnumerationTerm/selectEnumerationOption and exact quota-completion transition boundary; add presentation-keyed version-2 snapshot persistence.",
+    "Add repository, utility, hook, persistence, API, and privacy tests for empty options, malformed values, duplicate identity, quota mismatch, restore, retry, and hidden payload/markup."
+  ],
+  "acceptance_criteria": [
+    "Empty-option enumeration with answer_text 3 and answer_terms A/B/C round-trips through create/update/repositories.",
+    "Intermediate enumeration attempts do not invoke ordinary mastery transition; exactly one transition occurs at quota completion.",
+    "Missing/null, valid-empty, malformed, insufficient, and quota-mismatch states are deterministic and tested.",
+    "Hidden public/shared projections omit answer_terms and enumeration_distractors and do not leak them in rendered output."
+  ],
+  "verification": ["pnpm test -- packages/core/src/repositories apps/web/lib", "pnpm typecheck"],
+  "blocked_reason": null,
+  "findings": ""
+}

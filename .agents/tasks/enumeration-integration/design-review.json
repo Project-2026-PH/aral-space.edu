@@ -1,0 +1,54 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "severity": "HIGH",
+      "title": "Review/test route integration is not concretely grounded",
+      "location": "Adaptive Learn and /review/test",
+      "fix": "Name the exact practice page and navigation component/file, specify the sibling-route versus existing-route decision, and define exact runtime assertions for owner, shared, subject-shared, legacy, and missing cases."
+    },
+    {
+      "severity": "HIGH",
+      "title": "Enumeration state does not define the hook transition boundary",
+      "location": "Shared evaluation, quota, and state transitions",
+      "fix": "Define submitEnumerationTerm/selectEnumerationOption lifecycle and signatures: intermediate attempts must not call answerQuestion or transition mastery; quota completion must atomically create the final transition and pending advance once, with advance as the only reset path."
+    },
+    {
+      "severity": "HIGH",
+      "title": "Retry/re-presentation semantics are unspecified",
+      "location": "Persistence and session restoration",
+      "fix": "Key state by session presentation/attempt, restore partial state only for the same presentation, and explicitly clear/start fresh state on struggle retry while retaining history separately."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "DTO and persistence scope is too broad to implement",
+      "location": "Canonical model, precedence, and persistence",
+      "fix": "List exact DTOs, API schemas/routes, SQL migration, and repository mappers; specify column type, null/default behavior, and missing/null/valid-empty/malformed round-trip behavior."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "Term/distractor identity collision rules are incomplete",
+      "location": "getEnumerationMetadata and projectEnumerationOptions",
+      "fix": "Export one identity-key function using the exact core equivalence policy; drop distractors whose keys collide with canonical terms, deduplicate all remaining values by that key, and define deterministic IDs."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "Explicit terms versus legacy-option quota is underspecified",
+      "location": "Quota decision table",
+      "fix": "State whether extra explicit terms are invalid or truncated when legacy options determine total; never truncate silently, mark fewer-than-total unique terms unavailable, and add all count-mismatch cases to tests."
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "Public payload privacy boundary is not specified",
+      "location": "Error handling, privacy, and invariants",
+      "fix": "Define separate internal and public/shared projections and omit answer_terms and enumeration_distractors from hidden-key payloads; test serialized responses and rendered markup."
+    },
+    {
+      "severity": "NIT",
+      "title": "Design test plan mixes implementation execution with review",
+      "location": "Test plan",
+      "fix": "Keep builds, typechecks, and browser smoke tests as implementation acceptance steps and identify their exact commands separately."
+    }
+  ],
+  "reviewDoc": "c:\\Users\\User\\IntelliJ\\quiz-creator\\.agents\\tasks\\enumeration-integration\\design-review.md"
+}

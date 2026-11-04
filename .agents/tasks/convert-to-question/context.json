@@ -1,0 +1,29 @@
+{
+  "project_type": "pnpm + Turborepo TypeScript monorepo; Next.js 15 App Router web app in apps/web",
+  "language": "TypeScript and TSX",
+  "build_system": "Root pnpm@11.21.0 scripts invoke Vitest and Turbo. Web package uses Next.js with a prebuild script that runs scripts/generate-version.mjs and writes apps/web/public/version.json.",
+  "test_framework": "Vitest 3 from the repository root; existing focused tests are under apps/web/lib/__tests__.",
+  "build_command": "pnpm --filter @quiz-creator/web build",
+  "test_command": "pnpm vitest run",
+  "verification_instructions": "Run focused converter, prompt, parser, authoring-helper, and undo tests first; run pnpm --filter @quiz-creator/web typecheck; run pnpm --filter @quiz-creator/web build; finish with pnpm vitest run. Browser verification is required for paste event propagation, rich-text/native undo, and the meaning of the reported term field.",
+  "snapshot_or_generated_files": "The web build prebuild step generates apps/web/public/version.json and Next generates apps/web/.next; avoid unrelated generated churn and follow existing tracking conventions.",
+  "environment_constraints": "Windows PowerShell workspace at c:\\Users\\User\\IntelliJ\\quiz-creator. Do not touch unrelated pre-existing changes, especially apps/web/hooks/useQuizSession.ts. SmolLM2 is optional, client-only, bounded, and must not overwrite later user edits.",
+  "contribution_requirements": "Read current source before editing; keep deterministic conversion free of LLM/API calls; use explicit paste boundaries instead of ordinary typing interception; preserve native undo where possible; commit locally on the branch and never push.",
+  "key_patterns": "convertToQuestion is pure and consumed by apps/web/lib/clipboardQuestionPrompt.ts. parseSmartClipboard returns single_pair, bulk_terms, question_answer, question_answers, or enumeration_blocks. ManualQuizCreator intercepts rich question and identification answer paste plus a container bulk-import handler. QuizQuestionFormModal intercepts rich question and answer-field paste. RichTextEditor already handles Ctrl+Z/Ctrl+Y with document.execCommand and forwards onPaste. Existing tests cover converter, prompt, and parser behavior but not component runtime events.",
+  "relevant_files": [
+    "apps/web/lib/convertToQuestion.ts",
+    "apps/web/lib/clipboardQuestionPrompt.ts",
+    "apps/web/lib/clipboardParser.ts",
+    "apps/web/lib/ai/localClipboardParser.ts",
+    "apps/web/components/quiz/ManualQuizCreator.tsx",
+    "apps/web/components/quiz/QuizQuestionFormModal.tsx",
+    "apps/web/components/quiz/QuizOverviewClient.tsx",
+    "apps/web/components/quiz/QuizQuestionList.tsx",
+    "apps/web/components/editor/RichTextEditor.tsx",
+    "apps/web/lib/__tests__/convertToQuestion.test.ts",
+    "apps/web/lib/__tests__/clipboardQuestionPrompt.test.ts",
+    "apps/web/lib/__tests__/clipboardParser.test.ts"
+  ],
+  "directory_structure": "apps/web/lib contains deterministic parsers, prompt builders, and unit tests; apps/web/lib/ai contains optional local SmolLM2 fallback; apps/web/components/quiz contains manual creation, add/edit modal, overview, and question list; apps/web/components/editor contains contentEditable editor and native undo toolbar; packages/core contains deterministic transformation services.",
+  "source_discrepancy": "The requested apps/web/lib/ai/clipboardQuestionPrompt.ts does not exist. The actual module is apps/web/lib/clipboardQuestionPrompt.ts; do not create a duplicate without evidence."
+}

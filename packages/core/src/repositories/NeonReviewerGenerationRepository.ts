@@ -406,17 +406,20 @@ export class NeonReviewerGenerationRepository implements ReviewerGenerationRepos
       ),
       created_questions AS (
         INSERT INTO quiz_questions (
-          quiz_id, question_text, answer_text, question_type, options,
+          quiz_id, question_text, answer_text, answer_terms, enumeration_distractors, question_type, options,
           correct_answer, explanation, source_pages, order_index
         )
         SELECT
           created_quiz.id, question.question_text, question.answer_text,
+          question.answer_terms, question.enumeration_distractors,
           question.question_type, question.options, question.correct_answer,
           question.explanation, question.source_pages, question.order_index
         FROM created_quiz
         CROSS JOIN LATERAL jsonb_to_recordset(${questionPayload}::jsonb) AS question(
           question_text text,
           answer_text text,
+          answer_terms jsonb,
+          enumeration_distractors jsonb,
           question_type text,
           options jsonb,
           correct_answer integer,

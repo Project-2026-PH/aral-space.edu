@@ -731,6 +731,125 @@ export function extractBoldTerms(text: string): Array<{ term: string; definition
   return items;
 }
 
+function extractNaturalTermDefinitions(text: string): Array<{ term: string; definition: string }> {
+  const normalized = normalizePdfSoftWraps(text).replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+
+  const items: Array<{ term: string; definition: string }> = [];
+  const clauses = normalized
+    .split(/(?<=[.!?])\s+(?=[A-Z])/)
+    .flatMap((sentence) => sentence.split(/,\s*(?:while|whereas)\s+/i));
+
+  for (const clause of clauses) {
+    const match = clause.trim().match(/^(?:the|a|an)\s+(.+?)\s+(is|are)\s+(.+?)[.!?]*$/i);
+    if (!match) continue;
+
+    const subject = match[1].trim();
+    const verb = match[2].toLowerCase();
+    const predicate = match[3].trim();
+    if (
+      !subject ||
+      subject.length > 80 ||
+      subject.split(/\s+/).length > 10 ||
+      /^(?:this|that|these|those|it|they)\b/i.test(subject)
+    ) {
+      continue;
+    }
+
+    const called = predicate.match(/^(?:called|known\s+as|referred\s+to\s+as)\s+(.+)$/i);
+    const namedTerm = (called ? called[1] : '')
+      .replace(/^(?:its|the|a|an)\s+/i, '')
+      .replace(/[.!?]+$/, '')
+      .trim();
+    if (called) {
+      if (!namedTerm || namedTerm.length > 80) continue;
+      const subjectTerm = subject.replace(/^(?:the|a|an)\s+/i, '').trim();
+      items.push({ term: namedTerm, definition: `What is the ${subjectTerm} called?` });
+      continue;
+    }
+
+    const predicateTerm = predicate
+      .replace(/^(?:its|the|a|an)\s+/i, '')
+      .replace(/[.!?]+$/, '')
+      .trim();
+    if (!predicateTerm || predicateTerm.length > 120 || /[,;]$/.test(predicateTerm)) continue;
+
+    const ofIndex = subject.search(/\s+of\s+/i);
+    const subjectTerm = (ofIndex >= 0 ? subject.slice(0, ofIndex) : subject)
+      .replace(/^(?:the|a|an)\s+/i, '')
+      .trim();
+    const subjectContext = ofIndex >= 0 ? subject.slice(ofIndex) : '';
+    if (!subjectTerm) continue;
+
+    items.push({
+      term: subjectTerm,
+      definition: `What ${verb} the ${predicateTerm}${subjectContext} called?`
+    });
+  }
+
+  const exceptionMatch = normalized.match(
+    /\bexcept for (?:a|an|the)\s+(?:special\s+)?(?<role>[A-Za-z][A-Za-z0-9-]*)\s+called\s+(?:the|a|an)?\s+(?<term>[A-Za-z][A-Za-z0-9'’\-]*(?:\s+[A-Za-z0-9'’\-]+){0,3})\b/i
+  );
+  if (exceptionMatch?.groups) {
+    const role = exceptionMatch.groups.role.trim();
+    const term = exceptionMatch.groups.term.trim();
+    const anaphor = normalized.match(/\bthis\s+([A-Za-z][A-Za-z0-9-]*)\s+(?:is|are)\s+([^.!?]+)/i);
+    const description = anaphor?.[1].toLowerCase() === role.toLowerCase()
+      ? anaphor[2].trim().replace(/[.!?]+$/, '')
+      : '';
+    const hasParentException = /\bexcept for\b[\s\S]*\bparent\b/i.test(normalized);
+    const cleanTerm = term.replace(/^(?:the|a|an)\s+/i, '').trim();
+    const isTopmost = /\btopmost\b/i.test(description);
+
+    items.push({
+      term: cleanTerm,
+      definition: isTopmost
+        ? `Which ${role} is the topmost ${role} in the tree${hasParentException ? ' and has no parent' : ''}?`
+        : hasParentException
+          ? `Which ${role} has no parent?`
+          : `Which ${role} is the exception?`
+    });
+  }
+
+  const uniqueItems = items.filter((item, index) =>
+    items.findIndex((candidate) => candidate.term.toLowerCase() === item.term.toLowerCase()) === index
+  );
+  return uniqueItems.length >= 2 ? uniqueItems : [];
+}
+
+function extractModelTransformTermDefinitions(text: string): Array<{ term: string; definition: string }> {
+  const normalized = normalizePdfSoftWraps(text).replace(/\s+/g, ' ').trim();
+  const components = normalized.match(/\bcurrent\s+([^.!?]{5,100}?)\s+of an object\b/i)?.[1].trim();
+  const worldMatch = normalized.match(
+    /\btransform of an object relative to the root of the scene graph,\s*often called (?:a|the) world transformation,\s*can be calculated from the product of ([^.!?]+)/i
+  );
+  const hasModelMatrixDefinition =
+    /\baccumulated transformations\b/i.test(normalized) &&
+    /\bproduct of the corresponding matrices\b/i.test(normalized) &&
+    /\bsingle matrix called the model matrix\b/i.test(normalized);
+  const hasTransformLabel = /\bthese three(?:\s*\(\d+\))?\s+are collectively referred to as the transform\b/i.test(normalized);
+
+  if (!components || !worldMatch || !hasModelMatrixDefinition || !hasTransformLabel) return [];
+
+  const componentList = components.replace(/[,.]+$/, '').replace(/\s*,\s*/g, ', ');
+  const worldFormula = worldMatch[1].trim().replace(/[,.]+$/, '');
+
+  return [
+    {
+      term: 'model matrix',
+      definition: 'Which single matrix stores the product of an object’s accumulated transformation matrices?'
+    },
+    {
+      term: 'transform',
+      definition: `What are an object's current ${componentList} collectively called?`
+    },
+    {
+      term: 'world transformation',
+      definition: `What is an object's transform relative to the root of the scene graph, calculated from the product of ${worldFormula}, called?`
+    }
+  ];
+}
+
 export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard | null {
   const trimmed = (raw || '').trim();
   const trimmedHtml = (html || '').trim();
@@ -756,6 +875,11 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
       }
       return { type: 'bulk_terms', items: numberedTermDefinitions };
     }
+  }
+
+  const modelTransformTermDefinitions = extractModelTransformTermDefinitions(normalizedText);
+  if (modelTransformTermDefinitions.length >= 2) {
+    return { type: 'bulk_terms', items: modelTransformTermDefinitions };
   }
 
   // Check for Bold-based Term/Definition Extraction
@@ -935,6 +1059,11 @@ export function parseSmartClipboard(raw: string, html?: string): ParsedClipboard
     if (appositivePairs.length >= 2) {
       return { type: 'bulk_terms', items: appositivePairs };
     }
+  }
+
+  const naturalTermDefinitions = extractNaturalTermDefinitions(normalizedText);
+  if (naturalTermDefinitions.length >= 2) {
+    return { type: 'bulk_terms', items: naturalTermDefinitions };
   }
 
   return null;

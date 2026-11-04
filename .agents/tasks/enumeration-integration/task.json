@@ -1,0 +1,7 @@
+{
+  "task_id": "task-enumeration-integration",
+  "task_description": "Integrate term-aware enumeration into Learn, Flashcards, Identification, Multiple Choice, authoring, persistence, privacy, and /review/test.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

@@ -39,9 +39,9 @@ describe('convertToQuestion', () => {
     );
   });
 
-  it('transforms repeated mentions without inserting a mid-sentence question', () => {
+  it('preserves non-final predicate clauses while substituting repeated definitions', () => {
     expect(convertToQuestion('This is photosynthesis. Photosynthesis needs light.', 'photosynthesis')).toBe(
-      'This is known as what. this process needs light. What is this operation called?'
+      'This is this process. this process needs light. What is this operation called?'
     );
   });
 

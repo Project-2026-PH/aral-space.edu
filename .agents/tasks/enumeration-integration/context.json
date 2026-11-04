@@ -1,0 +1,15 @@
+{
+  "project_type": "pnpm/Turbo TypeScript monorepo with Next.js 15 App Router web app, core/types/controllers packages, local-first and SQL repositories",
+  "language": "TypeScript and SQL",
+  "build_system": "pnpm workspaces with Turbo; web uses Next.js; SQL uses JSONB question columns and Neon inline recordsets",
+  "test_framework": "Vitest at repository root",
+  "build_command": "pnpm build",
+  "test_command": "pnpm test",
+  "verification_instructions": "Run focused Vitest tests during each feature, package typechecks, then pnpm test, pnpm typecheck, pnpm lint, pnpm build; perform a browser/runtime smoke check for /review/test/<quizId>.",
+  "snapshot_or_generated_files": "apps/web build generates .next and scripts/generate-version.mjs output; do not commit generated build artifacts unless existing workflow requires it.",
+  "environment_constraints": "Windows PowerShell workspace; external database/browser credentials may be unavailable and must be documented rather than treated as passing runtime evidence.",
+  "contribution_requirements": "Preserve existing non-enumeration behavior, public answer-key privacy, numeric enumeration answer_text semantics, and commit locally without pushing.",
+  "key_patterns": "Question normalization is centralized in packages/core/src/repositories/questionFields.ts; public projection is packages/core/src/security/publicDtos.ts; practice route is the loader/mastery template; existing review/[quizId] is flashcard-only; QuizStartConfigModal owns study-mode navigation.",
+  "relevant_files": ["packages/types/src/models/QuizQuestion.ts", "packages/types/src/dtos/QuizDto.ts", "packages/core/src/repositories/questionFields.ts", "packages/core/src/repositories/NeonQuizRepository.ts", "packages/core/src/repositories/SupabaseQuizRepository.ts", "packages/core/src/repositories/MemoryQuizRepository.ts", "packages/core/src/repositories/LocalFirstQuizRepository.ts", "packages/core/src/repositories/CachedQuizRepository.ts", "packages/core/src/security/publicDtos.ts", "sql/schema.sql", "apps/web/lib/quizAnswerEvaluation.ts", "apps/web/lib/quizProgressPersistence.ts", "apps/web/hooks/useQuizSession.ts", "apps/web/components/quiz/QuizQuestionRenderer.tsx", "apps/web/components/quiz/QuizRunner.tsx", "apps/web/components/quiz/FlashcardReview.tsx", "apps/web/components/quiz/QuizQuestionFormModal.tsx", "apps/web/components/quiz/ManualQuizCreator.tsx", "apps/web/components/quiz/QuizStartConfigModal.tsx", "apps/web/app/(app)/practice/[quizId]/page.tsx", "apps/web/app/(app)/review/[quizId]/page.tsx"],
+  "directory_structure": "packages/types contains models/DTOs; packages/core contains repositories, security, schema; apps/web contains App Router routes, quiz components/hooks/lib; sql/schema.sql is the canonical DDL."
+}

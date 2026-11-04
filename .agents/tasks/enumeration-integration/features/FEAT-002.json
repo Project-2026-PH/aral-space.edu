@@ -1,0 +1,21 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Integrate enumeration interactions into authoring and all study surfaces, add adaptive Learn routing at /review/test, and verify end-to-end behavior.",
+  "status": "pending",
+  "steps": [
+    "Add enumeration Identification and Multiple Choice renderer branches, QuizRunner plumbing, and FlashcardReview two-column answer rendering with accessible unavailable/privacy states.",
+    "Add answer-term/quota/distractor authoring controls and exact empty-options payload behavior in QuizQuestionFormModal and ManualQuizCreator.",
+    "Implement learnModeDispatcher and new sibling route apps/web/app/(app)/review/test/[quizId]/page.tsx by copying the practice/[quizId] authorization/loading/mastery contract; add Learn entry to QuizStartConfigModal.",
+    "Add component, authoring, dispatcher, route, runtime, and browser smoke tests covering quota progression, wrong/right counting, duplicate suppression, typed matching, flashcard grid, owner/shared/subject-shared/legacy/missing route cases, and reload."
+  ],
+  "acceptance_criteria": [
+    "Enumeration flashcards show all visible terms in two columns on wide screens and one column on narrow screens.",
+    "Identification and multiple choice continue until unique attempted selections equal the quota and show the final verdict only then.",
+    "Learn mode dispatches enumeration, exact true/false, ordinary multiple choice, and typed-answer questions without numeric-term evaluation.",
+    "/review/test/<quizId> renders QuizRunner for owner/shared/subject-shared cases, redirects legacy IDs preserving query, and notFounds missing quizzes."
+  ],
+  "verification": ["pnpm test", "pnpm --filter @quiz-creator/web typecheck", "pnpm --filter @quiz-creator/web build", "Browser smoke test for /review/test/<quizId>"],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -31,6 +31,7 @@ const GenerateQuizModal = dynamic(() => import('@/components/quiz/GenerateQuizMo
 });
 import FloatingBottomNav from '@/components/navigation/FloatingBottomNav';
 import KoleAgent from '@/components/library/KoleAgent';
+import LibrarySidebar from '@/components/library/LibrarySidebar';
 import { useSynchronizedLibraryCollections, publishLibraryMutation } from '@/lib/libraryMutationStore';
 
 export interface LibraryClientProps {
@@ -225,13 +226,6 @@ export default function LibraryClient({
     + filteredLibrary.sharedQuizzes.length;
   const hasSearch = search.trim().length > 0;
 
-  const viewTabs: Array<{ id: LibraryView; label: string; count: number }> = [
-    { id: 'overview', label: 'Overview', count: totalItemCount },
-    { id: 'subjects', label: 'Subjects', count: synchronizedLibrary.subjects.length },
-    { id: 'reviewers', label: 'Reviewers', count: synchronizedLibrary.quizzes.length },
-    { id: 'shared', label: 'Shared', count: sharedItemCount },
-  ];
-
   const selectView = (view: LibraryView) => {
     setActiveView(view);
   };
@@ -321,7 +315,17 @@ export default function LibraryClient({
   );
 
   return (
-    <div className="home-page mx-auto max-w-5xl space-y-7 px-4 py-6 pb-24 sm:px-6 lg:px-8 desktop-zoom-133">
+    <div className="lg:flex lg:min-h-[calc(100vh-4rem)]">
+      <LibrarySidebar
+        activeView={activeView}
+        onSelect={selectView}
+        totalCount={totalItemCount}
+        setCount={synchronizedLibrary.quizzes.length}
+        subjectCount={synchronizedLibrary.subjects.length}
+        sharedCount={sharedItemCount}
+      />
+      <div className="min-w-0 flex-1 pl-14 lg:pl-0">
+        <div className="home-page mx-auto max-w-5xl space-y-7 px-4 py-6 pb-24 sm:px-6 lg:px-8 desktop-zoom-133">
       {/* Library command center */}
       <section
         className="home-hero relative isolate z-30 space-y-4 overflow-visible rounded-3xl border-3 border-slate-900 bg-slate-50 p-4 shadow-brutal transition-colors duration-500 dark:border-white/30 dark:bg-card sm:p-6"
@@ -394,33 +398,7 @@ export default function LibraryClient({
           )}
         </div>
 
-        <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="flex items-center gap-1 overflow-x-auto rounded-xl border-2 border-slate-900 bg-white p-1 dark:border-white/30 dark:bg-slate-900 scrollbar-none" role="tablist" aria-label="Library sections">
-            {viewTabs.map((tab) => {
-              const isActive = activeView === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => selectView(tab.id)}
-                  className={`flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black transition-colors ${
-                    isActive
-                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] ${isActive ? 'bg-white/20' : 'bg-slate-100 dark:bg-white/10'}`}>
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-center shrink-0">
+        <div className="relative z-10 flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => setShowAiModal(true)}
@@ -531,7 +509,6 @@ export default function LibraryClient({
                 document.body
               )}
             </div>
-          </div>
         </div>
       </section>
 
@@ -543,6 +520,7 @@ export default function LibraryClient({
         viewerId={viewerId}
       />
 
+      <div key={activeView} className="space-y-7 animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none">
       {activeView === 'overview' && hasSearch && (
         <section className="space-y-4" aria-labelledby="library-search-results-heading">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -616,6 +594,7 @@ export default function LibraryClient({
             : <EmptyLibraryResults label="shared items" search={search} />}
         </div>
       )}
+      </div>
 
       <NewSubjectModal
         open={showSubjectModal}
@@ -639,6 +618,8 @@ export default function LibraryClient({
         onLibrarySectionSelect={(section) => setActiveView(section)}
         activeSection={activeView === 'reviewers' ? 'reviewers' : activeView === 'subjects' ? 'subjects' : undefined}
       />
+        </div>
+      </div>
     </div>
   );
 }

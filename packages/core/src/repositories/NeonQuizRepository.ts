@@ -636,6 +636,18 @@ export class NeonQuizRepository implements IQuizRepository {
                 AND (q.share_expires_at IS NULL OR q.share_expires_at > now())
               )
               OR EXISTS (SELECT 1 FROM subject_collaborators sc WHERE sc.subject_id = q.subject_id AND sc.user_id = ${userId})
+              OR EXISTS (
+                SELECT 1
+                FROM study_class_subjects cs
+                JOIN subjects shared_subject ON shared_subject.id = cs.subject_id
+                JOIN study_classes c ON c.id = cs.classroom_id
+                LEFT JOIN study_class_members cm
+                  ON cm.classroom_id = c.id AND cm.user_id = ${userId}
+                WHERE cs.subject_id = q.subject_id
+                  AND shared_subject.archived_at IS NULL
+                  AND c.archived_at IS NULL
+                  AND (c.owner_id = ${userId} OR cm.user_id = ${userId})
+              )
             )
           LIMIT 1
         `

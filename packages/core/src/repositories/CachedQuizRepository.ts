@@ -223,6 +223,10 @@ export class CachedQuizRepository implements IQuizRepository {
   }
 
   async getQuizById(id: string, userId?: string): Promise<Quiz | null> {
+    // User-scoped access can change when a class member is removed or a class set is unshared.
+    // Re-check authorization on every read instead of retaining revoked access in the LRU cache.
+    if (userId) return this.underlying.getQuizById(id, userId);
+
     const key = this.quizKey(id, userId);
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;
@@ -298,6 +302,8 @@ export class CachedQuizRepository implements IQuizRepository {
   }
 
   async getQuestionsByQuizId(quizId: string, userId?: string): Promise<QuizQuestion[]> {
+    if (userId) return this.underlying.getQuestionsByQuizId(quizId, userId);
+
     const key = this.questionsKey(quizId, userId);
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;

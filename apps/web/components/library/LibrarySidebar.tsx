@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import type { Classroom } from '@quiz-creator/types';
 import {
   Archive,
   BookOpen,
@@ -10,11 +11,12 @@ import {
   Layers,
   Menu,
   Share2,
+  Users,
   X,
   type LucideIcon,
 } from 'lucide-react';
 
-type LibrarySidebarView = 'overview' | 'subjects' | 'reviewers' | 'shared';
+type LibrarySidebarView = 'overview' | 'subjects' | 'reviewers' | 'shared' | 'classes';
 
 interface LibrarySidebarProps {
   activeView: LibrarySidebarView;
@@ -23,6 +25,10 @@ interface LibrarySidebarProps {
   setCount: number;
   subjectCount: number;
   sharedCount: number;
+  classCount: number;
+  classrooms: Classroom[];
+  selectedClassId: string;
+  onSelectClass: (classroomId: string) => void;
 }
 
 interface NavigationItem {
@@ -39,6 +45,10 @@ export default function LibrarySidebar({
   setCount,
   subjectCount,
   sharedCount,
+  classCount,
+  classrooms,
+  selectedClassId,
+  onSelectClass,
 }: LibrarySidebarProps) {
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const mobileToggleRef = useRef<HTMLButtonElement>(null);
@@ -62,6 +72,7 @@ export default function LibrarySidebar({
       items: [
         { id: 'reviewers', label: 'Sets', count: setCount, icon: Layers },
         { id: 'subjects', label: 'Subjects', count: subjectCount, icon: BookOpen },
+        { id: 'classes', label: 'Classes', count: classCount, icon: Users },
       ],
     },
     {
@@ -92,6 +103,12 @@ export default function LibrarySidebar({
 
   const chooseView = (view: LibrarySidebarView) => {
     onSelect(view);
+    if (mobileExpanded) collapseMobileNavigation();
+  };
+
+  const chooseClassroom = (classroomId: string) => {
+    onSelect('classes');
+    onSelectClass(classroomId);
     if (mobileExpanded) collapseMobileNavigation();
   };
 
@@ -158,7 +175,7 @@ export default function LibrarySidebar({
 
       <aside
         aria-label="Library navigation"
-        className={`fixed bottom-0 left-0 top-16 z-50 flex overflow-hidden border-r-3 border-slate-900 bg-slate-50 text-slate-900 shadow-brutal transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none dark:border-white/50 dark:bg-card dark:text-white lg:sticky lg:top-4 lg:bottom-auto lg:z-30 lg:m-4 lg:h-auto lg:max-h-none lg:self-start lg:shrink-0 lg:rounded-2xl lg:border-3 ${
+        className={`fixed bottom-0 left-0 top-16 z-50 flex overflow-hidden border-r-3 border-slate-900 bg-slate-50 text-slate-900 shadow-brutal transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none dark:border-white/50 dark:bg-card dark:text-white lg:fixed lg:left-4 lg:top-1/2 lg:-translate-y-1/2 lg:bottom-auto lg:z-30 lg:m-0 lg:h-auto lg:max-h-none lg:self-start lg:shrink-0 lg:rounded-2xl lg:border-3 ${
           mobileExpanded ? 'w-[17rem]' : 'w-14'
         } lg:w-[16rem] lg:shadow-brutal`}
       >
@@ -237,7 +254,28 @@ export default function LibrarySidebar({
                     {group.label}
                   </h2>
                   <div className="space-y-1">
-                    {group.items.map((item) => renderItem(item))}
+                    {group.items.map((item) => (
+                      <div key={item.id} className="space-y-1">
+                        {renderItem(item)}
+                        {item.id === 'classes' && classrooms.length > 0 && (
+                          <div aria-label="Your classes" className="ml-4 max-h-40 space-y-1 overflow-y-auto border-l-2 border-slate-900/15 pl-2 dark:border-white/15 lg:max-h-56">
+                            {classrooms.map((classroom) => (
+                              <button
+                                key={classroom.id}
+                                type="button"
+                                onClick={() => chooseClassroom(classroom.id)}
+                                aria-current={selectedClassId === classroom.id ? 'page' : undefined}
+                                title={classroom.name}
+                                className={`flex min-h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left transition ${selectedClassId === classroom.id ? 'bg-[#fde047] font-black text-slate-950' : 'font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+                              >
+                                <span className="min-w-0 truncate text-xs">{classroom.name}</span>
+                                <span className="shrink-0 text-[8px] font-black uppercase tracking-wide opacity-60">{classroom.role === 'member' ? 'joined' : 'owner'}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </section>
               ))}

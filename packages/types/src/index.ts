@@ -1,4 +1,5 @@
 export * from './models/Subject';
+export * from './models/Classroom';
 export * from './models/Quiz';
 export * from './models/Library';
 export * from './models/QuizQuestion';

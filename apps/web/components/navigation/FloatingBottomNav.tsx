@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { BookOpen, Layers, Plus, Sparkles, GripVertical, GripHorizontal, FilePlus2, FileText } from 'lucide-react';
+import { BookOpen, Layers, Plus, Sparkles, GripVertical, GripHorizontal, FilePlus2, FileText, Users } from 'lucide-react';
 import Link from 'next/link';
 
 interface FloatingBottomNavProps {
   onOpenAiModal?: () => void;
   onOpenSubjectModal?: () => void;
-  onLibrarySectionSelect?: (section: 'subjects' | 'reviewers') => void;
-  activeSection?: 'subjects' | 'reviewers';
+  onLibrarySectionSelect?: (section: 'subjects' | 'reviewers' | 'classes') => void;
+  activeSection?: 'subjects' | 'reviewers' | 'classes';
 }
 
 export default function FloatingBottomNav({
@@ -20,7 +20,7 @@ export default function FloatingBottomNav({
 }: FloatingBottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'subjects' | 'reviewers'>('subjects');
+  const [activeTab, setActiveTab] = useState<'subjects' | 'reviewers' | 'classes'>('subjects');
 
   useEffect(() => {
     if (activeSection) {
@@ -53,14 +53,15 @@ export default function FloatingBottomNav({
     || pathname.startsWith('/review/');
 
   const isNotesActive = pathname === '/notes' || pathname.startsWith('/notes/');
-  const isReviewerActive = !isNotesActive && (
+  const isClassesActive = !isNotesActive && isLibraryRoute && activeTab === 'classes';
+  const isReviewerActive = !isNotesActive && !isClassesActive && (
     (isLibraryRoute && activeTab === 'reviewers') ||
     pathname === '/quizzes' ||
     pathname.startsWith('/quizzes/') ||
     pathname === '/review' ||
     pathname.startsWith('/review/')
   );
-  const isSubjectsActive = !isNotesActive && !isReviewerActive && (
+  const isSubjectsActive = !isNotesActive && !isReviewerActive && !isClassesActive && (
     (isLibraryRoute && activeTab === 'subjects') ||
     pathname === '/subjects' ||
     pathname.startsWith('/subjects/')
@@ -223,13 +224,13 @@ export default function FloatingBottomNav({
     }
   };
 
-  const scrollToSection = (id: string, tab: 'subjects' | 'reviewers') => {
+  const scrollToSection = (id: string, tab: 'subjects' | 'reviewers' | 'classes') => {
     setActiveTab(tab);
     setShowQuickMenu(false);
     onLibrarySectionSelect?.(tab);
 
     if (!isLibraryRoute) {
-      router.push(`/library#${id}`);
+      router.push(tab === 'classes' ? `/library?tab=classes#${id}` : `/library#${id}`);
       return;
     }
 
@@ -454,6 +455,22 @@ export default function FloatingBottomNav({
               <Layers className="h-4 w-4" />
             </div>
             {!isVertical && <span>Reviewer</span>}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => scrollToSection('classes-section', 'classes')}
+            aria-label="Navigate to Classes"
+            className={`group relative flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold transition-all duration-200 active:scale-95 ${
+              isClassesActive
+                ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-800 dark:text-zinc-100 dark:border dark:border-zinc-700/70'
+                : 'text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/60 dark:hover:text-zinc-100'
+            } ${isVertical ? 'w-full justify-center px-2 py-2.5' : ''}`}
+          >
+            <div className={`flex h-6 w-6 items-center justify-center rounded-md ${isClassesActive ? 'text-white' : 'text-zinc-600 dark:text-zinc-400'}`}>
+              <Users className="h-4 w-4" />
+            </div>
+            {!isVertical && <span>Classes</span>}
           </button>
 
           <Link

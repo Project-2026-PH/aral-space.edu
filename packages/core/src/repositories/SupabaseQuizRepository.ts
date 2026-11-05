@@ -695,6 +695,7 @@ export class SupabaseQuizRepository implements IQuizRepository {
         if (archiveIds.quizIds.has(quiz.id) || (quiz.subject_id && archiveIds.subjectIds.has(quiz.subject_id))) return null;
       }
       let subjectIds = new Set<string>();
+      let hasClassAccess = false;
       if (userId) {
         const { data: memberships, error: membershipError } = await this.supabase
           .from('subject_collaborators')
@@ -702,12 +703,43 @@ export class SupabaseQuizRepository implements IQuizRepository {
           .eq('user_id', userId);
         if (membershipError) throw membershipError;
         subjectIds = new Set((memberships || []).map((row: any) => row.subject_id));
+
+        const { data: classLinks, error: classLinksError } = quiz.subject_id
+          ? await this.supabase
+              .from('study_class_subjects')
+              .select('classroom_id')
+              .eq('subject_id', quiz.subject_id)
+          : { data: [], error: null };
+        if (classLinksError) throw classLinksError;
+        const classroomIds = Array.from(new Set((classLinks || []).map((row: any) => String(row.classroom_id))));
+        if (classroomIds.length) {
+          const [activeClasses, classMemberships] = await Promise.all([
+            this.supabase
+              .from('study_classes')
+              .select('id, owner_id')
+              .in('id', classroomIds)
+              .is('archived_at', null),
+            this.supabase
+              .from('study_class_members')
+              .select('classroom_id')
+              .in('classroom_id', classroomIds)
+              .eq('user_id', userId),
+          ]);
+          if (activeClasses.error) throw activeClasses.error;
+          if (classMemberships.error) throw classMemberships.error;
+          const activeIds = new Set((activeClasses.data || []).map((row: any) => String(row.id)));
+          hasClassAccess = Boolean(
+            (activeClasses.data || []).some((row: any) => row.owner_id === userId)
+            || (classMemberships.data || []).some((row: any) => activeIds.has(String(row.classroom_id)))
+          );
+        }
       }
 
       const hasAccess = !userId
         ? isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at)
         : quiz.user_id === userId
           || (quiz.subject_id ? subjectIds.has(quiz.subject_id) : false)
+          || hasClassAccess
           || isShareTokenActive(quiz.is_public, quiz.share_expires_at, quiz.share_revoked_at);
       if (!hasAccess) return null;
 

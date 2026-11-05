@@ -2,12 +2,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Quiz, Subject } from '@quiz-creator/types';
+import { Classroom, Quiz, Subject } from '@quiz-creator/types';
 import dynamic from 'next/dynamic';
 import NewSubjectModal from '@/components/subject/NewSubjectModal';
 import SubjectLibrary from '@/components/subject/SubjectLibrary';
 import QuizLibrary from '@/components/quiz/QuizLibrary';
 import SharedLibrary from '@/components/library/SharedLibrary';
+import ClassroomLibrary from '@/components/library/ClassroomLibrary';
 import {
   ArrowRight,
   Atom,
@@ -42,7 +43,7 @@ export interface LibraryClientProps {
   viewerId: string;
 }
 
-type LibraryView = 'overview' | 'subjects' | 'reviewers' | 'shared';
+type LibraryView = 'overview' | 'subjects' | 'reviewers' | 'shared' | 'classes';
 
 const PREVIEW_LIMIT = 6;
 
@@ -88,6 +89,9 @@ export default function LibraryClient({
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [activeView, setActiveView] = useState<LibraryView>('overview');
+  const [classCount, setClassCount] = useState(0);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [showAiModal, setShowAiModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
@@ -102,6 +106,27 @@ export default function LibraryClient({
     sharedQuizzes,
     sharedSubjects,
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const classId = params.get('classId');
+    if (params.get('tab') === 'classes' || classId) setActiveView('classes');
+    if (classId) setSelectedClassId(classId);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/classes', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : [])
+      .then((rows: unknown) => {
+        if (active && Array.isArray(rows)) {
+          setClassrooms(rows as Classroom[]);
+          setClassCount(rows.length);
+        }
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const tipTimer = window.setInterval(() => {
@@ -230,6 +255,18 @@ export default function LibraryClient({
     setActiveView(view);
   };
 
+  const selectClassroom = (classroomId: string) => {
+    setSelectedClassId(classroomId);
+    const url = new URL(window.location.href);
+    if (classroomId) {
+      url.searchParams.set('tab', 'classes');
+      url.searchParams.set('classId', classroomId);
+    } else {
+      url.searchParams.delete('classId');
+    }
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  };
+
   const handleSubjectDeleted = (subjectId: string) => {
     setSubjects((current) => current.filter((subject) => subject.id !== subjectId));
     setQuizzes((current) => current.filter((quiz) => quiz.subject_id !== subjectId));
@@ -316,14 +353,20 @@ export default function LibraryClient({
 
   return (
     <div className="lg:flex lg:min-h-[calc(100vh-4rem)]">
-      <LibrarySidebar
-        activeView={activeView}
-        onSelect={selectView}
-        totalCount={totalItemCount}
-        setCount={synchronizedLibrary.quizzes.length}
-        subjectCount={synchronizedLibrary.subjects.length}
-        sharedCount={sharedItemCount}
-      />
+      <div className="lg:w-[18rem] lg:shrink-0">
+        <LibrarySidebar
+          activeView={activeView}
+          onSelect={selectView}
+          totalCount={totalItemCount}
+          setCount={synchronizedLibrary.quizzes.length}
+          subjectCount={synchronizedLibrary.subjects.length}
+          sharedCount={sharedItemCount}
+          classCount={classCount}
+          classrooms={classrooms}
+          selectedClassId={selectedClassId}
+          onSelectClass={selectClassroom}
+        />
+      </div>
       <div className="min-w-0 flex-1 pl-14 lg:pl-0">
         <div className="home-page mx-auto max-w-5xl space-y-7 px-4 py-6 pb-24 sm:px-6 lg:px-8 desktop-zoom-133">
       {/* Library command center */}
@@ -594,6 +637,16 @@ export default function LibraryClient({
             : <EmptyLibraryResults label="shared items" search={search} />}
         </div>
       )}
+      {activeView === 'classes' && (
+        <ClassroomLibrary
+          subjects={synchronizedLibrary.subjects}
+          viewerId={viewerId}
+          selectedClassId={selectedClassId}
+          onSelectedClassChange={selectClassroom}
+          onClassesChange={setClassrooms}
+          onCountChange={setClassCount}
+        />
+      )}
       </div>
 
       <NewSubjectModal
@@ -616,7 +669,7 @@ export default function LibraryClient({
         onOpenAiModal={() => setShowAiModal(true)}
         onOpenSubjectModal={() => setShowSubjectModal(true)}
         onLibrarySectionSelect={(section) => setActiveView(section)}
-        activeSection={activeView === 'reviewers' ? 'reviewers' : activeView === 'subjects' ? 'subjects' : undefined}
+        activeSection={activeView === 'classes' ? 'classes' : activeView === 'reviewers' ? 'reviewers' : activeView === 'subjects' ? 'subjects' : undefined}
       />
         </div>
       </div>

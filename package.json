@@ -23,6 +23,8 @@
     "migrate:archive": "node scripts/migrate-archive.mjs",
     "migrate:infisical": "infisical run -- node scripts/migrate.mjs",
     "migrate:archive:infisical": "infisical run -- node scripts/migrate-archive.mjs",
+    "migrate:classes": "node scripts/migrate-study-classes.mjs",
+    "migrate:classes:infisical": "infisical run -- node scripts/migrate-study-classes.mjs",
     "seed": "node scripts/seed.mjs",
     "seed:infisical": "infisical run -- node scripts/seed.mjs"
   },

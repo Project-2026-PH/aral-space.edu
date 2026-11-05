@@ -112,9 +112,12 @@ export default function LibrarySidebar({
     if (mobileExpanded) collapseMobileNavigation();
   };
 
+  const hasSelectedClass = activeView === 'classes'
+    && classrooms.some((classroom) => classroom.id === selectedClassId);
+
   const renderItem = (item: NavigationItem, compact = false) => {
     const Icon = item.icon;
-    const isActive = activeView === item.id;
+    const isActive = activeView === item.id && (item.id !== 'classes' || !hasSelectedClass);
 
     return (
       <button
@@ -264,9 +267,9 @@ export default function LibrarySidebar({
                                 key={classroom.id}
                                 type="button"
                                 onClick={() => chooseClassroom(classroom.id)}
-                                aria-current={selectedClassId === classroom.id ? 'page' : undefined}
+                                aria-current={activeView === 'classes' && selectedClassId === classroom.id ? 'page' : undefined}
                                 title={classroom.name}
-                                className={`flex min-h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left transition ${selectedClassId === classroom.id ? 'bg-[#fde047] font-black text-slate-950' : 'font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+                                className={`flex min-h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left transition ${activeView === 'classes' && selectedClassId === classroom.id ? 'bg-[#fde047] font-black text-slate-950' : 'font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
                               >
                                 <span className="min-w-0 truncate text-xs">{classroom.name}</span>
                                 <span className="shrink-0 text-[8px] font-black uppercase tracking-wide opacity-60">{classroom.role === 'member' ? 'joined' : 'owner'}</span>

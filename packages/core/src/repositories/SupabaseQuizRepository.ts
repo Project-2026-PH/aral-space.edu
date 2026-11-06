@@ -15,6 +15,12 @@ function isMissingArchiveTableError(error: any): boolean {
   return error?.code === '42P01';
 }
 
+function isMissingQuizCreationFunctionError(error: any): boolean {
+  return error?.code === '42883'
+    || error?.code === 'PGRST202'
+    || /create_quiz_with_questions/i.test(error?.message || '');
+}
+
 const memoryFallback = new MemoryQuizRepository();
 
 const productionDisabledFallback: IQuizRepository = new Proxy({} as IQuizRepository, {
@@ -761,52 +767,52 @@ export class SupabaseQuizRepository implements IQuizRepository {
       const { data: existing } = await this.supabase.from('quizzes').select('slug');
       const used = new Set((existing || []).map((row) => row.slug));
       const slug = await createUniqueSlug(dto.title, async (candidate) => used.has(candidate), 'quiz');
-      const { data: quizData, error: quizError } = await this.supabase
-        .from('quizzes')
-        .insert({
-          title: dto.title,
-          slug,
-          description: dto.description || null,
-          term: dto.term || null,
-          question_count: dto.questions.length,
-          handout_name: dto.handout_name,
-          source_model: dto.source_model || 'manual',
-          subject_id: dto.subject_id,
-          share_token: shareToken,
-          is_public: true,
-          allow_cloning: true,
-          user_id: userId
-        })
-        .select('*')
-        .single();
+      const questions = dto.questions.map((q, order_index) => {
+        const fields = normalizeQuestionFields(q);
+        return {
+          question_text: q.question_text,
+          answer_text: fields.answer_text,
+          answer_terms: fields.answer_terms,
+          enumeration_distractors: fields.enumeration_distractors,
+          question_type: fields.question_type,
+          options: fields.options,
+          correct_answer: fields.correct_answer,
+          explanation: q.explanation || null,
+          correct_explanation: fields.correct_explanation || null,
+          distractor_explanations: fields.distractor_explanations,
+          discriminatory_keywords: fields.discriminatory_keywords,
+          source_pages: q.source_pages || null,
+          order_index
+        };
+      });
 
-      if (!quizError && quizData) {
-        if (dto.questions.length > 0) {
-          const rows = dto.questions.map((q, idx) => {
-            const fields = normalizeQuestionFields(q);
-            return {
-              quiz_id: quizData.id,
-              question_text: q.question_text,
-              answer_text: fields.answer_text,
-              answer_terms: fields.answer_terms,
-              enumeration_distractors: fields.enumeration_distractors,
-              question_type: fields.question_type,
-              options: fields.options,
-              correct_answer: fields.correct_answer,
-              explanation: q.explanation,
-              source_pages: q.source_pages,
-              order_index: idx
-            };
-          });
+      const { data, error } = await this.supabase.rpc('create_quiz_with_questions', {
+        p_title: dto.title,
+        p_slug: slug,
+        p_description: dto.description || null,
+        p_term: dto.term || null,
+        p_question_count: dto.questions.length,
+        p_handout_name: dto.handout_name || null,
+        p_source_model: dto.source_model || 'manual',
+        p_subject_id: dto.subject_id || null,
+        p_share_token: shareToken,
+        p_user_id: userId || null,
+        p_questions: questions
+      });
 
-          await this.supabase.from('quiz_questions').insert(rows);
-        }
-
-        return quizData;
+      if (error) throw error;
+      const quizData = Array.isArray(data) ? data[0] : data;
+      if (!quizData) throw new Error('Supabase quiz creation returned no quiz');
+      return quizData as Quiz;
+    } catch (error: any) {
+      if (isMissingQuizCreationFunctionError(error)) {
+        throw new Error(
+          'Supabase schema is missing create_quiz_with_questions. Apply sql/migrations/20261106_atomic_quiz_creation.sql before creating quizzes.',
+          { cause: error }
+        );
       }
-    } catch (e) {}
-
-    return this.fallback.createQuiz(dto, userId);
+      throw error;
+    }
   }
 
   async updateQuiz(id: string, dto: UpdateQuizDto, userId?: string): Promise<Quiz> {
